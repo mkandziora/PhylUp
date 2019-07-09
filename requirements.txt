@@ -1,0 +1,28 @@
+DateTime
+DendroPy
+anyjson
+argcomplete
+argparse
+biopython
+configparser
+coverage>=4.4
+locket
+-e git+https://github.com/OpenTreeOfLife/peyotl@api_v3#egg=peyotl
+python-dateutil
+pytz
+redis
+requests
+sh
+six
+
+zope.interface
+numpy
+ete3
+pandas
+pytest
+m2r; python_version > '2.7.13'
+recommonmark
+#past
+future
+pytest-xdist
+pytest-cov
