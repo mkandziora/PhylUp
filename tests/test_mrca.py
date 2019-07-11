@@ -1,13 +1,10 @@
 # package import
-import os
-import pickle
-import shutil
-
 from pandas_filter import pandas_numpy_try1, config
 
 
+
 def test_mrca():
-    workdir = "test_runs"
+    workdir = "tests/test_runs"
     trfn = "data/tiny_test_example/test.tre"
     schema_trf = "newick"
     id_to_spn = "data/tiny_test_example/test_nicespl.csv"
@@ -32,11 +29,11 @@ def test_mrca_list():
     configfi = "data/localblast.config"
 
     conf = config.ConfigObj(configfi, workdir, interactive=False)
-
-    ingroup_mrca = [723076, 710505, 187044, 4727685, 4728090, 711399]
+    ingroup_mrca = [18794, 422320, 422327, 422329, 422331]
+    # ingroup_mrca = [senecio, culcitium, hasteola, iocenes, lasiocephalus]
     test = pandas_numpy_try1.Update_data(id_to_spn, seqaln, mattype, trfn, schema_trf, conf, mrca=ingroup_mrca)
 
-    test.mrca == 18794
+    test.mrca == 795077  # Senecionineae
 
 def test_no_mrca():
     workdir = "test_runs"
@@ -52,7 +49,7 @@ def test_no_mrca():
     test = pandas_numpy_try1.Update_data(id_to_spn, seqaln, mattype, trfn, schema_trf, conf, mrca=None)
     print(test.mrca)
 
-    test.mrca == 18794
+    assert test.mrca == 18794
 
 def test_mrca_outgroup():
     workdir = "test_runs"
@@ -65,12 +62,12 @@ def test_mrca_outgroup():
 
     conf = config.ConfigObj(configfi, workdir, interactive=False)
 
-    ingroup_mrca = [723076, 710505, 187044, 4727685, 4728090, 711399, 405757]
-
+    ingroup_mrca = [18794, 422320, 422327, 422329, 422331, 84584]
+    # ingroup_mrca = [senecio, culcitium, hasteola, iocenes, lasiocephalus, ABROTANELLA]
     test = pandas_numpy_try1.Update_data(id_to_spn, seqaln, mattype, trfn, schema_trf, conf, mrca=ingroup_mrca)
 
-    test.mrca != 18794
-    test.mrca == 795077
+    test.mrca != 795077  # Senecioninea
+    test.mrca == 102812  # Senecioneae
 
 
 
