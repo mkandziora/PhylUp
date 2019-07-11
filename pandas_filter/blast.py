@@ -14,7 +14,7 @@ def get_acc_from_blast(query_string):
     Get the accession number from a blast query using local blast.
 
     """
-    # get acc is more difficult now, as new seqs not always have gi number, then query changes
+    # Note: get acc is more difficult now, as new seqs not always have gi number, then query changes
     if len(query_string.split("|")) >= 3:
         gb_acc = query_string.split("|")[3]
     else:
@@ -23,13 +23,16 @@ def get_acc_from_blast(query_string):
     return gb_acc
 
 
+# todo unused
 def get_gi_from_blast(query_string):
     """
     Get the gi number from a blast query using local blast. If not available return None.
 
-    """
-    # get acc is more difficult now, as new seqs not always have gi number, then query changes
+    Note: get acc is more difficult now, as new seqs not always have gi number, then query changes
 
+    :param query_string:
+    :return:
+    """
     if len(query_string.split("|")) >= 3:
         gb_id = query_string.split("|")[1]
     assert len(gb_id.split(".")) < 2, (len(gb_id.split(".")), gb_id)
@@ -40,7 +43,7 @@ def get_taxid_from_acc(gb_acc, blastdb, workdir):
     """
     Use the blastdb to get the taxon id from a queried gb acc.
 
-    Sometimes there are more than a singel id, as database has merged redundant seqs.
+    Sometimes there are more than a single id, as database has merged redundant seqs.
 
     :param gb_acc: Genbank accession number
     :param workdir: working directory
@@ -55,7 +58,7 @@ def get_taxid_from_acc(gb_acc, blastdb, workdir):
     fn_open.close()
 
     cmd1 = "blastdbcmd -db {}/nt_v5 -entry_batch {} -outfmt %T -out {}/tmp/tax_id_{}.csv".format(blastdb, fn, workdir,
-                                                                                                gb_acc)
+                                                                                                 gb_acc)
     os.system(cmd1)
     f = open("{}/tmp/tax_id_{}.csv".format(workdir, gb_acc))
     tax_id_l = []
@@ -69,8 +72,7 @@ def get_taxid_from_acc(gb_acc, blastdb, workdir):
 def write_local_blast_files(workdir, seq_id, seq, db=False, fn=None):
     """
     Writes the files needed to run a local blast search.
-    Output will be read by  run_blast_query()/former alsorun_filter_blast().
-    Former write_filterblast_files()
+    Output will be read by run_blast_query()
 
     :param workdir: working directory
     :param seq_id: unique sequence identifier: Genbank accession, localID
@@ -80,8 +82,6 @@ def write_local_blast_files(workdir, seq_id, seq, db=False, fn=None):
     :return: files with sequences written to it in fasta format
     """
     print("writing blast files")
-    # print(seq, seq_id)
-    # print(some)
     if not os.path.exists("{}/".format(workdir)):
         os.makedirs("{}/tmp/".format(workdir))
     if db:
@@ -90,14 +90,13 @@ def write_local_blast_files(workdir, seq_id, seq, db=False, fn=None):
     else:
         # fnw = "{}/tmp/{}_tobeblasted".format(workdir, fn)
         fnw = "{}/tmp/query_seq.fas".format(workdir, fn)
-
         fi_o = open(fnw, "w")
     fi_o.write(">{}\n".format(seq_id))
     fi_o.write("{}\n".format(str(seq).replace("-", "")))
     fi_o.close()
 
 
-def make_local_blastdb(workdir, db, output_db_path=None, seq_dict=None):
+def make_local_blastdb(workdir, db, output_db_path=None):
     """
     Adds sequences into a  new blast database, which then can be used to blast aln seq against it
     and adds sequences that were found to be similar to input.
@@ -107,7 +106,6 @@ def make_local_blastdb(workdir, db, output_db_path=None, seq_dict=None):
     :param workdir:  where to write the files
     :param db: string that defines, if local, genbank or filter
     :param output_db_path: path where db is stored
-    :param seq_dict:
     :return: writes local blast databases for the local sequences
     """
     print("make_local_blastdb")
@@ -131,6 +129,7 @@ def make_local_blastdb(workdir, db, output_db_path=None, seq_dict=None):
             seq_l = content[1::2]
             # in current setup 1 seq per file, but this is written in a way,
             # that a file with multiple seqs can be read in as well
+            os.remove('{}/tmp/filter_seq_db'.format(workdir))
             for i in range(0, len(gb_id_l)):
                 key = gb_id_l[i].replace(">", "")
                 count = count + 1
@@ -160,19 +159,29 @@ def get_full_seq(gb_acc, blast_seq, workdir, blastdb, db):
     :return: full sequence, the whole submitted sequence, not only the part that matched the blast query sequence
     """
     # print("get full seq")
-    # if we did not already try to get full seq:
-    #seq = ""
     if db is not "Genbank":  # no need to make a db first (it already exists), we just open it and get full seq
+        print('get full seq for non genbank')
         # read in file to get full seq
-        found = False
-        with open(blastdb) as f:
-            for i, line in enumerate(f):
-                if found:
-                    seq = line.rstrip().lstrip()
-                    seq = seq.upper()
-                    break
-                elif gb_acc in line:
-                    found = True
+        seq_set = False
+        # todo: commented code replaced by get_seq_from_file. Make sure it really works
+        # found = False
+        # with open(blastdb) as f:
+        #     for i, line in enumerate(f):
+        #         print(line)
+        #
+        #         if found:
+        #             seq = line.rstrip().lstrip()
+        #             seq = seq.upper()
+        #             seq_set = True
+        #             break
+        #         elif gb_acc in line:
+        #             found = True
+        seq, seq_set = get_seq_from_file(gb_acc, blastdb, seq_set)
+        print(seq_set)
+        if seq_set is False:
+            print('not yet found')
+            seq, seq_set = get_seq_from_file(gb_acc, '{}/tmp/query_seq.fas'.format(workdir), seq_set)
+        assert seq_set is True
     else:
         if not os.path.exists("{}/tmp".format(workdir)):
             os.mkdir("{}/tmp".format(workdir))
@@ -186,34 +195,55 @@ def get_full_seq(gb_acc, blast_seq, workdir, blastdb, db):
             cmd1 = "blastdbcmd -db {}/nt_v5  -entry_batch {} " \
                    "-outfmt %f -out {}/tmp/full_seq_{}.fasta".format(db_path, fn, workdir, gb_acc)
             os.system(cmd1)
-        else:
-            print('get full seq blast query done earlier')
+        # else:
+        #     print('get full seq blast query done earlier')
 
-    # read in file to get full seq
-    fn_seq = "{}/tmp/full_seq_{}.fasta".format(workdir, gb_acc)
-    f = open(fn_seq)
-    seq = ""
-    for line in iter(f):
-        line = line.rstrip().lstrip()
-        if line[0] != ">":
-            seq += line
-        elif line[0] == ">":
-            assert gb_acc in line, (gb_acc, line)
-    f.close()
-
+        # read in file to get full seq
+        fn_seq = "{}/tmp/full_seq_{}.fasta".format(workdir, gb_acc)
+        f = open(fn_seq)
+        seq = ""
+        for line in iter(f):
+            line = line.rstrip().lstrip()
+            if line[0] != ">":
+                seq += line
+            elif line[0] == ">":
+                assert gb_acc in line, (gb_acc, line)
+        f.close()
     full_seq = check_directionality(blast_seq, seq)
     return full_seq
 
 
+def get_seq_from_file(gb_acc, fn, seq_set):
+    """
+    Read full seq out of file.
+
+    :param gb_acc: gb acc associated with id
+    :param fn: file name where seq is in
+    :param seq_set: T/F - seq found?
+    :return: seq and seq_set
+    """
+    found = False
+    seq = None
+    with open(fn) as f:
+        for i, line in enumerate(f):
+            if found:
+                seq = line.rstrip().lstrip()
+                seq = seq.upper()
+                seq_set = True
+                break
+            elif gb_acc in line:
+                found = True
+    return seq, seq_set
+
+
 def check_directionality(blast_seq, seq):
-    '''
-    check direction of sequence as seq is sometimes not stored in Genbank with the correct directionality.
+    """
+    Check direction of sequence as seq is sometimes not stored in Genbank with the correct directionality.
 
     :param blast_seq: seq that was found by blast
     :param seq: Genbank full seq as saved
     :return: full seq in correct directionality
-    '''
-    # check direction of sequence:
+    """
     orig = Seq(seq, generic_dna)
     dna_comp = orig.complement()
     dna_rcomp = orig.reverse_complement()
@@ -237,8 +267,14 @@ def get_new_seqs(query_seq, taxon, db_path, db_name, config):
     """
     Produces the pandas df with the new sequences. Main function of this class.
 
+
+    :param query_seq:
+    :param taxon:
+    :param db_path:
+    :param db_name:
+    :param config:
+    :return:
     """
-    # print(db_path)
     run_blast_query(query_seq, taxon, db_path, db_name, config)
     new_blastseqs = read_blast_query(taxon, config, db_name)
     assert new_blastseqs["ncbi_txn"].isnull() is not None, (new_blastseqs["ncbi_txn"])
@@ -246,15 +282,22 @@ def get_new_seqs(query_seq, taxon, db_path, db_name, config):
 
 
 def run_blast_query(query_seq, taxon, db_path, db_name, config):
-    """Contains the cmds used to run a local blast query.
+    """
+    Contains the cmds used to run a local blast query.
 
+    :param query_seq:
+    :param taxon:
+    :param db_path:
+    :param db_name:
+    :param config:
     :return: runs local blast query and writes it to file
     """
-    #print("run_blast_query")
+    # print("run_blast_query")
+    assert taxon not in [None, 'nan', 'NA', 'na']
+
     taxon = str(taxon)
     if len(taxon.split('.')) > 1:
         taxon = taxon.split('.')[0]
-
     db_path = os.path.abspath(db_path)
     if db_name == "local":  # Run a local blast search if the data is unpublished or for filtering.
         query_output_fn = "{}/blast/local_query_result.xml".format(config.workdir)
@@ -267,7 +310,6 @@ def run_blast_query(query_seq, taxon, db_path, db_name, config):
         input_fn = "{}/blast/{}_tobeblasted.fas".format(config.workdir, taxon)
     query_output_fn = os.path.abspath(query_output_fn)
     input_fn = os.path.abspath(input_fn)
-
     toblast = open(input_fn, "w")
     toblast.write(">{}\n".format(taxon))
     toblast.write("{}\n".format(query_seq))
@@ -275,7 +317,6 @@ def run_blast_query(query_seq, taxon, db_path, db_name, config):
 
     outfmt = " -outfmt '6 sseqid staxids sscinames pident evalue bitscore sseq salltitles sallseqid'"
 
-    # print(db_name)
     if db_name == "Genbank":
         with cd(db_path):
             # this format (6) allows to get the taxonomic information at the same time
@@ -300,16 +341,20 @@ def run_blast_query(query_seq, taxon, db_path, db_name, config):
             blastcmd = "blastn -query query_seq.fas -db filter_seq_db -out ".format(db_path) + query_output_fn + \
                        " {} -num_threads {}".format(outfmt, config.num_threads) + \
                        " -max_target_seqs {} -max_hsps {}".format(config.hitlist_size, config.hitlist_size)
-            if not os.path.isfile(query_output_fn):
-                print(blastcmd)
-                os.system(blastcmd)
-                # produces blastn taxdb warning, taxids here not needed and not part of taxdb anyways as local search.
-                # I keep it to make it coherent for reading in results.
+            # if not os.path.isfile(query_output_fn):
+            #     print(blastcmd)
+            os.system(blastcmd)
+            # produces blastn taxdb warning, taxids here not needed and not part of taxdb anyways as local search.
+            # I keep it to make it coherent for reading in results.
 
 
 def read_blast_query(taxon, config, db_name):
-    """ Implementation to read in results of local blast searches.
+    """
+    Implementation to read in results of local blast searches.
 
+    :param taxon:
+    :param config:
+    :param db_name:
     :return: updated self.new_seqs and self.data.gb_dict dictionaries
     """
     print("read_blast_query")
@@ -326,16 +371,14 @@ def read_blast_query(taxon, config, db_name):
     else:
         query_output_fn = "{}/blast/{}.txt".format(config.workdir, taxon)
     query_output_fn = os.path.abspath(query_output_fn)
-
     new_blast_seq_dict = pd.DataFrame(columns=['ncbi_txn', 'ncbi_txid', 'status', "date",
                                                'accession', 'pident', 'evalue', 'bitscore', 'sseq', 'title'])
     # todo: check that query_acc has not broken stuff - comment july 8th
     queried_acc = set()  # used to test if gb_acc was added before  aka query_dict in physcraper
-    # TODO: query_dict is not functional anymore! - has no effect
     with open(query_output_fn, mode="r") as infile:
         for lin in infile:
             bitscore, evalue, gb_acc, pident, sallseqid, salltitles, \
-            sscinames, sseq, staxids, stitle = get_blastval_from_line(db_name, lin, ncbi_parser, taxon)
+                sscinames, sseq, staxids, stitle = get_blastval_from_line(db_name, lin, ncbi_parser, taxon)
             # NOTE: sometimes there are seq which are identical & are combined in the local blast db...
             # Get all of them! (they can be of a different taxon id = get redundant seq info)
             found_taxids = set()
@@ -462,13 +505,22 @@ def read_blast_query(taxon, config, db_name):
                              'pident': pident, 'evalue': evalue,
                              'bitscore': bitscore, 'sseq': sseq, 'title': stitle}, ignore_index=True)
     # add data which was not added before and that passes the evalue thresh
-    new_blast_seq_dict = wrapper_get_fullseq(config, new_blast_seq_dict)
+    new_blast_seq_dict = wrapper_get_fullseq(config, new_blast_seq_dict, db_name)
     print('new_blast_dict')
     print(len(new_blast_seq_dict))
+    print(new_blast_seq_dict[['ncbi_txn', 'ncbi_txid', 'status', 'accession']])
     return new_blast_seq_dict
 
 
 def split_multiple_tolist(sallseqid, salltitles, sscinames, staxids):
+    """
+
+    :param sallseqid:
+    :param salltitles:
+    :param sscinames:
+    :param staxids:
+    :return:
+    """
     staxids_l = staxids.split(";")
     sscinames_l = sscinames.split(";")
     sallseqid_l = sallseqid.split(";")
@@ -477,11 +529,18 @@ def split_multiple_tolist(sallseqid, salltitles, sscinames, staxids):
 
 
 def get_blastval_from_line(db_name, lin, ncbi_parser, taxon):
+    """
+
+    :param db_name:
+    :param lin:
+    :param ncbi_parser:
+    :param taxon:
+    :return:
+    """
     sseqid, staxids, sscinames, pident, evalue, bitscore, sseq, salltitles, sallseqid = lin.strip().split('\t')
     # get acc is more difficult now, as new seqs not always have gi number, then query changes
     if db_name == 'filterrun':
         staxids = str(taxon)
-
         sscinames = ncbi_parser.get_name_from_id(staxids)
         stitle = None
         salltitles = None
@@ -498,14 +557,26 @@ def get_blastval_from_line(db_name, lin, ncbi_parser, taxon):
     return bitscore, evalue, gb_acc, pident, sallseqid, salltitles, sscinames, sseq, staxids, stitle
 
 
-def wrapper_get_fullseq(config, new_blast_seq_dict):
+def wrapper_get_fullseq(config, new_blast_seq_dict, db):
+    """
+
+    :param config:
+    :param new_blast_seq_dict:
+    :param db:
+    :return:
+    """
+    print(db)
+    if db == 'Genbank':
+        blastdb = config.blastdb
+    else:
+        blastdb = '{}/tmp/filter_seq_db'.format(config.workdir)
     for idx in new_blast_seq_dict.index:
         gb_acc = new_blast_seq_dict.loc[idx, "accession"]
         if len(gb_acc.split(".")) >= 2:  # Do not add sequences that are not in Genbank accession format, e.g. PDB
             # replace sequence
             # print(new_blast_seq_dict.loc[idx, "sseq"])
-            full_seq = get_full_seq(gb_acc, new_blast_seq_dict.loc[idx, "sseq"], config.workdir, config.blastdb,
-                                    "Genbank")
+            full_seq = get_full_seq(gb_acc, new_blast_seq_dict.loc[idx, "sseq"], config.workdir, blastdb,
+                                    db)
             new_blast_seq_dict.loc[idx, "sseq"] = full_seq
     return new_blast_seq_dict
 

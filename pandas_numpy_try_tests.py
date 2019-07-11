@@ -16,8 +16,11 @@ print("data/tiny_test_example/test_nicespl.csv")
 
 
 
+blacklist = ['JX895419.1']
+
+
 conf = config.ConfigObj(configfi, workdir, interactive=False)
-test = pandas_numpy_try1.Update_data(id_to_spn, seqaln, mattype, trfn, schema_trf, conf, mrca=18794)
+test = pandas_numpy_try1.Update_data(id_to_spn, seqaln, mattype, trfn, schema_trf, conf, mrca=18794, blacklist=blacklist)
 print()
 
 # test.build_table(fn)

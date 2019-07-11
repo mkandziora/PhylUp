@@ -6,19 +6,9 @@ parts are altered from https://github.com/zyxue/ncbitax2lin/blob/master/ncbitax2
 import os
 import sys
 import pandas as pd
+from . import debug
 
-
-_DEBUG_MK = 0
-
-
-def debug(msg):
-    """short debugging command
-    """
-    if _DEBUG_MK == 1:
-        print(msg)
-
-
-debug("Current ncbi_parser version number: 11272018.0")
+debug("Current ncbi_parser version number: 07102019.0")
 
 nodes = None
 names = None
@@ -149,32 +139,19 @@ class Parser:
         :return:
         """
         print('get mrca from taxid_set')
-        print(taxid_set)
         if nodes is None:
             self.initialize()
         id_dict = dict()
         for item in taxid_set:
             id_list = list()
-            print(nodes[nodes["tax_id"] == item])
             parent_id = int(nodes[nodes["tax_id"] == item]["parent_tax_id"].values[0])
-            # print(' to while...')
             while parent_id != 131567:
-            #life = False
-            #while life == False:
-                #print(parent_id)
-                #print(type(parent_id))
                 id_list.append(parent_id)
                 parent_id = int(nodes[nodes["tax_id"] == parent_id]["parent_tax_id"].values[0])
-                # if parent_id
             id_dict[item] = id_list
-        # print('gotten all ids')
         count = 0
-        # print(id_dict)
         for taxid in next(iter(id_dict.values())):  # take random entry as comparison
-            # print(taxid)
-            #print(some)
             for id2 in id_dict:
-                # print(id2)
                 idl = id_dict[id2]
                 if taxid in idl:
                     count += 1
@@ -209,7 +186,7 @@ class Parser:
     def get_downtorank_id(self, tax_id, downtorank="species"):
         """ Recursive function to find the parent id of a taxon as defined by downtorank.
         """
-        debug("get downtorank")
+        # debug("get downtorank")
         if nodes is None:
             self.initialize()
         if type(tax_id) != int:
@@ -219,8 +196,6 @@ class Parser:
             #     )
             # )
             tax_id = int(tax_id)
-        # debug(downtorank)
-        print(nodes[nodes["tax_id"] == tax_id])
         # following statement is to get id of taxa if taxa is higher ranked than specified
         try:
             rank = nodes[nodes["tax_id"] == tax_id]["rank"].values[0]
@@ -236,7 +211,6 @@ class Parser:
                 ):
                     return tax_id
         if nodes[nodes["tax_id"] == tax_id]["rank"].values[0] == downtorank:
-            # debug("found right rank")
             return tax_id
         elif nodes[nodes["tax_id"] == tax_id]["rank"].values[0] == "superkingdom":
             tax_id = 0
@@ -282,31 +256,12 @@ class Parser:
             # )
             tax_id = int(tax_id)
         debug([tax_id, mrca_id])
-        # debug(nodes[nodes["tax_id"] == tax_id]["rank"].values[0])
         rank_mrca_id = nodes[nodes["tax_id"] == mrca_id]["rank"].values[0]
         rank_tax_id = nodes[nodes["tax_id"] == tax_id]["rank"].values[0]
         debug([rank_mrca_id, rank_tax_id])
         if tax_id == mrca_id:
             debug("found right rank")
             return tax_id
-        # elif does not work, as synonyms have same tax id     
-        # elif rank_tax_id == rank_mrca_id and mrca_id != tax_id:
-        #     # try to figure out if synonym would fit mrca_id
-        #     if original_tax_id:
-        #         debug('original_tax_id:')
-        #         debug(original_tax_id)
-        #         debug(names[names["tax_id"] == original_tax_id])
-        #         debug((synonyms[synonyms["tax_id"] == original_tax_id]))
-        #         try:
-        #             tax_id = synonyms[synonyms["tax_id"] == original_tax_id]["tax_id"].values[0]
-        #             return self.match_id_to_mrca(tax_id, mrca_id)
-        #         except IndexError:
-        #             tax_id = 0
-        #             return tax_id
-
-        # debug(some)
-        # elif rank_mrca_id == rank_tax_id:
-        #     return tax_id
         elif rank_tax_id == "superkingdom":
             debug("superkingdom")
             tax_id = 0
@@ -330,7 +285,6 @@ class Parser:
             #     )
             # )
             tax_id = int(tax_id)
-
         try:
             # print(names[names["tax_id"] == tax_id])
             if tax_id == 0:
