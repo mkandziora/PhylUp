@@ -117,11 +117,11 @@ class Update_data:
         return otu_dict
 
     def add_seq_to_table(self):
-        '''
+        """
         Puts input sequences into the pandas table.
 
         :return:
-        '''
+        """
         aln = self.read_in_aln()
         queried_taxa = []
         for index in self.table.index:
@@ -163,8 +163,6 @@ class Update_data:
     def extend(self, new_seqs=None, date=None):
         """
         """
-        # todo: write using status, currently everything is blasted again
-
         # create list of indice of subset list
         sys.stdout.write("func extend")
         self.status += 1
@@ -234,6 +232,8 @@ class Update_data:
         self.table = self.table.append(subcols, ignore_index=True)
 
     def call_filter(self, new_seqs, aln, mrca):
+        msg = "Round of filters: {}\n".format(self.status)
+        write_msg_logfile(msg, self.config.workdir)
         print('call filter')
         print(len(new_seqs))
         orig_len = len(new_seqs)
@@ -360,26 +360,6 @@ class FilterNumberOtu(Filter):
         self.ncbi_parser = ncbi_data_parser.Parser(names_file=config.ncbi_parser_names_fn,
                                                    nodes_file=config.ncbi_parser_nodes_fn)
 
-    # def build_table_from_dict(self, new_blast_seq_dict):
-    #     print("build table dict")
-    #
-    #     otu_dict = pd.DataFrame(columns=['ncbi_txn', 'ncbi_txid', 'org_sp_name', 'tip_name', 'status', "date", 'index'])
-    #
-    #     print(new_blast_seq_dict.columns)
-    #     subcols = new_blast_seq_dict[['ncbi_txn', 'ncbi_txid', 'status', "date"]]
-    #     subcols['org_sp_name'] = None
-    #     subcols['tip_name'] = None
-    #     subcols['index'] = None
-    #     print(subcols)
-    #     for idx in subcols.index:
-    #         print(new_blast_seq_dict.loc[idx, 'accession'])
-    #         subcols.loc[idx, 'tip_name'] = new_blast_seq_dict.loc[idx, 'accession']
-    #
-    #         print(subcols.loc[idx, 'tip_name'])
-    #         print(some)
-    #         otu_dict = otu_dict.append(subcols.iloc[idx], ignore_index=True)
-    #     return otu_dict
-
     def filter(self, new_seqs, downtorank=None):
         print("filter FilterNumberOtu")
         if downtorank is None:
@@ -422,7 +402,8 @@ class FilterNumberOtu(Filter):
                             print('should not happen')
                             sys.exit(2)
 
-                else:  # add all
+                elif len(ns_otu_dict) + len(table_otu_dict) <= self.config.threshold:  # filter
+                    # add all
                     print('add all')
                     filtered = ns_otu_dict
                 self.upd_new_seqs = pd.concat([self.upd_new_seqs, filtered], axis=0, ignore_index=True, sort=True)
@@ -595,10 +576,9 @@ class FilterBLASTThreshold(Filter):
         deltab['status'] = 'deleted - evalue'
         self.del_table = deltab
         self.upd_new_seqs = new_seqs_unique_nd
-        lfd = "{}/logfile".format(self.config.workdir)
-        with open(lfd, "a") as log:
-            log.write("Filter FilterBLASTThreshold has lowered the new seqs df from {} to {}.\n".format(len(new_seqs),
-                                                                                                   len(new_seqs_unique_nd)))
+
+        msg = "Filter FilterBLASTThreshold has lowered the new seqs df from {} to {}.\n".format(len(new_seqs), len(upd_new_seqs))
+        write_msg_logfile(msg, self.config.workdir)
 
 
 class FilterUniqueAcc(Filter):
