@@ -54,3 +54,13 @@ def get_user_input():
             print("'%s' is not a valid answer." % e.args[0].split(": ")[1])
     return x
 
+def write_msg_logfile(msg, workdir, fn="logfile"):
+    """
+    Write string to logfile.
+
+    :param msg: string
+    :return:
+    """
+    lfd = "{}/{}".format(workdir, fn)
+    with open(lfd, "a") as log:
+        log.write(msg)

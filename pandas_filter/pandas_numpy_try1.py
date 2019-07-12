@@ -12,6 +12,7 @@ from dendropy import DnaCharacterMatrix, Tree
 from . import blast
 from . import ncbi_data_parser
 from . import aln_updater
+from . import write_msg_logfile
 
 
 def clean_inputlabel(tipname):
@@ -216,14 +217,14 @@ class Update_data:
                 new_seqs_local = new_seqs_local.append(new_seq_tax, ignore_index=True)
 
         assert len(new_seqs_local) > 0, new_seqs_local
-        new_seqs_local = pd.concat([new_seqs_local, new_seqs], sort=True)
+        new_seqs_local = pd.concat([new_seqs_local, new_seqs], sort=True, ignore_index=True)
         if self.blacklist is not None:
             new_seqs_local = self.remove_blacklist_items(new_seqs_local)
         return new_seqs_local
 
     def remove_blacklist_items(self, new_seqs_local):
-        remove_TF = np.where((new_seqs_local.accession.isin(self.blacklist)), True, False)
-        new_seqs_local = new_seqs_local[remove_TF != True]
+        drop_boolean = np.where((new_seqs_local.accession.isin(self.blacklist)), True, False)
+        new_seqs_local = new_seqs_local[drop_boolean != True]
         return new_seqs_local
 
     def add_new_seqs(self, new_seqs, status=0):
@@ -427,8 +428,8 @@ class FilterNumberOtu(Filter):
                 self.upd_new_seqs = pd.concat([self.upd_new_seqs, filtered], axis=0, ignore_index=True, sort=True)
             else:
                 print('sample large enough')
-        #subset = self.upd_new_seqs
-        not_selected = list(set(new_seqs.index) - set(filtered.index))
+        subset = self.upd_new_seqs
+        not_selected = list(set(new_seqs.index) - set(subset.index))
         print(not_selected)
         # del_tab = new_seqs.ix[not_selected]  # is deprecated
         del_tab = new_seqs[new_seqs.index.isin(not_selected)]
@@ -436,13 +437,18 @@ class FilterNumberOtu(Filter):
         self.del_table = del_tab
 
         # todo add assert
-
-        lfd = "{}/logfile".format(self.config.workdir)
-        with open(lfd, "a") as log:
-            log.write("Filter FilterBLASTThreshold has lowered the new seqs df from {} to {}.\n".format(len(new_seqs),
-                                                                                                        len(to_add)))
+        msg = "Filter FilterBLASTThreshold has lowered the new seqs df from {} to {}.\n".format(len(new_seqs),
+                                                                                                        len(filtered))
+        write_msg_logfile(msg, self.config.workdir)
 
     def set_downtorank(self, new_seqs, downtorank):
+        """
+        Method is used to get the corresponding rank if higher than lowest otu by ncbi.
+        
+        :param new_seqs:
+        :param downtorank:
+        :return:
+        """
         print("set_downtorank")
         new_seqs['downtorank'] = 0
         if self.ncbi_parser is None:
@@ -504,7 +510,7 @@ class FilterNumberOtu(Filter):
             seq_bitscore = filter_blast_seqs.loc[idx, 'bitscore']
             if (seq_bitscore >= mean_sd['mean'] - mean_sd['sd']) & \
                     (seq_bitscore <= mean_sd['mean'] + mean_sd['sd']):
-                subfilter_blast_seqs = subfilter_blast_seqs.append(filter_blast_seqs.loc[idx])
+                subfilter_blast_seqs = subfilter_blast_seqs.append(filter_blast_seqs.loc[idx], ignore_index=True)
             else:
                 print('filter thresh too large')
         amnt_missing_seq = self.config.threshold - len(table_otu_dict)
@@ -540,10 +546,9 @@ class FilterSeqIdent(Filter):
                 self.del_table = self.del_table.append(to_del, ignore_index=True)
         self.del_table['status'] = 'deleted - same seq'
         self.upd_new_seqs = self.upd_new_seqs.append(to_add, ignore_index=True)
-        lfd = "{}/logfile".format(self.config.workdir)
-        with open(lfd, "a") as log:
-            log.write("Filter FilterBLASTThreshold has lowered the new seqs df from {} to {}.\n".format(len(new_seqs),
-                                                                                                        len(to_add)))
+        msg = "Filter FilterSeqIdent has lowered the new seqs df from {} to {}.\n".format(len(new_seqs), len(to_add))
+        write_msg_logfile(msg, self.config.workdir)
+
 
 class FilterMRCA(Filter):
     def __init__(self, config, mrca):
@@ -573,12 +578,8 @@ class FilterMRCA(Filter):
                 to_del['status'] = 'deleted - mrca'
                 self.del_table = pd.concat([self.del_table, to_del], axis=0, ignore_index=True, sort=True)
         # todo add assert that rows of upd_new_seq not in del_table
-
-        lfd = "{}/logfile".format(self.config.workdir)
-        with open(lfd, "a") as log:
-            log.write("Filter FilterBLASTThreshold has lowered the new seqs df from {} to {}.\n".format(len(new_seqs),
-                                                                                                        len(to_add)))
-
+        msg = "Filter FilterBLASTThreshold has lowered the new seqs df from {} to {}.\n".format(len(new_seqs), len(to_add))
+        write_msg_logfile(msg, self.config.workdir)
 
 class FilterBLASTThreshold(Filter):
     def __init__(self, config):
@@ -588,7 +589,7 @@ class FilterBLASTThreshold(Filter):
         print("FilterBLASTThreshold")
         TF_eval = new_seqs['evalue'] < float(self.config.e_value_thresh)
         upd_new_seqs = new_seqs[TF_eval == True]
-        df = pd.concat([upd_new_seqs, self.upd_new_seqs], sort=True)
+        df = pd.concat([upd_new_seqs, self.upd_new_seqs], sort=True, ignore_index=True)
         new_seqs_unique_nd = df.drop_duplicates(subset=['accession'], keep='first')
         deltab = new_seqs[TF_eval != True]
         deltab['status'] = 'deleted - evalue'
@@ -609,7 +610,7 @@ class FilterUniqueAcc(Filter):
         new_seqs_drop = new_seqs.drop_duplicates(subset=['accession'])
         new_seqs_unique = self.upd_new_seqs.drop_duplicates(subset=['accession'], keep='first')
         if len(new_seqs_drop) > 0 and len(new_seqs_unique) > 0:
-            df = pd.concat([new_seqs_drop, new_seqs_unique], sort=True)
+            df = pd.concat([new_seqs_drop, new_seqs_unique], sort=True, ignore_index=True)
             new_seqs_unique_nd = df.drop_duplicates(subset=['accession'], keep='first')  # inplace=True replaces df
             # Select all duplicate rows based on one column
             del_seq = df[df.duplicated(['accession'])]
@@ -617,15 +618,13 @@ class FilterUniqueAcc(Filter):
         else:
             new_seqs_unique_fn = new_seqs_drop
             dropped = new_seqs.duplicated(subset=['accession'])
-            del_seq = pd.concat([self.del_table, new_seqs[dropped == True]], sort=True)
+            del_seq = pd.concat([self.del_table, new_seqs[dropped == True]], sort=True, ignore_index=True)
         self.upd_new_seqs = new_seqs_unique_fn
         self.del_table = del_seq
         assert len(del_seq) + len(new_seqs_unique_fn) == len(new_seqs), \
             (len(del_seq), len(new_seqs_unique_fn), len(new_seqs))
-        lfd = "{}/logfile".format(self.config.workdir)
-        with open(lfd, "a") as log:
-            log.write("Filter FilterUniqueAcc has lowered the new seqs df from {} to {}.\n".format(len(new_seqs),
-                                                                                                len(new_seqs_unique_fn)))
+        msg = "Filter FilterUniqueAcc has lowered the new seqs df from {} to {}.\n".format(len(new_seqs), len(new_seqs_unique_fn))
+        write_msg_logfile(msg, self.config.workdir)
 
 
 class FilterLength(Filter):
@@ -656,9 +655,8 @@ class FilterLength(Filter):
                 del_seq.loc[idx, 'status'] = 'deleted - seq len wrong: {}'.format(len(seq))
                 print(del_seq)
         assert len(del_seq) + len(filter_new_seqs) == len(new_seqs), (len(del_seq), len(filter_new_seqs), len(new_seqs))
-        self.upd_new_seqs = pd.concat([self.upd_new_seqs, filter_new_seqs], sort=True)
-        self.del_table = pd.concat([self.del_table, del_seq], sort=True)
+        self.upd_new_seqs = pd.concat([self.upd_new_seqs, filter_new_seqs], sort=True, ignore_index=True)
+        self.del_table = pd.concat([self.del_table, del_seq], sort=True, ignore_index=True)
         print(self.del_table)
-        lfd = "{}/logfile".format(self.config.workdir)
-        with open(lfd, "a") as log:
-            log.write("Filter FilterLength has lowered the new seqs df from {} to {}.\n".format(len(new_seqs), len(filter_new_seqs)))
+        msg = "Filter FilterLength has lowered the new seqs df from {} to {}.\n".format(len(new_seqs), len(filter_new_seqs))
+        write_msg_logfile(msg, self.config.workdir)
