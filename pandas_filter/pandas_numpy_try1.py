@@ -38,7 +38,7 @@ def clean_inputlabel(tipname):
 class Update_data:
     def __init__(self, id_to_spn, aln, aln_schema, tre, tre_schema, config, mrca=None, blacklist=None):
         self.otu_counter = 1
-        self.date = datetime.date.today()
+        self.date = pd.Timestamp.today()
         self.config = config
         self.workdir = self.config.workdir
         self.status = 0
@@ -169,8 +169,8 @@ class Update_data:
         sys.stdout.write("func extend")
         self.status += 1
         present_subset_df = self.table['status'] != "excluded"
-        today = datetime.date.today()
-        min_date_blast = today - datetime.timedelta(days=90)
+        today = pd.Timestamp.today()
+        min_date_blast = today - pd.Timedelta(days=90)
         present_subset_df = self.table[present_subset_df == True]
         present_subset_df = present_subset_df[(present_subset_df.date <= min_date_blast)]
 
