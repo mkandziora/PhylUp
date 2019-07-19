@@ -179,7 +179,12 @@ class Update_data:
             tip_name = self.table.loc[index, 'tip_name']
             self.aln = self.read_in_aln()
             query_seq = self.table.loc[index, 'sseq']
-            self.table.loc[index, 'date'] = today  # TODO: is here the blast date the issue???
+            bef = self.table.loc(index, 'date')
+
+            self.table.set_value(index, 'date', today)
+            aft = self.table.loc(index, 'date')
+            assert bef != aft, (bef, aft)
+            #self.table.loc[index, 'date'] = today  # TODO: is here the blast date the issue???
             new_seq_tax = blast.get_new_seqs(query_seq, tip_name, self.config.blastdb, "Genbank", self.config)
             queried_taxa.append(tip_name)
             assert tip_name in queried_taxa, (tip_name, queried_taxa)
@@ -191,16 +196,23 @@ class Update_data:
             print(new_seqs)
             print('add new seqs to subset new seqs blast table')
             # add to present_subset the sequences which have been added from former new_seqs searches
+            #new_seqs_subset = new_seqs[new_seqs.status >= self.status -1]
             new_seqs_subset = new_seqs[(new_seqs.date <= min_date_blast)]
             print(new_seqs_subset.date)
 
             print(len(new_seqs_subset))
+            if self.status > 0:
+                msg = "{} new sequences will be blasted.\n".format(len(new_seqs_subset))
+                write_msg_logfile(msg, self.config.workdir)
+                msg = new_seqs_subset[['accession', 'status', 'date']].to_string()
+                write_msg_logfile(msg, self.config.workdir)
             for index in new_seqs_subset.index:
                 tip_name = new_seqs_subset.loc[index, 'accession']
                 self.aln = self.read_in_aln()
 
                 query_seq = new_seqs_subset.loc[index, 'sseq']
-                new_seqs_subset.loc[index, 'date'] = today  # TODO: is here the blast date issue???
+                new_seqs_subset.set_value(index, 'date', today)
+                # new_seqs_subset.loc[index, 'date'] = today  # TODO: is here the blast date issue???
                 new_seq_tax = blast.get_new_seqs(query_seq, tip_name, self.config.blastdb, "Genbank", self.config)
 
                 queried_taxa.append(tip_name)
@@ -261,6 +273,8 @@ class Update_data:
         new_seqs = f.upd_new_seqs  # assign new_seqs to last upd from filter before
 
         f = FilterNumberOtu(self.config, self.table, aln)
+        msg = "Time before Filter {}: {}.\n".format(f, datetime.datetime.now())
+        write_msg_logfile(msg, self.config.workdir)
         f.filter(new_seqs, self.config.downtorank)
         new_seqs = f.upd_new_seqs
         print('new seqs after number otu')
@@ -269,6 +283,10 @@ class Update_data:
         return new_seqs, all_del
 
     def run(self):
+        msg = "Begin update: {}.\n".format(datetime.datetime.now())
+        write_msg_logfile(msg, self.config.workdir)
+
+
         all_new_seqs = pd.DataFrame(
             columns=['ncbi_txn', 'ncbi_txid', 'org_sp_name', 'tip_name', 'status', 'status_note', "date", 'index',
                      'accession', 'pident', 'evalue', 'bitscore', 'sseq', 'title'])
@@ -286,15 +304,57 @@ class Update_data:
         new_seqs = None
         while retrieved_seqs > 0:
 
+            # pathes for debugging
+            fn = 'save_table_{}.csv'.format(self.status)
+            save_path = os.path.join(self.config.workdir, fn)
+            new_seqs_path = 'save_new_seqs_{}.csv'.format(self.status)
+            all_new_seqs_path = 'save_all_new_seqs_{}.csv'.format(self.status)
 
-            retrieved_seqs = len(new_seqs)
+            if os.path.exists(save_path):  # load data from debugging
+                self.table = pd.read_csv(save_path)
+                new_seqs = pd.read_csv(os.path.join(self.config.workdir, new_seqs_path))
+                all_new_seqs = pd.read_csv(os.path.join(self.config.workdir, all_new_seqs_path))
+            else:  # continue as normal
 
-            # todo add loop to only add new gb_ids.
-            all_new_seqs = all_new_seqs.append(new_seqs, ignore_index=True)
+                msg = "Time before blast: {}.\n".format(datetime.datetime.now())
+                write_msg_logfile(msg, self.config.workdir)
+                new_seqs = self.extend(new_seqs)  # todo rename to find new seqs
+                msg = "Time after BLAST: {}.\n".format(datetime.datetime.now())
+                write_msg_logfile(msg, self.config.workdir)
+
+                new_seqs = new_seqs[~new_seqs['accession'].isin(all_new_seqs['accession'])]  # ~ is the pd not in/!
+
+                print('len new seqs before filter - round after')
+                print(self.status)
+
+                print(len(new_seqs))
+                new_seqs, all_del = self.call_filter(new_seqs, aln, self.mrca)
+
+                # todo add loop to only add new gb_ids.
+                # todo add new seqs to table, implement later filter to change status in table for that
+
+                print(len(new_seqs))
+                print('len new seqs after filter - round after')
+                print(len(new_seqs))
+
+                retrieved_seqs = len(new_seqs)
+                msg = "Newly found seqs: {}.\n".format(len(new_seqs))
+                write_msg_logfile(msg, self.config.workdir)
+
+                all_new_seqs = all_new_seqs.append(new_seqs, ignore_index=True)
+
+            # write dfs to file for debugging:
+            self.table.to_csv(save_path)
+            new_seqs.to_csv(os.path.join(self.config.workdir, new_seqs_path))
+            all_new_seqs.to_csv(os.path.join(self.config.workdir, all_new_seqs_path))
         print('last filter')
         all_new_seqs, all_del = self.call_filter(all_new_seqs, self.aln, self.mrca)
         print(len(all_new_seqs))
         self.add_new_seqs(all_new_seqs)
+        msg = "Time before update tre/aln: {}.\n".format(datetime.datetime.now())
+        write_msg_logfile(msg, self.config.workdir)
+        msg = "Newly found seqs will be added to aln and tre: {}.\n".format(len(all_new_seqs))
+        write_msg_logfile(msg, self.config.workdir)
         self.update_aln_tre(all_new_seqs[['accession', 'sseq']])
         self.table.to_csv('{}/seq_table.csv'.format(self.config.workdir))
         self.table.to_pickle('{}/seq_table.pickle'.format(self.config.workdir))
@@ -365,13 +425,17 @@ class FilterNumberOtu(Filter):
             print('filter per otu')
             ns_otu_dict = new_seqs[ns_otu_df == txid]
             table_otu_dict = self.table[table_otu_df == txid]
+            filtered = pd.DataFrame()
             if len(table_otu_dict) < self.config.threshold:  # if we still want to add - might be obsolete
                 if len(ns_otu_dict) + len(table_otu_dict) > self.config.threshold:  # filter
                     if len(table_otu_dict) == 0:  # new taxa, select random seq for blast
                         print('taxa new')
                         #print(ns_otu_dict[['accession', 'ncbi_txn', 'ncbi_txid']])
                         if self.config.filtertype == 'blast':
-                            filtered = self.wrapper_filter_blast_otu(ns_otu_dict, table_otu_dict, 'accession', txid)
+                            filtered_acc = self.wrapper_filter_blast_otu(ns_otu_dict, table_otu_dict, 'accession', txid)
+                            print(filtered_acc)
+                            filtered = new_seqs[new_seqs['accession'].isin(filtered_acc)]
+                            print(len(filtered))
                         elif self.config.filtertype == 'length':
                             print('filter otu by length')
                             sys.exit(2)
@@ -381,7 +445,12 @@ class FilterNumberOtu(Filter):
                     else:  # select seq from aln
                         print('taxa present already')
                         if self.config.filtertype == 'blast':
-                            filtered = self.wrapper_filter_blast_otu(ns_otu_dict, table_otu_dict, 'tip_name', txid)
+                            filtered_acc = self.wrapper_filter_blast_otu(ns_otu_dict, table_otu_dict, 'tip_name', txid)
+                            print(filtered_acc)
+
+                            filtered = new_seqs[new_seqs['accession'].isin(filtered_acc)]
+                            print(len(filtered))
+
                         elif self.config.filtertype == 'length':
                             print('filter otu by length')
                             sys.exit(2)
@@ -393,21 +462,51 @@ class FilterNumberOtu(Filter):
                     # add all
                     print('add all')
                     filtered = ns_otu_dict
-                self.upd_new_seqs = pd.concat([self.upd_new_seqs, filtered], axis=0, ignore_index=True, sort=True)
+                    print(len(filtered))
+
+
             else:
                 print('sample large enough')
-        subset = self.upd_new_seqs
-        not_selected = list(set(new_seqs.index) - set(subset.index))
+            self.upd_new_seqs = pd.concat([self.upd_new_seqs, filtered], axis=0, sort=True)
+            print('len upd new seqs')
+            print(len(self.upd_new_seqs))
+        print('upd new seqs full')
+        print(self.upd_new_seqs)
+        print(self.upd_new_seqs.index)
+        # print('assert')
+        # print(self.upd_new_seqs[self.upd_new_seqs.duplicated()].unique())
+        # print(self.new_seqs[self.new_seqs.duplicated()].unique())
+        # assert self.upd_new_seqs[self.upd_new_seqs.duplicated()].unique() == 0
+        # assert self.new_seqs[self.new_seqs.duplicated()].unique() == 0
+
+        not_selected = list(set(new_seqs.index) - set(self.upd_new_seqs.index))
+        print('no selected')
         print(not_selected)
+
+        selected = list(set(self.upd_new_seqs.index))
+        print(len(selected))
+        print('sets')
+        print(len(set(not_selected)))
+        print(len(set(selected)))
+
+        # selected_2 = set(new_seqs.index).intersection(set(not_selected))  # set(['dog', 'cat', 'donkey'])
+        # assert selected == selected_2
+        # not_selected_2 = set(new_seqs.index).symmetric_difference(selected)  # set(['pig'])
+        # assert not_selected == not_selected_2
+
+
+
         # del_tab = new_seqs.ix[not_selected]  # is deprecated
+        print('deltab')
+        print(new_seqs.index.isin(not_selected))
         del_tab = new_seqs[new_seqs.index.isin(not_selected)]
         del_tab['status'] = 'deleted - number otu'
         self.del_table = del_tab
 
-        # todo add assert
-        msg = "Filter FilterBLASTThreshold has lowered the new seqs df from {} to {}.\n".format(len(new_seqs),
-                                                                                                        len(filtered))
+        msg = "Filter FilterNumberOtu has lowered the new seqs df from {} to {}.\n".format(len(new_seqs), len(self.upd_new_seqs))
         write_msg_logfile(msg, self.config.workdir)
+
+        assert len(self.del_table) + len(self.upd_new_seqs) == len(new_seqs), (len(self.del_table), len(self.upd_new_seqs), len(new_seqs))
 
     def set_downtorank(self, new_seqs, downtorank):
         """
@@ -466,7 +565,8 @@ class FilterNumberOtu(Filter):
         filtered_seqs = self.remove_mean_sd_nonfit(filter_blast_seqs, exist_dict)
         # self.upd_new_seqs = pd.concat([filtered_seqs, self.upd_new_seqs], axis=0, ignore_index=True,
         #                               sort=True)
-        return filtered_seqs
+        filtered_acc = list(filtered_seqs['accession'])
+        return filtered_acc
 
 
     def remove_mean_sd_nonfit(self, filter_blast_seqs, table_otu_dict):
@@ -543,10 +643,11 @@ class FilterMRCA(Filter):
                 print('out of mrca')
                 to_del = new_seqs[select_TF]
                 to_del['status'] = 'deleted - mrca'
-                self.del_table = pd.concat([self.del_table, to_del], axis=0, ignore_index=True, sort=True)
-        # todo add assert that rows of upd_new_seq not in del_table
-        msg = "Filter FilterBLASTThreshold has lowered the new seqs df from {} to {}.\n".format(len(new_seqs), len(to_add))
+                self.del_table = pd.concat([self.del_table, to_del], axis=0, sort=True)
+        assert len(self.del_table) + len(self.upd_new_seqs) == len(new_seqs), (len(self.del_table), len(self.upd_new_seqs), len(new_seqs))
+        msg = "Filter FilterMRCA has lowered the new seqs df from {} to {}.\n".format(len(new_seqs), len(self.upd_new_seqs))
         write_msg_logfile(msg, self.config.workdir)
+
 
 class FilterBLASTThreshold(Filter):
     def __init__(self, config):
@@ -576,8 +677,6 @@ class FilterUniqueAcc(Filter):
         new_seqs_drop = new_seqs.drop_duplicates(subset=['accession'])
         new_seqs_unique = self.upd_new_seqs.drop_duplicates(subset=['accession'], keep='first')
         if len(new_seqs_drop) > 0 and len(new_seqs_unique) > 0:
-            df = pd.concat([new_seqs_drop, new_seqs_unique], sort=True, ignore_index=True)
-            new_seqs_unique_nd = df.drop_duplicates(subset=['accession'], keep='first')  # inplace=True replaces df
             # Select all duplicate rows based on one column
             del_seq = new_seqs[new_seqs.duplicated(['accession'])]
             new_seqs_unique_fn = new_seqs_unique
