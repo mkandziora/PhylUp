@@ -31,7 +31,7 @@ def clean_inputlabel(tipname):
 
 # TODO: add add_lower_taxa function (palms dataset)
 # TODO: add gb_id_filename naming scheme for reuse of blast files
-# TODO: add unublished seq add
+# TODO: add unpublished seq add
 # TODO: write tests
 
 
@@ -51,7 +51,6 @@ class Update_data:
         self.blacklist = blacklist
 
         self.table = self.build_table_from_file(id_to_spn)
-        self.add_seq_to_table()
 
         self.mrca = None
         self.set_mrca(config, mrca)
@@ -110,10 +109,11 @@ class Update_data:
                 ncbi_spn = species
                 status = 0
                 otu_dict = otu_dict.append({'ncbi_txn': ncbi_spn, 'ncbi_txid': ncbiid, 'org_sp_name': ncbi_spn,
-                                            'tip_name': tipname, 'status': status,
-                                            "date": datetime.datetime.strptime('01/01/00', '%d/%m/%y'),
+                                            'tip_name': tipname, 'accession': tipname, 'status': status,
+                                            "date": pd.Timestamp.strptime('01/01/00', '%d/%m/%y'),
                                             'sseq': None, "index": self.otu_counter}, ignore_index=True)
                 self.otu_counter += 1
+        self.add_seq_to_table()
         return otu_dict
 
     def add_seq_to_table(self):
@@ -146,22 +146,13 @@ class Update_data:
 
         :return:
         '''
-        # with open(self.aln_fn, "r") as fin:
-        #     filedata = fin.read()
-        # # Write the file out again
-        # with open("{}/orig_inputaln.fasta".format(self.workdir), "w") as aln_file:
-        #     aln_file.write(filedata)
-        # filedata = filedata.replace("?", "-")
-        # self.aln_fn = "{}/updt_aln.fasta".format(self.workdir)
-        # with open(self.aln_fn, "w") as aln_file:
-        #     aln_file.write(filedata)
-        # # use replaced aln as input
         aln = DnaCharacterMatrix.get(path=self.aln_fn, schema=self.aln_schema)
         assert aln.taxon_namespace
         return aln
 
     def extend(self, new_seqs=None, date=None):
         """
+        gets new sequences from thos existing once which have not yet been blasted before.
         """
         # create list of indice of subset list
         sys.stdout.write("func extend")
@@ -176,11 +167,13 @@ class Update_data:
 
         print(len(present_subset))
 
-        new_seqs_local = pd.DataFrame(columns=['ncbi_txn', 'ncbi_txid', 'org_sp_name', 'tip_name', 'status', 'status_note', "date",
-                                               'index', 'accession', 'pident', 'evalue', 'bitscore', 'sseq', 'title'])
+        new_seqs_local = pd.DataFrame(columns=['ncbi_txn', 'ncbi_txid', 'org_sp_name', 'tip_name', 'status',
+                                               'status_note', "date", 'index', 'accession', 'pident', 'evalue',
+                                               'bitscore', 'sseq', 'title'])
 
+        # get new seqs from seqs in blast table seq
         queried_taxa = []
-        for index in present_subset.index:
+        for index in present_subset.index:  # should be empty in later rounds...that is why it does not matter that new_seqs_local is reassigned
             print('blast table seq')
 
             tip_name = self.table.loc[index, 'tip_name']
@@ -192,10 +185,11 @@ class Update_data:
             assert tip_name in queried_taxa, (tip_name, queried_taxa)
             new_seqs_local = new_seqs_local.append(new_seq_tax, ignore_index=True)
 
+        # make subset from new seqs of former rounds
         if new_seqs is not None:
             print(len(new_seqs))
             print(new_seqs)
-            print('add new seqs to blast table')
+            print('add new seqs to subset new seqs blast table')
             # add to present_subset the sequences which have been added from former new_seqs searches
             new_seqs_subset = new_seqs[(new_seqs.date <= min_date_blast)]
             print(new_seqs_subset.date)
@@ -215,7 +209,7 @@ class Update_data:
                 new_seqs_local = new_seqs_local.append(new_seq_tax, ignore_index=True)
 
         assert len(new_seqs_local) > 0, new_seqs_local
-        new_seqs_local = pd.concat([new_seqs_local, new_seqs], sort=True, ignore_index=True)
+        # new_seqs_local = pd.concat([new_seqs_local, new_seqs], sort=True, ignore_index=True)
         if self.blacklist is not None:
             new_seqs_local = self.remove_blacklist_items(new_seqs_local)
         return new_seqs_local
@@ -291,14 +285,7 @@ class Update_data:
         retrieved_seqs = 1
         new_seqs = None
         while retrieved_seqs > 0:
-            new_seqs = self.extend(new_seqs)  # todo rename to find new seqs
-            print(' len new seqs before filter - round after')
-            print(self.status)
 
-            print(len(new_seqs))
-            new_seqs, all_del = self.call_filter(new_seqs, aln, self.mrca)
-            print('len new seqs after filter - round after')
-            print(len(new_seqs))
 
             retrieved_seqs = len(new_seqs)
 
@@ -382,7 +369,7 @@ class FilterNumberOtu(Filter):
                 if len(ns_otu_dict) + len(table_otu_dict) > self.config.threshold:  # filter
                     if len(table_otu_dict) == 0:  # new taxa, select random seq for blast
                         print('taxa new')
-                        print(ns_otu_dict[['accession', 'ncbi_txn', 'ncbi_txid']])
+                        #print(ns_otu_dict[['accession', 'ncbi_txn', 'ncbi_txid']])
                         if self.config.filtertype == 'blast':
                             filtered = self.wrapper_filter_blast_otu(ns_otu_dict, table_otu_dict, 'accession', txid)
                         elif self.config.filtertype == 'length':
@@ -454,8 +441,7 @@ class FilterNumberOtu(Filter):
         rndm = filter_dict.sample(1)
         idx = rndm.index.values.tolist()[0]
         query_seq = rndm.loc[idx, 'sseq']
-        query_seq_id = rndm.loc[idx, columnname]
-        print('write query file')
+        query_seq_id = rndm.loc[idx, 'accession']
         blast.write_local_blast_files(self.config.workdir, query_seq_id, query_seq, db=False,
                                       fn=txid)
         # write local db and create it
@@ -469,7 +455,7 @@ class FilterNumberOtu(Filter):
             os.remove('{}/tmp/filter_seq_db'.format(self.config.workdir))
 
         for idx in for_db.index:
-            seq_id = for_db.loc[idx, columnname]
+            seq_id = for_db.loc[idx, 'accession']
             seq = for_db.loc[idx, 'sseq']
             blast.write_local_blast_files(self.config.workdir, seq_id, seq, db=True, fn=txid)
         # ###########
@@ -491,7 +477,7 @@ class FilterNumberOtu(Filter):
             seq_bitscore = filter_blast_seqs.loc[idx, 'bitscore']
             if (seq_bitscore >= mean_sd['mean'] - mean_sd['sd']) & \
                     (seq_bitscore <= mean_sd['mean'] + mean_sd['sd']):
-                subfilter_blast_seqs = subfilter_blast_seqs.append(filter_blast_seqs.loc[idx], ignore_index=True)
+                subfilter_blast_seqs = subfilter_blast_seqs.append(filter_blast_seqs.loc[idx])
             else:
                 print('filter thresh too large')
         amnt_missing_seq = self.config.threshold - len(table_otu_dict)
@@ -545,16 +531,16 @@ class FilterMRCA(Filter):
         if self.ncbi_parser is None:
             self.initialize(self.config)
 
-        for txid in set(new_seqs['ncbi_txid']):
-            tax_id = int(txid)
+        for tax_id in set(new_seqs['ncbi_txid']):
+            tax_id = int(tax_id)
             mrca_tx = self.ncbi_parser.match_id_to_mrca(tax_id, self.mrca)
+            select_TF = new_seqs['ncbi_txid'] == tax_id
+
             if mrca_tx == self.mrca:
-                select_TF = new_seqs['ncbi_txid'] == tax_id
                 to_add = new_seqs[select_TF]
-                self.upd_new_seqs = pd.concat([self.upd_new_seqs, to_add], axis=0, ignore_index=True, sort=True)
+                self.upd_new_seqs = pd.concat([self.upd_new_seqs, to_add], axis=0, sort=True)
             else:
                 print('out of mrca')
-                select_TF = new_seqs['ncbi_txid'] == tax_id
                 to_del = new_seqs[select_TF]
                 to_del['status'] = 'deleted - mrca'
                 self.del_table = pd.concat([self.del_table, to_del], axis=0, ignore_index=True, sort=True)
@@ -568,14 +554,14 @@ class FilterBLASTThreshold(Filter):
 
     def filter(self, new_seqs):
         print("FilterBLASTThreshold")
-        TF_eval = new_seqs['evalue'] < float(self.config.e_value_thresh)
-        upd_new_seqs = new_seqs[TF_eval == True]
-        df = pd.concat([upd_new_seqs, self.upd_new_seqs], sort=True, ignore_index=True)
-        new_seqs_unique_nd = df.drop_duplicates(subset=['accession'], keep='first')
-        deltab = new_seqs[TF_eval != True]
+        tf_eval = new_seqs['evalue'] < float(self.config.e_value_thresh)
+        upd_new_seqs = new_seqs[tf_eval == True]
+        deltab = new_seqs[tf_eval != True]
         deltab['status'] = 'deleted - evalue'
+        assert len(deltab) + len(upd_new_seqs) == len(new_seqs), (len(deltab), len(upd_new_seqs), len(new_seqs))
+
         self.del_table = deltab
-        self.upd_new_seqs = new_seqs_unique_nd
+        self.upd_new_seqs = upd_new_seqs
 
         msg = "Filter FilterBLASTThreshold has lowered the new seqs df from {} to {}.\n".format(len(new_seqs), len(upd_new_seqs))
         write_msg_logfile(msg, self.config.workdir)
@@ -585,7 +571,7 @@ class FilterUniqueAcc(Filter):
     def __init__(self, config):
         super().__init__(config)
 
-    def filter(self, new_seqs):
+    def filter(self, new_seqs):  #todo: rewrite: this assumes thats upd_new-seqs has information in before, that is not true anymore
         # delete things in table
         new_seqs_drop = new_seqs.drop_duplicates(subset=['accession'])
         new_seqs_unique = self.upd_new_seqs.drop_duplicates(subset=['accession'], keep='first')
@@ -593,16 +579,18 @@ class FilterUniqueAcc(Filter):
             df = pd.concat([new_seqs_drop, new_seqs_unique], sort=True, ignore_index=True)
             new_seqs_unique_nd = df.drop_duplicates(subset=['accession'], keep='first')  # inplace=True replaces df
             # Select all duplicate rows based on one column
-            del_seq = df[df.duplicated(['accession'])]
-            new_seqs_unique_fn = new_seqs_unique_nd
+            del_seq = new_seqs[new_seqs.duplicated(['accession'])]
+            new_seqs_unique_fn = new_seqs_unique
         else:
             new_seqs_unique_fn = new_seqs_drop
             dropped = new_seqs.duplicated(subset=['accession'])
-            del_seq = pd.concat([self.del_table, new_seqs[dropped == True]], sort=True, ignore_index=True)
+            del_seq = pd.concat([self.del_table, new_seqs[dropped == True]], sort=True)
         self.upd_new_seqs = new_seqs_unique_fn
         self.del_table = del_seq
         assert len(del_seq) + len(new_seqs_unique_fn) == len(new_seqs), \
             (len(del_seq), len(new_seqs_unique_fn), len(new_seqs))
+        # todo add comapre to new seq round before
+
         msg = "Filter FilterUniqueAcc has lowered the new seqs df from {} to {}.\n".format(len(new_seqs), len(new_seqs_unique_fn))
         write_msg_logfile(msg, self.config.workdir)
 
@@ -635,8 +623,7 @@ class FilterLength(Filter):
                 del_seq.loc[idx, 'status'] = 'deleted - seq len wrong: {}'.format(len(seq))
                 print(del_seq)
         assert len(del_seq) + len(filter_new_seqs) == len(new_seqs), (len(del_seq), len(filter_new_seqs), len(new_seqs))
-        self.upd_new_seqs = pd.concat([self.upd_new_seqs, filter_new_seqs], sort=True, ignore_index=True)
-        self.del_table = pd.concat([self.del_table, del_seq], sort=True, ignore_index=True)
-        print(self.del_table)
+        self.upd_new_seqs = filter_new_seqs
+        self.del_table = del_seq
         msg = "Filter FilterLength has lowered the new seqs df from {} to {}.\n".format(len(new_seqs), len(filter_new_seqs))
         write_msg_logfile(msg, self.config.workdir)
