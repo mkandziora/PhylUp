@@ -25,31 +25,22 @@ def load_nodes(nodes_file):
     Contains the information about the taxonomic hierarchy of names.
     """
     # print(nodes_file)
-    assert os.path.exists(nodes_file), (
-        "file `%s` does not exist. Make sure you downloaded the "
-        "databases from ncbi." % nodes_file
-    )
-    df = pd.read_csv(
-        nodes_file,
-        sep="|",
-        header=None,
-        index_col=False,
-        names=[
-            "tax_id",
-            "parent_tax_id",
-            "rank",
-            "embl_code",
-            "division_id",
-            "inherited_div_flag",
-            "genetic_code_id",
-            "inherited_GC__flag",
-            "mitochondrial_genetic_code_id",
-            "inherited_MGC_flag",
-            "GenBank_hidden_flag",
-            "hidden_subtree_root_flag",
-            "comments",
-        ],
-    )
+    assert os.path.exists(nodes_file), ("file `%s` does not exist. Make sure you downloaded the "
+        "databases from ncbi." % nodes_file )
+    col_names = ["tax_id",
+                 "parent_tax_id",
+                 "rank",
+                 "embl_code",
+                 "division_id",
+                 "inherited_div_flag",
+                 "genetic_code_id",
+                 "inherited_GC__flag",
+                 "mitochondrial_genetic_code_id",
+                 "inherited_MGC_flag",
+                 "GenBank_hidden_flag",
+                 "hidden_subtree_root_flag",
+                 "comments"]
+    df = pd.read_csv(nodes_file, sep="|", header=None, index_col=False, names=col_names)
     # To get rid of flanking tab characters
     df["rank"] = df["rank"].apply(strip)
     df["embl_code"] = df["embl_code"].apply(strip)
@@ -61,17 +52,10 @@ def load_names(names_file):
     """ Loads names.dmp and converts it into a pandas.DataFrame.
     Includes only names which are accepted as scientific name by ncbi.
     """
-    assert os.path.exists(names_file), (
-        "file `%s` does not exist. Make sure you downloaded the "
-        "databases from ncbi." % names_file
-    )
-    df = pd.read_csv(
-        names_file,
-        sep="|",
-        header=None,
-        index_col=False,
-        names=["tax_id", "name_txt", "unique_name", "name_class"],
-    )
+    assert os.path.exists(names_file), ("file `%s` does not exist. Make sure you downloaded the "
+        "databases from ncbi." % names_file)
+    df = pd.read_csv(names_file, sep="|", header=None, index_col=False,
+                     names=["tax_id", "name_txt", "unique_name", "name_class"])
     df["name_txt"] = df["name_txt"].apply(strip)
     df["unique_name"] = df["unique_name"].apply(strip)
     df["name_class"] = df["name_class"].apply(strip)
@@ -84,18 +68,11 @@ def load_synonyms(names_file):
     """Loads names.dmp and converts it into a pandas.DataFrame.
         Includes only names which are viewed as synonym by ncbi.
     """
-    assert os.path.exists(names_file), (
-        "file `%s` does not exist. Make sure you downloaded "
-        "the databases from ncbi." % names_file
-    )
+    assert os.path.exists(names_file), ("file `%s` does not exist. Make sure you downloaded "
+                                        "the databases from ncbi." % names_file)
     # print("load synonyms")
-    df = pd.read_csv(
-        names_file,
-        sep="|",
-        header=None,
-        index_col=False,
-        names=["tax_id", "name_txt", "unique_name", "name_class"],
-    )
+    df = pd.read_csv(names_file, sep="|", header=None, index_col=False,
+                     names=["tax_id", "name_txt", "unique_name", "name_class"])
     df["name_txt"] = df["name_txt"].apply(strip)
     df["unique_name"] = df["unique_name"].apply(strip)
     df["name_class"] = df["name_class"].apply(strip)
@@ -106,9 +83,8 @@ def load_synonyms(names_file):
 
 class Parser:
     """Reads in databases from ncbi to connect species names with the taxonomic identifier
-    and the corresponding hierarchical information. It provides a much faster way to get those information then using
-    web queries. We use those files to get independent from web requests to find those information (the implementation
-    of it in BioPython was not really reliable).
+    and the corresponding hierarchical information. It provides a fast way to get those information.
+
     Nodes includes the hierarchical information, names the scientific names and ID's.
     The files need to be updated regularly, best way to always do it when a new blast database was loaded.
     """
@@ -119,9 +95,8 @@ class Parser:
         # self.initialize()
 
     def initialize(self):
-        """ The data itself are not stored in __init__, as then the information will be pickled (which results in
-        gigantic pickle file sizes).
-        Instead every time the function is loaded after loading a pickle file, it will be 'initialized'.
+        """ The data itself are not stored in __init__. Instead every time the function is loaded
+        if it has not yet been run during a run - was important for pickle.
         """
         print("Initialize NODES and NAMES!!")
         global nodes
@@ -158,7 +133,7 @@ class Parser:
                     if count == len(id_dict.keys()):
                         return taxid
                 else:
-                    continue  # todo: make sure this is the cmd to go to next id - looks like it. still dont get it quite
+                    continue
 
     def taxid_is_valid(self, tax_id):
         """check if input number is known by ncbi.
@@ -166,11 +141,11 @@ class Parser:
         if nodes is None:
             self.initialize()
         if type(tax_id) != int:
-            # sys.stdout.write("WARNING: tax_id {} is no integer. Will convert value to int\n".format(
-            #         tax_id))
+            # sys.stdout.write("WARNING: mrca_id {} is no integer. Will convert value to int\n".format(mrca_id))
             tax_id = int(tax_id)
         try:
-            int(nodes[nodes["tax_id"] == tax_id]["parent_tax_id"].values[0])  # can be any value, just checking if val is known
+            # can be any value, just checking if val is known
+            int(nodes[nodes["tax_id"] == tax_id]["parent_tax_id"].values[0])
             return True
         except:
             return False
@@ -190,11 +165,7 @@ class Parser:
         if nodes is None:
             self.initialize()
         if type(tax_id) != int:
-            # sys.stdout.write(
-            #     "WARNING: tax_id {} is no integer. Will convert value to int\n".format(
-            #         tax_id
-            #     )
-            # )
+            # sys.stdout.write("WARNING: mrca_id {} is no integer. Will convert value to int\n".format(mrca_id))
             tax_id = int(tax_id)
         # following statement is to get id of taxa if taxa is higher ranked than specified
         try:
@@ -242,18 +213,10 @@ class Parser:
                 mrca_id = self.get_mrca(mrca_id)
             mrca_id = int(mrca_id)
         elif type(mrca_id) != int:
-            # sys.stdout.write(
-            #     "WARNING: mrca_id {} is no integer. Will convert value to int\n".format(
-            #         mrca_id
-            #     )
-            # )
+            # sys.stdout.write("WARNING: mrca_id {} is no integer. Will convert value to int\n".format(mrca_id))
             mrca_id = int(mrca_id)
         if type(tax_id) != int:
-            # sys.stdout.write(
-            #     "WARNING: mrca_id {} is no integer. Will convert value to int\n".format(
-            #         tax_id
-            #     )
-            # )
+            # sys.stdout.write("WARNING: mrca_id {} is no integer. Will convert value to int\n".format(mrca_id))
             tax_id = int(tax_id)
         debug([tax_id, mrca_id])
         rank_mrca_id = nodes[nodes["tax_id"] == mrca_id]["rank"].values[0]
@@ -279,14 +242,9 @@ class Parser:
         if names is None:
             self.initialize()
         if type(tax_id) != int:
-            # sys.stdout.write(
-            #     "WARNING: tax_id {} is no integer. Will convert value to int\n".format(
-            #         tax_id
-            #     )
-            # )
+            # sys.stdout.write("WARNING: mrca_id {} is no integer. Will convert value to int\n".format(mrca_id))
             tax_id = int(tax_id)
         try:
-            # print(names[names["tax_id"] == tax_id])
             if tax_id == 0:
                 tax_name = "unidentified"
             else:
@@ -294,9 +252,7 @@ class Parser:
                 tax_name = tax_name.values[0].replace(" ", "_")
                 tax_name = tax_name.strip()
         except IndexError:
-            sys.stdout.write(
-                    "tax_id {} unknown by ncbi_parser files (names.dmp)\n".format(tax_id)
-                )
+            sys.stdout.write("tax_id {} unknown by ncbi_parser files (names.dmp)\n".format(tax_id))
             tax_name = "unknown_{}".format(tax_id)
             if os.path.exists("ncbi_id_unknown.err"):
                 fn = open("ncbi_id_unknown.err", "a")
@@ -326,17 +282,12 @@ class Parser:
                 tax_name = "{} {}-{}".format(
                     tax_name.split(" ")[0],
                     tax_name.split(" ")[1],
-                    tax_name.split(" ")[2],
-                )
+                    tax_name.split(" ")[2])
                 tax_id = names[names["name_txt"] == tax_name]["tax_id"].values[0]
-                sys.stdout.write(
-                    "tax_name {} unknown, modified to {} worked.\n".format(org_tax, tax_name)
-                )
+                sys.stdout.write("tax_name {} unknown, modified to {} worked.\n".format(org_tax, tax_name))
             else:
-                sys.stdout.write(
-                    "Are you sure, its an accepted name and not a synonym: {}? "
-                    "I look in the synonym table now.\n".format(tax_name)
-                )
+                sys.stdout.write("Are you sure, its an accepted name and not a synonym: {}? "
+                                 "I look in the synonym table now.\n".format(tax_name))
                 tax_id = self.get_id_from_synonym(tax_name)
         tax_id = int(tax_id)
         return tax_id
@@ -354,8 +305,7 @@ class Parser:
                 tax_name = "{} {}-{}".format(
                     tax_name.split(" ")[0],
                     tax_name.split(" ")[1],
-                    tax_name.split(" ")[2],
-                )
+                    tax_name.split(" ")[2])
                 tax_id = names[names["name_txt"] == tax_name]["tax_id"].values[0]
             else:
                 sys.stderr.write("ncbi taxon name unknown by parser files: {}, taxid set to 0.\n".format(tax_name))
