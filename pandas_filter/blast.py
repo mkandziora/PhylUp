@@ -12,7 +12,6 @@ from . import cd
 def get_acc_from_blast(query_string):
     """
     Get the accession number from a blast query using local blast.
-
     """
     # Note: get acc is more difficult now, as new seqs not always have gi number, then query changes
     if len(query_string.split("|")) >= 3:
@@ -112,35 +111,44 @@ def make_local_blastdb(workdir, db, path_to_db=None):
     """
     print("make_local_blastdb")
 
-    if db == "local":
+    if db == "unpublished":
         # self.path_to_local_seq = path_to_local_seq
-        localfiles = os.listdir(output_db_path)
+        print(path_to_db)
+        localfiles = os.listdir(path_to_db)
+        if os.path.exists('{}/tmp/unpublished_seq_db'.format(workdir)):
+            os.remove('{}/tmp/unpublished_seq_db'.format(workdir))
         for index, item in enumerate(localfiles):
             item = str(item)
             if item.startswith(".~"):  # remove those files from list
                 localfiles[index] = None
-        localfiles = filter(None, localfiles)
+        localfiles = list(filter(None, localfiles))
         for filename in localfiles:
-            filepath = "{}/{}".format(output_db_path, filename)
+            filepath = "{}/{}".format(path_to_db, filename)
             open_file = open(filepath)
             content = open_file.readlines()
             content = [x.strip() for x in content]
-            content = filter(None, content)  # fastest
             count = 0
             gb_id_l = content[::2]
             seq_l = content[1::2]
+            gb_id_l = list(filter(None, gb_id_l))
+            seq_l = list(filter(None, seq_l))
+
             # in current setup 1 seq per file, but this is written in a way,
             # that a file with multiple seqs can be read in as well
-            os.remove('{}/tmp/filter_seq_db'.format(workdir))
+            assert len(gb_id_l) == len(seq_l), (gb_id_l, seq_l)
             len_gb = len(gb_id_l)
             for i in range(0, len_gb):
                 key = gb_id_l[i].replace(">", "")
                 count = count + 1
                 seq = seq_l[i]
-                write_local_blast_files(workdir, key, seq, db=True, fn="local_seq")
-        with cd(output_db_path):
-            cmd1 = "makeblastdb -in ./tmp/local_seq_db -dbtype nucl"
+                write_local_blast_files(workdir, key, seq, db=True, fn="unpublished_seq")
+        path_db = os.path.join(workdir, './tmp/unpublished_seq_db')
+        db = os.path.abspath(path_db)
+        # print(db)
+        with cd(path_to_db):
+            cmd1 = "makeblastdb -in {} -dbtype nucl".format(db)
             os.system(cmd1)
+            # print(cmd1)
     elif db == "filterrun":
         with cd(workdir):
             cmd1 = "makeblastdb -in ./tmp/filter_seq_db -dbtype nucl"
@@ -304,7 +312,6 @@ def run_blast_query(query_seq, taxon, db_path, db_name, config):
     toblast.close()
 
     outfmt = " -outfmt '6 sseqid staxids sscinames pident evalue bitscore sseq salltitles sallseqid'"
-
     if db_name == "Genbank":
         with cd(db_path):
             # this format (6) allows to get the taxonomic information at the same time
@@ -331,11 +338,77 @@ def run_blast_query(query_seq, taxon, db_path, db_name, config):
             # I keep it to make it coherent for reading in results.
 
 
-def read_blast_query(taxon, config, db_name):
+def read_blast_query_pandas(blast_fn, config, db_name):
     """
     Implementation to read in results of local blast searches.
 
-    :param taxon:
+    :param blast_fn: filename to read in; often taxon or gb_acc
+    :param config: config object
+    :param db_name: name that specifies if filterrun, unpublished or normal search
+    :return: updated self.new_seqs and self.data.gb_dict dictionaries
+    """
+    blast_fn = str(blast_fn)
+    if len(blast_fn.split('.')) > 1:
+        blast_fn = blast_fn.split('.')[0]
+    if db_name == "filterrun":  # Run a local blast search if the data is unpublished or for filtering.
+        query_output_fn = "{}/tmp/{}.txt".format(config.workdir, blast_fn)
+    elif db_name == 'unpublished':
+        query_output_fn = "{}/tmp/unpublished_query_result.txt".format(config.workdir)
+    else:
+        query_output_fn = "{}/blast/{}.txt".format(config.workdir, blast_fn)
+    query_output_fn = os.path.abspath(query_output_fn)
+    queried_acc = set()  # used to test if gb_acc was added before  aka query_dict in physcraper
+
+    colnames = ['accession;gi', 'ncbi_txid', 'ncbi_txn', 'pident', 'evalue', 'bitscore', 'sseq', 'title', 'accession']
+    data = pd.read_csv(query_output_fn, names=colnames, sep="\t", header=None)
+    assert len(data) > 0, data
+    redundant = data[data['accession'].str.contains(';')]
+    non_redundant = data[data['accession'].str.contains(';') == False]
+
+    # new data frame with split value columns
+    assert len(redundant) + len(non_redundant) == len(data)
+
+    acc_column = redundant["accession"].str.split(";", n=-1, expand=True)
+    non_redundant_redundant = pd.DataFrame(columns=colnames)
+    for idx in acc_column.index:
+        gb_acc = get_acc_from_blast(redundant.loc[idx, 'accession;gi'])
+        all_taxids = get_taxid_from_acc(gb_acc, config.blastdb, config.workdir)
+        all_taxids_set = set(all_taxids)
+        found_taxids = set()
+        t = acc_column.loc[idx]
+        shortened = t.dropna()
+        while len(found_taxids) < len(set(all_taxids_set)):
+            count = 0
+            for i in range(len(shortened)):
+                tax_id = all_taxids[i]
+                # if we found all taxon_ids present in the initial list, stop looking for more
+                if len(found_taxids) == len(all_taxids_set):
+                    break
+                if tax_id in found_taxids:
+                    continue
+                gb_acc = get_acc_from_blast(shortened.loc[i])
+                if gb_acc in queried_acc:
+                    # print("set to true")
+                    # stop_while = True
+                    break
+                spn = redundant.loc[idx, 'ncbi_txn'].split(";")[count]
+                split_df = redundant.loc[[idx]]
+                split_df['accession'] = gb_acc
+                split_df['ncbi_txid'] = tax_id
+                split_df['ncbi_txn'] = spn
+                non_redundant_redundant = non_redundant_redundant.append(split_df, ignore_index=True, sort=True)
+                found_taxids.add(tax_id)
+                queried_acc.add(gb_acc)
+                count += 1
+    if len(redundant) > 0:
+        assert len(non_redundant_redundant) > len(redundant), (len(non_redundant_redundant), len(redundant))
+
+    new_seqs = pd.concat([non_redundant_redundant, non_redundant], sort=True, ignore_index=True)
+    new_seqs['accession'] = new_seqs['accession'].apply(get_acc_from_blast)
+    new_seqs['sseq'] = new_seqs['sseq'].str.replace("-", "")
+    new_seqs['date'] = datetime.datetime.strptime('01/01/00', '%d/%m/%y')
+    new_seqs = wrapper_get_fullseq(config, new_seqs, db_name)
+    return new_seqs
 
 
 def wrapper_get_fullseq(config, new_blast_seq_dict, db):
