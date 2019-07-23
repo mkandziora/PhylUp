@@ -85,10 +85,12 @@ def write_local_blast_files(workdir, seq_id, seq, db=False, fn=None):
     if not os.path.exists("{}/".format(workdir)):
         os.makedirs("{}/tmp/".format(workdir))
     if db:
-        fnw = "{}/tmp/filter_seq_db".format(workdir)
+        if fn is None:
+            fnw = "{}/tmp/filter_seq_db".format(workdir)
+        else:
+            fnw = "{}/tmp/{}_db".format(workdir, fn)
         fi_o = open(fnw, "a")
     else:
-        # fnw = "{}/tmp/{}_tobeblasted".format(workdir, fn)
         fnw = "{}/tmp/query_seq.fas".format(workdir, fn)
         fi_o = open(fnw, "w")
     fi_o.write(">{}\n".format(seq_id))
@@ -96,7 +98,7 @@ def write_local_blast_files(workdir, seq_id, seq, db=False, fn=None):
     fi_o.close()
 
 
-def make_local_blastdb(workdir, db, output_db_path=None):
+def make_local_blastdb(workdir, db, path_to_db=None):
     """
     Adds sequences into a  new blast database, which then can be used to blast aln seq against it
     and adds sequences that were found to be similar to input.
@@ -105,7 +107,7 @@ def make_local_blastdb(workdir, db, output_db_path=None):
 
     :param workdir:  where to write the files
     :param db: string that defines, if local, genbank or filter
-    :param output_db_path: path where db is stored
+    :param path_to_db: path where db is stored
     :return: writes local blast databases for the local sequences
     """
     print("make_local_blastdb")
@@ -155,39 +157,22 @@ def get_full_seq(gb_acc, blast_seq, workdir, blastdb, db):
     :param gb_acc: unique sequence identifier (often genbank accession number)
     :param blast_seq: sequence retrived by blast
     :param workdir: working directory
-    :param blastdb: location of db
+    :param blastdb: location of file/db with full seq
     :param db: type of db - local, filter, Genbank
     :return: full sequence, the whole submitted sequence, not only the part that matched the blast query sequence
     """
     # print("get full seq")
     if db is not "Genbank":  # no need to make a db first (it already exists), we just open it and get full seq
-        # print('get full seq for non genbank')
-        # read in file to get full seq
         seq_set = False
-        # todo: commented code replaced by get_seq_from_file. Make sure it really works
-        # found = False
-        # with open(blastdb) as f:
-        #     for i, line in enumerate(f):
-        #         print(line)
-        #
-        #         if found:
-        #             seq = line.rstrip().lstrip()
-        #             seq = seq.upper()
-        #             seq_set = True
-        #             break
-        #         elif gb_acc in line:
-        #             found = True
         seq, seq_set = get_seq_from_file(gb_acc, blastdb, seq_set)
-        # print(seq_set)
         if seq_set is False:
-            print('not yet found')
             seq, seq_set = get_seq_from_file(gb_acc, '{}/tmp/query_seq.fas'.format(workdir), seq_set)
         assert seq_set is True
     else:
         if not os.path.exists("{}/tmp".format(workdir)):
             os.mkdir("{}/tmp".format(workdir))
         if not os.path.exists("{}/tmp/full_seq_{}.fasta".format(workdir, gb_acc)):
-            print('get full seq blast query')
+            # print('get full seq blast query')
             fn = "{}/tmp/tmp_search.csv".format(workdir)
             fn_open = open(fn, "w+")
             fn_open.write("{}\n".format(gb_acc.split(".")[0]))
@@ -276,7 +261,7 @@ def get_new_seqs(query_seq, taxon, db_path, db_name, config):
     :return:
     """
     run_blast_query(query_seq, taxon, db_path, db_name, config)
-    new_blastseqs = read_blast_query(taxon, config, db_name)
+    new_blastseqs = read_blast_query_pandas(taxon, config, db_name)  # pandas implementation of read_blast_query()
     assert new_blastseqs["ncbi_txn"].isnull() is not None, (new_blastseqs["ncbi_txn"])
     return new_blastseqs
 
@@ -299,12 +284,14 @@ def run_blast_query(query_seq, taxon, db_path, db_name, config):
     if len(taxon.split('.')) > 1:
         taxon = taxon.split('.')[0]
     db_path = os.path.abspath(db_path)
-    if db_name == "local":  # Run a local blast search if the data is unpublished or for filtering.
-        query_output_fn = "{}/blast/local_query_result.txt".format(config.workdir)
+    if db_name == "unpublished":  # Run a local blast search if the data is unpublished or for filtering.
+        query_output_fn = "{}/tmp/unpublished_query_result.txt".format(config.workdir)
         input_fn = "{}/blast/query_seq.fas".format(config.workdir)
+        db = 'unpublished_seq_db'
     elif db_name == "filterrun":  # Run a local blast search if the data is unpublished or for filtering.
         query_output_fn = "{}/tmp/{}.txt".format(config.workdir, taxon)
         input_fn = "{}/tmp/{}_tobeblasted.fas".format(config.workdir, taxon)
+        db = 'filter_seq_db'
     else:
         query_output_fn = "{}/blast/{}.txt".format(config.workdir, taxon)
         input_fn = "{}/blast/{}_tobeblasted.fas".format(config.workdir, taxon)
@@ -322,30 +309,25 @@ def run_blast_query(query_seq, taxon, db_path, db_name, config):
         with cd(db_path):
             # this format (6) allows to get the taxonomic information at the same time
             # outfmt = " -outfmt 5"  # format for xml file type
-            # TODO MK: update to blast+ v. 2.8 code - then we can limit search to taxids: -taxids self.mrca_ncbi
+            # TODO MK: blast+ v. 2.8 code - then we can limit search to taxids: -taxids self.mrca_ncbi
             blastcmd = "blastn -query " + input_fn + \
                        " -db {}/nt_v5 -out ".format(db_path) + query_output_fn + \
                        " {} -num_threads {}".format(outfmt, config.num_threads) + \
                        " -max_target_seqs {} -max_hsps {}".format(config.hitlist_size,
                                                                   config.hitlist_size)
             # needs to run from within the folder:
-            print('run blastcmd')
             if not os.path.isfile(query_output_fn):
-                # print(blastcmd)
                 os.system(blastcmd)
             elif not os.stat(query_output_fn).st_size > 0:
-                # print(blastcmd)
                 os.system(blastcmd)
     else:
         print("run against local data")
         with cd("{}/tmp/".format(config.workdir)):
-            blastcmd = "blastn -query {} -db filter_seq_db -out ".format(input_fn) + query_output_fn + \
+            blastcmd = "blastn -query {} -db {} -out ".format(input_fn, db) + query_output_fn + \
                        " {} -num_threads {}".format(outfmt, config.num_threads) + \
                        " -max_target_seqs {} -max_hsps {}".format(config.hitlist_size, config.hitlist_size)
-            # if not os.path.isfile(query_output_fn):
-            #     print(blastcmd)
             os.system(blastcmd)
-            # produces blastn taxdb warning, taxids here not needed and not part of taxdb anyways as local search.
+            # todo: produces blastn taxdb warning, taxids here not needed and not part of taxdb anyways as local search.
             # I keep it to make it coherent for reading in results.
 
 
@@ -354,210 +336,6 @@ def read_blast_query(taxon, config, db_name):
     Implementation to read in results of local blast searches.
 
     :param taxon:
-    :param config:
-    :param db_name:
-    :return: updated self.new_seqs and self.data.gb_dict dictionaries
-    """
-    print("read_blast_query")
-    print(taxon)
-    ncbi_parser = ncbi_data_parser.Parser(
-        names_file=config.ncbi_parser_names_fn,
-        nodes_file=config.ncbi_parser_nodes_fn)
-    taxon = str(taxon)
-    if len(taxon.split('.')) > 1:
-        taxon = taxon.split('.')[0]
-
-    if db_name == "filterrun":  # Run a local blast search if the data is unpublished or for filtering.
-        query_output_fn = "{}/tmp/{}.txt".format(config.workdir, taxon)
-    else:
-        query_output_fn = "{}/blast/{}.txt".format(config.workdir, taxon)
-    query_output_fn = os.path.abspath(query_output_fn)
-    new_blast_seq_dict = pd.DataFrame(columns=['ncbi_txn', 'ncbi_txid', 'status', "date",
-                                               'accession', 'pident', 'evalue', 'bitscore', 'sseq', 'title'])
-    # todo: check that query_acc has not broken stuff - comment july 8th
-    queried_acc = set()  # used to test if gb_acc was added before  aka query_dict in physcraper
-    with open(query_output_fn, mode="r") as infile:
-        for lin in infile:
-            bitscore, evalue, gb_acc, pident, sallseqid, salltitles, \
-                sscinames, sseq, staxids, stitle = get_blastval_from_line(db_name, lin, ncbi_parser, taxon)
-            # NOTE: sometimes there are seq which are identical & are combined in the local blast db...
-            # Get all of them! (they can be of a different taxon id = get redundant seq info)
-            found_taxids = set()
-            found_spn = set()
-
-            # get additional info only for seq that pass the eval
-            # TODO: e filter should maybe not be here...but makes it much faster
-            if evalue < float(config.e_value_thresh):
-                # print(sallseqid)
-                if len(sallseqid.split(";")) > 1:
-                    # FOR MERGED SEQS
-                    sallseqid_l, salltitles_l, sscinames_l, staxids_l = split_multiple_tolist(sallseqid, salltitles,
-                                                                                              sscinames, staxids)
-                    # make sure you have the correct infos
-                    tax_id_l = get_taxid_from_acc(gb_acc, config.blastdb, config.workdir)
-                    for item in tax_id_l:
-                        assert str(item) in staxids_l
-                    print(tax_id_l)
-                    # this while loop is here to speed up the process of finding the correct information
-                    count = 0
-                    stop_while = False
-                    while len(found_taxids) < len(set(staxids_l)):  # as long as i have not found all taxids for the seq
-                        count += 1
-                        if stop_while:
-                            break
-                        if count == 5:
-                            break  # too many tries to find correct number of redundant taxa
-                        elif count == 1:
-                            id_before = 0
-                            for i in range(0, len(sallseqid_l)):
-                                if len(found_taxids) == len(
-                                        staxids_l):  # if we found all taxon_ids present in the initial list, stop looking for more
-                                    break
-                                gb_acc = get_acc_from_blast(sallseqid_l[i])
-
-                                # if gb acc was already read in before stop the for loop
-                                if gb_acc in queried_acc:
-                                    # print("set to true")
-                                    stop_while = True
-                                    break
-
-                                stitle = salltitles_l[i]
-                                # if both var are the same, we do not need to search GB for taxon info
-                                staxids = tax_id_l[i]
-                                qtaxid = int(get_taxid_from_acc(gb_acc, config.blastdb, config.workdir)[0])
-                                id_now = qtaxid
-                                assert str(qtaxid) in staxids_l, (str(qtaxid), staxids_l)
-                                assert qtaxid in tax_id_l, (qtaxid, tax_id_l)
-                                assert str(staxids) in staxids_l, (staxids, staxids_l)
-
-                                # sometimes if multiple seqs are merged,
-                                # we lack information about which taxon is which gb_acc...
-                                # test it here:
-                                # if we have same number of gb_acc and taxon id go ahead as usual
-                                # print("get name from id")
-                                if len(sallseqid_l) == len(staxids_l):
-                                    sscinames = sscinames_l[i]
-                                # if only one taxon id present, all are from same taxon
-                                elif len(staxids_l) == 1:
-                                    sscinames = sscinames_l[0]
-                                    qtaxid = staxids_l[0]
-                                # if not the first item and id different from before: get name
-                                elif i != 0 and id_before != id_now:
-                                    sscinames = ncbi_parser.get_name_from_id(qtaxid)
-                                elif i == 0:  # for first item in redundant data, always get info
-                                    sscinames = ncbi_parser.get_name_from_id(qtaxid)
-                                else:  # if id_before and id_now were the same, we do not need to add same seq again
-                                    continue
-                                # next vars are used to stop loop if all taxids were found
-                                found_taxids.add(staxids)
-                                found_spn.add(sscinames)
-                                id_before = qtaxid
-                                # add info to new_blast_seq_dict
-                                if gb_acc not in queried_acc:
-                                    queried_acc.add(gb_acc)
-                                    new_blast_seq_dict = new_blast_seq_dict.append(
-                                        {'ncbi_txn': sscinames, 'ncbi_txid': int(staxids), 'status': "blast",
-                                         "date": datetime.datetime.strptime('01/01/00', '%d/%m/%y'),
-                                         "accession": gb_acc, 'pident': float(pident), 'evalue': float(evalue),
-                                         'bitscore': float(bitscore), 'sseq': sseq, 'title': stitle}, ignore_index=True)
-                        # # same loop as above, only that it does more blastdbcmd's
-                        # # this is used as sometimes the if above does not yield in stop_while == True,
-                        # # through different taxa names
-                        # elif count >= 1 and stop_while is False:
-                        #     for i in range(0, len(sallseqid_l)):
-                        #         if len(found_taxids) == len(staxids_l):
-                        #             break
-                        #         gb_acc = get_acc_from_blast(sallseqid_l[i])
-                        #         gb_id = get_gi_from_blast(sallseqid_l[i])
-                        #         print(gb_acc)
-                        #         stitle = salltitles_l[i]
-                        #         # if gb acc was already read in before stop the for loop
-                        #         if gb_acc in query_dict:  # TODO: check for formerly added seqs: or gb_acc in self.data.gb_dict:
-                        #             stop_while = True
-                        #             break
-                        #         # sometimes if multiple seqs are merged, we lack the information
-                        #         # which taxon is which gb_acc...test it here:
-                        #         # if we have same number information go ahead as usual
-                        #         if len(sallseqid_l) == len(staxids_l):
-                        #             staxids = staxids_l[i]
-                        #             sscinames = sscinames_l[i]
-                        #         elif len(staxids_l) == 1:  # only one taxon id present, all are from same taxon
-                        #             staxids = staxids_l[0]
-                        #             sscinames = sscinames_l[0]
-                        #         else:
-                        #             staxids = get_taxid_from_acc(gb_acc, config.blastdb, config.workdir)
-                        #             sscinames = ncbi_parser.get_name_from_id(staxids)
-                        #         assert str(staxids) in staxids_l, (staxids, staxids_l)
-                        #         # next vars are used to stop loop if all taxids were found
-                        #         found_taxids.add(staxids)
-                        #         found_spn.add(sscinames)
-                        #         if gb_acc not in query_dict:  # TODO: check for formerly added seqs and gb_acc not in self.newseqs_acc:
-                        #             new_blast_seq_dict = new_blast_seq_dict.append(
-                        #                 {'ncbi_txn': sscinames, 'ncbi_txid': staxids, 'status': "blast",
-                        #                  "date": datetime.date.today(),
-                        #                  "accession": gb_acc, 'pident': pident, 'evalue': evalue,
-                        #                  'bitscore': bitscore, 'sseq': sseq, 'title': stitle}, ignore_index=True)
-                else:
-                    staxids = int(staxids)
-                    if gb_acc not in queried_acc:  # TODO: filter formerly added seqs:  and gb_acc not in self.newseqs_acc:
-                        queried_acc.add(gb_acc)
-                        new_blast_seq_dict = new_blast_seq_dict.append(
-                            {'ncbi_txn': sscinames, 'ncbi_txid': int(staxids), 'status': "blast",
-                             "date": datetime.datetime.strptime('01/01/00', '%d/%m/%y'), "accession": gb_acc,
-                             'pident': float(pident), 'evalue': float(evalue),
-                             'bitscore': float(bitscore), 'sseq': sseq, 'title': stitle}, ignore_index=True)
-    # add data which was not added before and that passes the evalue thresh
-    new_blast_seq_dict = wrapper_get_fullseq(config, new_blast_seq_dict, db_name)
-    print('new_blast_dict')
-    print(len(new_blast_seq_dict))
-    print(new_blast_seq_dict[['ncbi_txn', 'ncbi_txid', 'status', 'accession']])
-    return new_blast_seq_dict
-
-
-def split_multiple_tolist(sallseqid, salltitles, sscinames, staxids):
-    """
-    For redundant data this will split the string with multiple information into a list.
-
-    :param sallseqid:
-    :param salltitles:
-    :param sscinames:
-    :param staxids:
-    :return:
-    """
-    staxids_l = staxids.split(";")
-    sscinames_l = sscinames.split(";")
-    sallseqid_l = sallseqid.split(";")
-    salltitles_l = salltitles.split("<>")
-    return sallseqid_l, salltitles_l, sscinames_l, staxids_l
-
-
-def get_blastval_from_line(db_name, lin, ncbi_parser, taxon):
-    """
-
-    :param db_name:
-    :param lin:
-    :param ncbi_parser:
-    :param taxon:
-    :return:
-    """
-    sseqid, staxids, sscinames, pident, evalue, bitscore, sseq, salltitles, sallseqid = lin.strip().split('\t')
-    # get acc is more difficult now, as new seqs not always have gi number, then query changes
-    if db_name == 'filterrun':
-        staxids = str(taxon)
-        sscinames = ncbi_parser.get_name_from_id(staxids)
-        stitle = None
-        salltitles = None
-        sallseqid = sseqid
-    else:
-        sscinames = sscinames.replace(" ", "_").replace("/", "_")
-        stitle = salltitles
-
-    gb_acc = get_acc_from_blast(sseqid)
-    sseq = sseq.replace("-", "")
-    pident = float(pident)
-    evalue = float(evalue)
-    bitscore = float(bitscore)
-    return bitscore, evalue, gb_acc, pident, sallseqid, salltitles, sscinames, sseq, staxids, stitle
 
 
 def wrapper_get_fullseq(config, new_blast_seq_dict, db):
@@ -568,7 +346,7 @@ def wrapper_get_fullseq(config, new_blast_seq_dict, db):
     :param db:
     :return:
     """
-    print(db)
+    # print(db)
     if db == 'Genbank':
         blastdb = config.blastdb
     else:
@@ -694,3 +472,174 @@ def find_correct_strand_batch(full_seqs, gb_acc_l_intern, list_gb_acc, seq):
         assert type(full_seq) == str, (type(full_seq))
         full_seqs[gb_acc] = full_seq
     return full_seqs
+
+
+def read_blast_query(blast_fn, config, db_name):
+    """
+    Implementation to read in results of local blast searches.
+
+    :param blast_fn: file to read
+    :param config: config object
+    :param db_name:
+    :return: updated self.new_seqs and self.data.gb_dict dictionaries
+    """
+    print("read_blast_query")
+    print(blast_fn)
+    ncbi_parser = ncbi_data_parser.Parser(
+        names_file=config.ncbi_parser_names_fn,
+        nodes_file=config.ncbi_parser_nodes_fn)
+    blast_fn = str(blast_fn)
+    if len(blast_fn.split('.')) > 1:
+        blast_fn = blast_fn.split('.')[0]
+
+    if db_name == "filterrun":  # Run a local blast search if the data is unpublished or for filtering.
+        query_output_fn = "{}/tmp/{}.txt".format(config.workdir, blast_fn)
+    else:
+        query_output_fn = "{}/blast/{}.txt".format(config.workdir, blast_fn)
+    query_output_fn = os.path.abspath(query_output_fn)
+    columns = ['ncbi_txn', 'ncbi_txid', 'status', "date", 'accession', 'pident', 'evalue', 'bitscore', 'sseq', 'title']
+    new_blast_seq_dict = pd.DataFrame(columns=columns)
+    queried_acc = set()  # used to test if gb_acc was added before
+    with open(query_output_fn, mode="r") as infile:
+        for lin in infile:
+            bitscore, evalue, gb_acc, pident, sallseqid, salltitles, \
+                sscinames, sseq, staxids, stitle = get_blastval_from_line(db_name, lin, ncbi_parser, blast_fn)
+            # NOTE: sometimes there are seq which are identical & are combined in the local blast db...
+            # Get all of them! (they can be of a different taxon id = get redundant seq info)
+            found_taxids = set()
+            found_spn = set()
+
+            # get additional info only for seq that pass the eval
+            # TODO: e filter should maybe not be here...but makes it much faster
+            if evalue < float(config.e_value_thresh):
+                # print(sallseqid)
+                if len(sallseqid.split(";")) > 1:
+                    # FOR MERGED SEQS
+                    sallseqid_l, salltitles_l, sscinames_l, staxids_l = split_multiple_tolist(sallseqid, salltitles,
+                                                                                              sscinames, staxids)
+                    # make sure you have the correct infos
+                    tax_id_l = get_taxid_from_acc(gb_acc, config.blastdb, config.workdir)
+                    for item in tax_id_l:
+                        assert str(item) in staxids_l
+                    print(tax_id_l)
+                    # this while loop is here to speed up the process of finding the correct information
+                    count = 0
+                    stop_while = False
+                    while len(found_taxids) < len(set(staxids_l)):  # as long as i have not found all taxids for the seq
+                        count += 1
+                        if stop_while:
+                            break
+                        if count == 5:
+                            break  # too many tries to find correct number of redundant taxa
+                        elif count == 1:
+                            id_before = 0
+                            for i in range(0, len(sallseqid_l)):
+                                # if we found all taxon_ids present in the initial list, stop looking for more
+                                if len(found_taxids) == len(staxids_l):
+                                    break
+                                gb_acc = get_acc_from_blast(sallseqid_l[i])
+
+                                # if gb acc was already read in before stop the for loop
+                                if gb_acc in queried_acc:
+                                    stop_while = True
+                                    break
+
+                                stitle = salltitles_l[i]
+                                # if both var are the same, we do not need to search GB for taxon info
+                                staxids = tax_id_l[i]
+                                qtaxid = int(get_taxid_from_acc(gb_acc, config.blastdb, config.workdir)[0])
+                                id_now = qtaxid
+                                assert str(qtaxid) in staxids_l, (str(qtaxid), staxids_l)
+                                assert qtaxid in tax_id_l, (qtaxid, tax_id_l)
+                                assert str(staxids) in staxids_l, (staxids, staxids_l)
+
+                                # sometimes if multiple seqs are merged,
+                                # we lack information about which taxon is which gb_acc...
+                                # test it here:
+                                # if we have same number of gb_acc and taxon id go ahead as usual
+                                if len(sallseqid_l) == len(staxids_l):
+                                    sscinames = sscinames_l[i]
+                                # if only one taxon id present, all are from same taxon
+                                elif len(staxids_l) == 1:
+                                    sscinames = sscinames_l[0]
+                                    qtaxid = staxids_l[0]
+                                # if not the first item and id different from before: get name
+                                elif i != 0 and id_before != id_now:
+                                    sscinames = ncbi_parser.get_name_from_id(qtaxid)
+                                elif i == 0:  # for first item in redundant data, always get info
+                                    sscinames = ncbi_parser.get_name_from_id(qtaxid)
+                                else:  # if id_before and id_now were the same, we do not need to add same seq again
+                                    continue
+                                # next vars are used to stop loop if all taxids were found
+                                found_taxids.add(staxids)
+                                found_spn.add(sscinames)
+                                id_before = qtaxid
+                                # add info to new_blast_seq_dict
+                                if gb_acc not in queried_acc:
+                                    queried_acc.add(gb_acc)
+                                    new_blast_seq_dict = new_blast_seq_dict.append(
+                                        {'ncbi_txn': sscinames, 'ncbi_txid': abs(int(staxids)), 'status': -100,
+                                         "date": datetime.datetime.strptime('01/01/00', '%d/%m/%y'),
+                                         "accession": gb_acc, 'pident': float(pident), 'evalue': float(evalue),
+                                         'bitscore': float(bitscore), 'sseq': sseq, 'title': stitle}, ignore_index=True)
+                else:
+                    staxids = int(staxids)
+                    if gb_acc not in queried_acc:
+                        queried_acc.add(gb_acc)
+                        new_blast_seq_dict = new_blast_seq_dict.append(
+                            {'ncbi_txn': sscinames, 'ncbi_txid': abs(int(staxids)), 'status': -100,
+                             "date": datetime.datetime.strptime('01/01/00', '%d/%m/%y'), "accession": gb_acc,
+                             'pident': float(pident), 'evalue': float(evalue),
+                             'bitscore': float(bitscore), 'sseq': sseq, 'title': stitle}, ignore_index=True)
+    # add data which was not added before and that passes the evalue thresh
+    new_blast_seq_dict = wrapper_get_fullseq(config, new_blast_seq_dict, db_name)
+    print('new_blast_dict')
+    print(len(new_blast_seq_dict))
+    print(new_blast_seq_dict[['ncbi_txn', 'ncbi_txid', 'status', 'accession']])
+    return new_blast_seq_dict
+
+
+def get_blastval_from_line(db_name, lin, ncbi_parser, taxon):
+    """
+    Method used in read_blast_query() that splits the lin of the result file as needed
+    :param db_name: name that specifies if filterrun, unpublished or normal search
+    :param lin: line in file
+    :param ncbi_parser: ncbi parser class to translate names, id's,...
+    :param taxon:
+    :return:
+    """
+    sseqid, staxids, sscinames, pident, evalue, bitscore, sseq, salltitles, sallseqid = lin.strip().split('\t')
+    # get acc is more difficult now, as new seqs not always have gi number, then query changes
+    if db_name == 'filterrun':
+        staxids = str(taxon)
+        sscinames = ncbi_parser.get_name_from_id(staxids)
+        stitle = None
+        salltitles = None
+        sallseqid = sseqid
+    else:
+        sscinames = sscinames.replace(" ", "_").replace("/", "_")
+        stitle = salltitles
+
+    gb_acc = get_acc_from_blast(sseqid)
+    sseq = sseq.replace("-", "")
+    pident = float(pident)
+    evalue = float(evalue)
+    bitscore = float(bitscore)
+    return bitscore, evalue, gb_acc, pident, sallseqid, salltitles, sscinames, sseq, staxids, stitle
+
+
+def split_multiple_tolist(sallseqid, salltitles, sscinames, staxids):
+    """
+    For redundant data this will split the string with multiple information into a list.
+
+    :param sallseqid:
+    :param salltitles:
+    :param sscinames:
+    :param staxids:
+    :return:
+    """
+    staxids_l = staxids.split(";")
+    sscinames_l = sscinames.split(";")
+    sallseqid_l = sallseqid.split(";")
+    salltitles_l = salltitles.split("<>")
+    return sallseqid_l, salltitles_l, sscinames_l, staxids_l
