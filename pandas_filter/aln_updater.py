@@ -1,5 +1,5 @@
 # class for aln updating
-#from __future__ import absolute_import
+# from __future__ import absolute_import
 
 import os
 import glob
@@ -39,13 +39,9 @@ class PhyAlnUpdater(object):
         self.tre = tre
         self.config = config
 
-        # todo is this needed???
-        if self.status == 1:
-            add_to_aln = self.table[self.table['status'] != 0]
-        else:
-            add_to_aln = self.table[self.table['status'] >= 1]
+        add_to_aln = self.table[self.table['status'].astype(int) > 0]
         self.new_seq_table = add_to_aln
-        self.new_seqs = new_seq_acc_seq
+        # self.new_seqs = new_seq_acc_seq
         self.newseqs_file = "{}.fasta".format(str(datetime.date.today()))
 
     def update_data(self):
@@ -59,16 +55,17 @@ class PhyAlnUpdater(object):
             self.align_query_seqs()
             self.place_query_seqs()
             self.prune_short()
-            self.write_papara_alnfile()
             self.trim()
-            print('est tree')
-            self.est_full_tree()  # for development speed up
+            self.est_full_tree()
+            # todo commented for development speed up
             # self.calculate_final_tree()
 
             self.tre = Tree.get(path="{}/RAxML_bestTree.{}".format(self.config.workdir, str(datetime.date.today())),
                                 schema="newick",
                                 preserve_underscores=True,
                                 taxon_namespace=self.aln.taxon_namespace)
+            fn = '{}/papara_alignment.extended'.format((self.config.workdir))
+            self.aln = DnaCharacterMatrix.get(path=fn, schema="phylip")
             os.rename("{}/RAxML_bestTree.{}".format(self.config.workdir, str(datetime.date.today())),
                       "{}/upd_tre".format(self.config.workdir))
 
@@ -110,6 +107,7 @@ class PhyAlnUpdater(object):
 
         fn = "{}/papara_alignment.{}".format(self.config.workdir, papara_runname)
         fn = os.path.abspath(fn)
+        print(fn)
         self.aln = DnaCharacterMatrix.get(path=fn, schema="phylip")
         self.aln.taxon_namespace.is_mutable = True  # Was too strict...
         lfd = "{}/logfile".format(self.config.workdir)
@@ -124,17 +122,14 @@ class PhyAlnUpdater(object):
         print("write query seq")
         fi = open("{}/{}".format(self.config.workdir, self.newseqs_file), "w")
         for idx in self.new_seq_table.index:
-            row = (self.new_seqs[self.new_seqs['accession'].str.contains(self.new_seq_table.loc[idx, 'tip_name'],
-                                                                         regex=False)])
-            if len(row) > 0:
-                tip_name = self.new_seq_table.loc[idx, 'tip_name'].split('.')[0]
-                fi.write(">{}\n".format(tip_name))
-                idx_newseq = row.index
-                # !! index is some form of list. only like this it will print it as str
-                seq = self.new_seqs.loc[idx_newseq[0]]['sseq']
-                fi.write("{}\n".format(seq))
+            tip_name = self.new_seq_table.loc[idx, 'accession'].split('.')[0]
+            fi.write(">{}\n".format(tip_name))
+            # idx_newseq = row.index
+            # !! index is some form of list. only like this it will print it as str
+            seq = self.new_seq_table.loc[idx]['sseq']
+            fi.write("{}\n".format(seq))
 
-    def write_papara_alnfile(self, ):
+    def write_papara_alnfile(self):
         """This writes out aln files for papara (except query sequences).
         Papara needs phylip format for the alignment.
 
@@ -186,7 +181,7 @@ class PhyAlnUpdater(object):
                      "step due to sequence shorter than {}\n".format(seq_len_cutoff))
             for tax in prune:
                 self.remove_taxa_aln_tre(tax.label)
-                fi.write("{}, {}\n".format(tax.label, self.table[tax.label].get('tip_name')))
+                fi.write("{}, {}\n".format(tax.label, self.table[tax.label].get('accession')))
             fi.close()
         for tax in prune:
             self.table[tax.label]["status"] = "deleted in prune short"
@@ -217,8 +212,8 @@ class PhyAlnUpdater(object):
         """ It removes bases at the start and end of alignments, if they are represented by less than the value
         specified in the config file. E.g. 0.75 given in config.
 
-        Means, that 75% of the sequences need to have a base present. Ensures, that not whole chromosomes get dragged in.
-        It's cutting the ends of long sequences.
+        Means, that 75% of the sequences need to have a base present. This ensures, that not whole chromosomes
+        get dragged in by cutting the ends of long sequences.
         """
         # print('in trim')
         taxon_missingness = self.config.trim_perc
@@ -262,7 +257,7 @@ class PhyAlnUpdater(object):
         lfd = "{}/logfile".format(self.config.workdir)
         with open(lfd, "a") as log:
             log.write("trimmed alignment ends to < {} missing taxa, "
-                         "start {}, stop {}\n".format(taxon_missingness, start, stop))
+                      "start {}, stop {}\n".format(taxon_missingness, start, stop))
         return
 
     def check_tre_in_aln(self):
@@ -270,7 +265,7 @@ class PhyAlnUpdater(object):
         """
         print('check_tre_in_aln')
         aln_ids = set(taxon.label for taxon in self.aln)
-        # todo assert does not work if i change aln name for file writing! (removing .1 from gb_acc
+        # todo assert does not work if i change aln name for file writing! (removing .1 from gb_acc)
         # assert aln_ids.issubset(self.table['tip_name'].tolist()), ([x for x in aln_ids if x not in self.table['tip_name'].tolist()], self.table['tip_name'].tolist())
         treed_taxa = set(leaf.taxon.label for leaf in self.tre.leaf_nodes())
         treed_tax_not_in_aln = [tax for tax in treed_taxa if tax not in aln_ids]
@@ -387,7 +382,7 @@ class PhyAlnUpdater(object):
         -n: output fn
         -t: starting tree
         -b: bootstrap random seed
-        -#: bootstrap stopping criteria
+        -# : bootstrap stopping criteria
         -z: specifies file with multiple trees
 
         -f b: to make bipartition tree only
@@ -443,7 +438,6 @@ class PhyAlnUpdater(object):
                              "-n", "EMR{}".format(date)])
         except:
             sys.stderr.write("You do not have the raxmlHPC-PTHREADS installed, will fall down to slow version!")
-
             # strict consensus:
             subprocess.call(["raxmlHPC", "-m", "GTRCAT",
                              "-J", "STRICT",
@@ -481,7 +475,8 @@ class PhyAlnUpdater(object):
         # todo reassign self tre and aln to updated data
 
     def write_files(self, treepath="PhyFilter.tre", treeschema="newick", alnpath="PhyFilter.fas", alnschema="fasta"):
-        """Outputs dendropy tre and aln as file
+        """
+        Outputs dendropy tre and aln as file.
         """
         print("write_files")
         self.tre.write(path="{}/{}".format(self.config.workdir, treepath),
@@ -507,7 +502,7 @@ class PhyAlnUpdater(object):
         new_names = set()
         for taxon in tmp_tre.taxon_namespace:
             new_label = '{}_{}'.format(self.table['ncbi_txn'],
-                                       self.table['tip_name'])  # tipname is either tipname or gi number!
+                                       self.table['accession'])  # tipname is either tipname or gi number!
             taxon.label = new_label
             new_names.add(new_label)
         tmp_tre.write(path=treepath,
@@ -633,7 +628,7 @@ class InputCleaner(object):
 
         :return: replaced tip names
         """
-        tipnames = self.table['tip_name'].tolist()
+        tipnames = self.table['accession'].tolist()
         for tax in self.aln.taxon_namespace:
             if tax.label in tipnames:
                 pass
@@ -645,7 +640,7 @@ class InputCleaner(object):
                     newname = tax.label[2:]
                     newname = newname[:-1]
                 for idx in self.table.index:
-                    original = self.table.loc[idx, "tip_name"]
+                    original = self.table.loc[idx, "accession"]
                     if original == tax.label or original == newname:
                         tax.label = self.table.loc[idx, "accession"]
                         found_label = 1
@@ -666,7 +661,7 @@ class InputCleaner(object):
         aln = DnaCharacterMatrix.get(path=upd_aln_fn, schema='fasta', taxon_namespace=self.tre.taxon_namespace)
         return aln
 
-# #################################
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # 
 
 # todo unused
 def aln_to_seqs(aln, unalign):
