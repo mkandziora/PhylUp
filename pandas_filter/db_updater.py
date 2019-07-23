@@ -4,8 +4,6 @@ import datetime
 from . import get_user_input, cd
 
 
-
-
 def _download_localblastdb(self):
     """Check if files are present and if they are uptodate.
     If not files will be downloaded.
@@ -31,8 +29,7 @@ def _download_localblastdb(self):
                         os.system("gunzip -cd taxdb.tar.gz | (tar xvf - )")
                         os.system("rm *.tar.gz*")
                 elif x == "no":
-                    print(
-                        "You did not agree to download data from ncbi. Program will default to blast web-queries.")
+                    print("You did not agree to download data from ncbi. Program will default to blast web-queries.")
                     self.blast_loc = "remote"
                 else:
                     print("You did not type yes or no!")
@@ -57,6 +54,7 @@ def _download_localblastdb(self):
                         print("You did not agree to update data from ncbi. Old database files will be used.")
                     else:
                         print("You did not type 'yes' or 'no'!")
+
 
 def _download_ncbi_parser(self):
     """Check if files are present and if they are up to date.
