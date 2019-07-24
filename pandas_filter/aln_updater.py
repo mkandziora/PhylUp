@@ -20,16 +20,15 @@ from dendropy import Tree, DnaCharacterMatrix  # , DataSet, datamodel
 
 class PhyAlnUpdater(object):
     """
-    Class to update aln and tre with newly retrived sequences.
+    Class to update aln and tre with newly retrieved sequences.
 
     Last step in the pipeline.
     """
-    def __init__(self, tre, aln, status, new_seq_acc_seq, table, config):
+    def __init__(self, tre, aln, status, table, config):
         """
         :param tre: dendropy tree object
         :param aln: dendropy alignment object
         :param status: status, how many cycles since start...
-        :param new_seq_acc_seq:
         :param table: pd df table with all the information about the seqs, old and new
         :param config: config object
         """
@@ -39,9 +38,10 @@ class PhyAlnUpdater(object):
         self.tre = tre
         self.config = config
 
+        print(self.table['status'])
+        print(self.table[self.table['status'].astype(int) > 0])
         add_to_aln = self.table[self.table['status'].astype(int) > 0]
         self.new_seq_table = add_to_aln
-        # self.new_seqs = new_seq_acc_seq
         self.newseqs_file = "{}.fasta".format(str(datetime.date.today()))
 
     def update_data(self):
@@ -50,15 +50,17 @@ class PhyAlnUpdater(object):
 
         :return: output files
         """
+        print('start update')
+        print(len(self.new_seq_table))
         if len(self.new_seq_table) > 0:
+            print('update data')
             self.write_papara_queryseqs()
             self.align_query_seqs()
             self.place_query_seqs()
             self.prune_short()
             self.trim()
             self.est_full_tree()
-            # todo commented for development speed up
-            # self.calculate_final_tree()
+            # self.calculate_final_tree()   # todo commented for development speed up
 
             self.tre = Tree.get(path="{}/RAxML_bestTree.{}".format(self.config.workdir, str(datetime.date.today())),
                                 schema="newick",
