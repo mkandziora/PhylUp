@@ -1,3 +1,4 @@
+import pickle
 from pandas_filter import pandas_numpy_try1, config
 
 workdir = "test_runs"
@@ -24,8 +25,10 @@ test = pandas_numpy_try1.Update_data(id_to_spn, seqaln, mattype, trfn, schema_tr
 print()
 
 # test.build_table(fn)
+# if os.path.exists('{}/pickled'.format(test.config.workdir)):
+#     test = pickle.load('{}/pickled'.format(test.config.workdir))
 test.run()
 tab = test.table
 print(test.table[['tip_name', 'status']])
 
-print(len(test.table[test.table['status'] != 'original']))
+print(len(test.table[test.table['status'] == 0]))

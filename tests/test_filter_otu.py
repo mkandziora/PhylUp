@@ -23,7 +23,12 @@ def test_filter_otu_no_rank():
 
     before = len(new_seqs)
     new_seqs_org = new_seqs
-    f = pandas_numpy_try1.FilterNumberOtu(test.config, test.table, aln)
+
+    present = test.table['status'] != 'deleted'
+    old_status = test.table['status'] < test.status
+    comp_table = test.table[present & old_status]
+
+    f = pandas_numpy_try1.FilterNumberOtu(test.config, test.table, test.status)
     f.filter(new_seqs)
     new_seqs = f.upd_new_seqs
 
@@ -36,9 +41,9 @@ def test_filter_otu_no_rank():
     # with downtorank
     new_seqs = new_seqs_org
     before_dtr = len(new_seqs)
-    aln = test.read_in_aln()
 
-    f = pandas_numpy_try1.FilterNumberOtu(test.config, test.table, aln)
+
+    f = pandas_numpy_try1.FilterNumberOtu(test.config, test.table, test.status)
     f.filter(new_seqs, 'genus')
     new_seqs = f.upd_new_seqs
 

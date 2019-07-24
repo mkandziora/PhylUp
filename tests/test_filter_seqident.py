@@ -19,9 +19,14 @@ def test_filter_seqident():
 
     before = len(new_seqs)
 
-    aln = test.read_in_aln()
+    present = test.table['status'] != 'deleted'
+    old_status = test.table['status'] < test.status
+    comp_table = test.table[present & old_status]
 
-    f = pandas_numpy_try1.FilterSeqIdent(test.config, aln, test.table)
+    seqs_to_comp = comp_table[['ncbi_txid', 'tip_name', 'sseq']]
+
+
+    f = pandas_numpy_try1.FilterSeqIdent(test.config, seqs_to_comp, test.table, test.status)
     f.filter(new_seqs)
     new_seqs = f.upd_new_seqs
 
