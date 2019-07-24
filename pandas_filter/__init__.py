@@ -5,14 +5,11 @@
 
 import sys
 import os
-import json
 import contextlib
-import csv
 from builtins import input
-from ete3 import NCBITaxa
-from dendropy import Tree, DnaCharacterMatrix, DataSet, datamodel
+import logging
 
-_DEBUG_MK = 1
+_DEBUG_MK = 0
 
 
 def debug(msg):
@@ -64,3 +61,72 @@ def write_msg_logfile(msg, workdir, fn="logfile"):
     lfd = "{}/{}".format(workdir, fn)
     with open(lfd, "a") as log:
         log.write(msg)
+
+
+def license_print():
+    sys.stdout.write(
+    """
+    Physcraper: automatic updating of phylogenies
+    Copyright (C) 2019  E.J. McTavish and M. Kandziora
+
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with this program.  If not, see <https://www.gnu.org/licenses/>.
+    """)
+
+
+# global logger
+# http://docs.python.org/library/logging.html
+# LOG = logging.getLogger("")
+# logging.basicConfig(filename='debug.log',level=logging.DEBUG,
+#                    format='%(levelname)s [%(asctime)s]: %(message)s')
+
+
+def setup_logger(name, log_file, level=logging.INFO, writemode="w"):
+    """setups as many loggers as you want.
+    """
+    formatter = logging.basicConfig(filemode="w+", format='%(levelname)s [%(asctime)s]: %(message)s')
+
+    log_fn = "{}".format(log_file)
+    handler = logging.FileHandler(log_fn)
+    handler.setFormatter(formatter)
+
+    logger = logging.getLogger(name)
+    logger.setLevel(level)
+    logger.addHandler(handler)
+
+    return logger
+
+# setup different loggers
+log_dict = {}
+
+log_dict2 = {}
+
+
+def log_info(text, wd):
+    """
+    setup info logger"""
+    if wd not in log_dict:
+        dlog = setup_logger("info_log", '{}/info.log'.format(wd), level=logging.INFO, writemode="w+")
+        dlog.propagate = True  # logs to file and console
+        log_dict[wd] = dlog
+    log_dict[wd].info(text)
+
+
+def log_debug(text, wd):
+    """
+    setup debug logger"""
+    if wd not in log_dict2:
+        dlog = setup_logger("debug_log", '{}/debug.log'.format(wd), level=logging.DEBUG, writemode="w+")
+        dlog.propagate = False  # logs to file only
+        log_dict2[wd] = dlog
+    log_dict2[wd].debug(text)
