@@ -6,6 +6,10 @@ parts are altered from https://github.com/zyxue/ncbitax2lin/blob/master/ncbitax2
 import os
 import sys
 import pandas as pd
+import logging
+import re
+import multiprocessing
+
 from . import debug
 
 debug("Current ncbi_parser version number: 07102019.0")
@@ -13,6 +17,8 @@ debug("Current ncbi_parser version number: 07102019.0")
 nodes = None
 names = None
 
+
+# todo: make_lineage_table needs to be rerun, when nodes and names are updated.
 
 def strip(str_):
     """ Strips of blank characters from string in pd dataframe.
@@ -108,10 +114,12 @@ class Parser:
 
     def get_mrca(self, taxid_set):
         """
-        Find mrca for a set of taxa.
+        Find mrca for a set of taxon ids.
 
-        :param taxid_set:
-        :return:
+        Finds the most recent common ancestor of  all provided ncbi taxon ids.
+
+        :param taxid_set: set of ncbi taxon ids
+        :return: mrca
         """
         print('get mrca from taxid_set')
         if nodes is None:
@@ -136,7 +144,11 @@ class Parser:
                     continue
 
     def taxid_is_valid(self, tax_id):
-        """check if input number is known by ncbi.
+        """
+        Checks if input taxon id is known by ncbi.
+
+        :param tax_id:  ncbi taxon id
+        :return: True or False
         """
         if nodes is None:
             self.initialize()
@@ -159,27 +171,42 @@ class Parser:
         return rank
 
     def get_downtorank_id(self, tax_id, downtorank="species"):
-        """ Recursive function to find the parent id of a taxon as defined by downtorank.
+        """
+        Recursive function to find the parent id of a taxon as defined by downtorank.
+
+        Returns the taxonomic id of the specified rank to the taxon id provided,
+        e.g. user gives a taxon id of a species and wants to find the corresponding family id.
+
+        :param tax_id:
+        :param downtorank: rank provided as string, e.g. 'species'. Rank must be known by ncbi,
+        :return:
         """
         # debug("get downtorank")
+        if downtorank == 'no rank':
+            sys.stderr.write("Cannot provide an id of a given taxon id corresponding to 'no rank'.")
+            sys.exit(-5)
+        id_known = self.taxid_is_valid(tax_id)
+        if id_known == False:
+            sys.stderr.write("Taxon id is not known by nodes. Probably to new.\n'.")
+            sys.exit(-6)
+
         if nodes is None:
             self.initialize()
         if type(tax_id) != int:
             # sys.stdout.write("WARNING: mrca_id {} is no integer. Will convert value to int\n".format(mrca_id))
             tax_id = int(tax_id)
         # following statement is to get id of taxa if taxa is higher ranked than specified
-        try:
-            rank = nodes[nodes["tax_id"] == tax_id]["rank"].values[0]
-        except IndexError:
-            rank = None
-            return rank
+        rank = nodes[nodes["tax_id"] == tax_id]["rank"].values[0]
+        # try:
+        #     rank = nodes[nodes["tax_id"] == tax_id]["rank"].values[0]
+        # except IndexError:
+        #     sys.stderr.write("Cannot provide an id of a given taxon id corresponding to 'no rank'.")
+        #     rank = None
+        #     return rank
         if rank != "species":
             if downtorank == "species":
-                if (
-                    nodes[nodes["tax_id"] == tax_id]["rank"].values[0] != "varietas"
-                    and nodes[nodes["tax_id"] == tax_id]["rank"].values[0]
-                    != "subspecies"
-                ):
+                if (nodes[nodes["tax_id"] == tax_id]["rank"].values[0] != "varietas"
+                    and nodes[nodes["tax_id"] == tax_id]["rank"].values[0] != "subspecies"):
                     return tax_id
         if nodes[nodes["tax_id"] == tax_id]["rank"].values[0] == downtorank:
             return tax_id
@@ -191,21 +218,27 @@ class Parser:
             return self.get_downtorank_id(parent_id, downtorank)
 
     def match_id_to_mrca(self, tax_id, mrca_id):
-        """ Recursive function to find out if tax_id is part of mrca_id.
+        """
+        Recursive function to find out if tax_id is part of mrca_id.
+
+        :param tax_id: ncbi taxon id of otu to be checked
+        :param mrca_id: provided mrca ncbi taxon id
+        :return: taxon id (= mrca id) if matches, if not 0
+        """
+        """ 
         """
         debug("match_id_to_mrca")
-        if tax_id in [81077, 28384]:  # other sequences/artificial sequences
-            debug("artifical")
-            tax_id = 0
-            return tax_id
-
-        if tax_id == 131567 or tax_id == 1 or tax_id == 0:  # cellular organism
-            tax_id = 0
-            debug("cellular or 0")
-            return tax_id
-       
         if nodes is None:
             self.initialize()
+        id_known = self.taxid_is_valid(tax_id)
+        if id_known == False:
+            sys.stderr.write("Taxon id is not known known by nodes. Probably to new.\n'.")
+            sys.exit(-6)
+        id_known = self.taxid_is_valid(mrca_id)
+        if id_known == False:
+            sys.stderr.write("mrca id is not known by nodes. Probably to new.\n'.")
+            sys.exit(-6)
+
         if type(mrca_id) == set:
             if len(mrca_id) == 1:
                 mrca_id = next(iter(mrca_id))
@@ -215,17 +248,32 @@ class Parser:
         elif type(mrca_id) != int:
             # sys.stdout.write("WARNING: mrca_id {} is no integer. Will convert value to int\n".format(mrca_id))
             mrca_id = int(mrca_id)
+
         if type(tax_id) != int:
             # sys.stdout.write("WARNING: mrca_id {} is no integer. Will convert value to int\n".format(mrca_id))
             tax_id = int(tax_id)
+
+        if tax_id in [81077, 28384, 131567, 1, 0]:  # other sequences/artificial sequences
+            debug("artifical")
+            tax_id = 0
+            return tax_id
+
         debug([tax_id, mrca_id])
-        rank_mrca_id = nodes[nodes["tax_id"] == mrca_id]["rank"].values[0]
-        rank_tax_id = nodes[nodes["tax_id"] == tax_id]["rank"].values[0]
-        debug([rank_mrca_id, rank_tax_id])
+        rank_mrca = nodes[nodes["tax_id"] == mrca_id]["rank"].values[0]
+        rank_tax = nodes[nodes["tax_id"] == tax_id]["rank"].values[0]
+
+        # try:
+        #     rank_tax = nodes[nodes["tax_id"] == tax_id]["rank"].values[0]
+        # except IndexError:
+        #     with open('nodes.err', "a") as log:
+        #         log.write('ncbi taxon id {} not known by nodes. Probably to new.\n'.format(tax_id))
+        #         return tax_id
+        debug([rank_mrca, rank_tax])
+        #todo rewrite to return true/false
         if tax_id == mrca_id:
             debug("found right rank")
             return tax_id
-        elif rank_tax_id == "superkingdom":
+        elif rank_tax == "superkingdom":
             debug("superkingdom")
             tax_id = 0
             return tax_id
@@ -319,3 +367,199 @@ class Parser:
                     fn.write("{}".format(tax_name))
                     fn.close()
         return tax_id
+
+    def get_lower_from_id(self, tax_id):
+        """
+        Find all lower taxon ids for given id.
+
+        Takes ages, as it loops through almost all ids provided by ncbi.
+        :param tax_id:
+        :return:
+        """
+        if names is None:
+            self.initialize()
+        rank_mrca = nodes[nodes["tax_id"] == tax_id]["rank"].values[0]
+        spn = self.get_name_from_id(tax_id)
+        if rank_mrca in ['tax_id',
+                         'superkingdom',
+                         'phylum',
+                         'class',
+                         'order',
+                         'family',
+                         'tribe',
+                         'genus',
+                         'species']:  # corresponds to what is written into the lineage files.
+
+            df = lineages_to_df(rank_mrca, spn)
+        else:
+            while rank_mrca not in ['tax_id',
+                                    'superkingdom',
+                                    'phylum',
+                                    'class',
+                                    'order',
+                                    'family',
+                                    'tribe',
+                                    'genus',
+                                    'species']:
+                parent_id = int(nodes[nodes["tax_id"] == tax_id]["parent_tax_id"].values[0])
+                rank_mrca = nodes[nodes["tax_id"] == parent_id]["rank"].values[0]
+                if rank_mrca in ['tax_id',
+                                 'superkingdom',
+                                 'phylum',
+                                 'class',
+                                 'order',
+                                 'family',
+                                 'tribe',
+                                 'genus',
+                                 'species']:
+                    df = lineages_to_df(rank_mrca, spn)
+        return df['tax_id'].to_list()
+
+
+def lineages_to_df(rank, name):
+    """
+    Returns pandas df subset of the taxon ids that correspond to the provided rank-name.
+    E.g. 'family' and 'Asteraceae' will return all entries that exists for Asteraceae.
+
+    :param rank: as known by ncbi taxonomy - not 'no rank'.
+    :param name:
+    :return:
+    """
+    if rank == 'no rank':
+        sys.stderr.write("Cannot provide an id of a given taxon id corresponding to 'no rank'.")
+        sys.exit(-5)
+    if not os.path.exists(os.path.join('lineages_cols.csv')):
+        make_lineage_table()
+    lin = pd.read_csv(os.path.join('lineages_cols.csv'))
+    subset = lin[lin[rank] == name]
+    return subset
+
+# copy from ncbitax2lin
+def make_lineage_table():
+    """
+    Produces the table needed for get_lower_from_id().
+    :return:
+    """
+    # data downloaded from ftp://ftp.ncbi.nih.gov/pub/taxonomy/
+    nodes_df = load_nodes('./data/nodes.dmp')
+    names_df = load_names('./data/names.dmp')
+    df = nodes_df.merge(names_df, on='tax_id')
+    df = df[['tax_id', 'parent_tax_id', 'rank', 'name_txt']]
+    df.reset_index(drop=True, inplace=True)
+    # # log summary info about the dataframe
+    # print('=' * 50)
+    # df.info(verbose=True, memory_usage="deep")
+    # print('=' * 50)
+
+    global TAXONOMY_DICT
+    TAXONOMY_DICT = dict(zip(df.tax_id.values, df.to_dict('records')))
+    ncpus = multiprocessing.cpu_count()
+    print('map - takes time and a lot of memory... (multiprocessing)')
+    pool = multiprocessing.Pool(ncpus)
+    # take about 18G memory
+    lineages_dd = pool.map(find_lineage, df.tax_id.values)
+    pool.close()
+    dd_for_df = dict(zip(range(len(lineages_dd)), lineages_dd))
+    print('make pandas df')
+    lineages_df = pd.DataFrame.from_dict(dd_for_df, orient='index')
+    lineages_df.sort_values('tax_id', inplace=True)
+    cols = ['tax_id',
+            'superkingdom',
+            'phylum',
+            'class',
+            'order',
+            'family',
+            'tribe',
+            'genus',
+            'species']
+    lineages_df.to_csv(os.path.join('lineages_cols.csv'), index=False, columns=cols)
+
+    # zipping does not work, byte issue
+    # util.backup_file(lineages_csv_output)
+    # print('write zip')
+    # lineages_csv_output = os.path.join('{0}.csv.gz'.format(output))
+    # with open(lineages_csv_output, 'wb') as opf:
+    #     # make sure the name and timestamp are not gzipped, (like gzip -n)
+    #     opf_gz = gzip.GzipFile(
+    #         filename='',        # empty string because fileobj is given
+    #         mode='wb',          # wb doesn't seem to work sometimes
+    #         compresslevel=9,
+    #         fileobj=opf,
+    #         mtime=0.   # an optional numeric timestamp, set to be deterministic
+    #     )
+    #     cols = ['tax_id',
+    #             'superkingdom',
+    #             'phylum',
+    #             'class',
+    #             'order',
+    #             'family',
+    #             'tribe'
+    #             'genus',
+    #             'species']
+    #     other_cols = sorted([__ for __ in lineages_df.columns
+    #                          if __ not in cols])
+    #     output_cols = cols + other_cols
+    #     output_cols_byte = []
+    #     for item in output_cols:
+    #         item = item.encode()
+    #         output_cols_byte.append(item)
+    #     lineages_df.to_csv(opf_gz, index=False, columns=output_cols_byte)
+    #     opf_gz.close()
+
+
+# copy from ncbitax2lin
+def to_dict(lineage):
+    """
+    convert the lineage into a list of tuples in the form of
+
+    [
+        (tax_id1, rank1, name_txt1),
+        (tax_id2, rank2, name_txt2),
+        ...
+    ]
+
+    to a dict
+    """
+    dd = {}
+    num_re = re.compile('[0-9]+')
+    len_lineage = len(lineage)
+    for k, __ in enumerate(lineage):
+        tax_id, rank, name_txt = __
+        # use the last rank as the tax_id, whatever it is, genus or species.
+        if k == len_lineage - 1:
+            dd['tax_id'] = tax_id
+
+        # e.g. there could be multiple 'no rank'
+        numbered_rank = rank
+        while numbered_rank in dd:
+            # print __, numbered_rank
+            search = num_re.search(numbered_rank)
+            if search is None:
+                count = 1
+            else:
+                count = int(search.group()) + 1
+            numbered_rank = '{0}{1}'.format(rank, count)
+        dd[numbered_rank] = name_txt
+    return dd
+
+
+# copy from ncbitax2lin
+def find_lineage(tax_id):
+    """
+
+    :param tax_id:
+    :return:
+    """
+    if tax_id % 50000 == 0:
+        logging.debug('working on tax_id: {0}'.format(tax_id))
+    lineage = []
+    while True:
+        rec = TAXONOMY_DICT[tax_id]
+        lineage.append((rec['tax_id'], rec['rank'], rec['name_txt']))
+        tax_id = rec['parent_tax_id']
+        if tax_id == 1:
+            break
+    # reverse results in lineage of Kingdom => species, this is helpful for
+    # to_dict when there are multiple "no rank"s
+    lineage.reverse()
+    return to_dict(lineage)
