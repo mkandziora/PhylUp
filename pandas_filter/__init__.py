@@ -1,8 +1,6 @@
 #!/usr/bin/env python
 """init module"""
 
-#from __future__ import absolute_import
-
 import sys
 import os
 import contextlib
@@ -51,11 +49,14 @@ def get_user_input():
             print("'%s' is not a valid answer." % e.args[0].split(": ")[1])
     return x
 
+
 def write_msg_logfile(msg, workdir, fn="logfile"):
     """
     Write string to logfile.
 
     :param msg: string
+    :param workdir: working directory as string
+    :param fn: filename for logging
     :return:
     """
     lfd = "{}/{}".format(workdir, fn)
@@ -64,10 +65,15 @@ def write_msg_logfile(msg, workdir, fn="logfile"):
 
 
 def license_print():
+    """
+    Print the corresponding license
+    :return:
+    """
+    # todo needs to be added to start of program when finished
     sys.stdout.write(
     """
-    Physcraper: automatic updating of phylogenies
-    Copyright (C) 2019  E.J. McTavish and M. Kandziora
+    PhylUp: automatic updating of phylogenetic data
+    Copyright (C) 2019  M. Kandziora
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -108,7 +114,6 @@ def setup_logger(name, log_file, level=logging.INFO, writemode="w"):
 
 # setup different loggers
 log_dict = {}
-
 log_dict2 = {}
 
 

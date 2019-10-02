@@ -1,5 +1,7 @@
 """uses ncbi databases to easily retrieve taxonomic information.
 
+data is provided by ncbi - downloaded via db_updater
+
 parts are altered from https://github.com/zyxue/ncbitax2lin/blob/master/ncbitax2lin.py
 """
 
@@ -12,13 +14,11 @@ import multiprocessing
 
 from . import debug
 
-debug("Current ncbi_parser version number: 07102019.0")
-
 nodes = None
 names = None
 
 
-# todo: make_lineage_table needs to be rerun, when nodes and names are updated.
+# extodo: make_lineage_table needs to be rerun, when nodes and names are updated: is now part of db_updater
 
 def strip(str_):
     """ Strips of blank characters from string in pd dataframe.
@@ -29,10 +29,13 @@ def strip(str_):
 def load_nodes(nodes_file):
     """ Loads nodes.dmp and converts it into a pandas.DataFrame.
     Contains the information about the taxonomic hierarchy of names.
+
+    :param nodes_file: relative path to the files 'nodes'
+    :return: pandas dataframe with the data
     """
     # print(nodes_file)
     assert os.path.exists(nodes_file), ("file `%s` does not exist. Make sure you downloaded the "
-        "databases from ncbi." % nodes_file )
+                                        "databases from ncbi." % nodes_file)
     col_names = ["tax_id",
                  "parent_tax_id",
                  "rank",
@@ -55,11 +58,15 @@ def load_nodes(nodes_file):
 
 
 def load_names(names_file):
-    """ Loads names.dmp and converts it into a pandas.DataFrame.
+    """
+    Loads names.dmp and converts it into a pandas.DataFrame.
     Includes only names which are accepted as scientific name by ncbi.
+
+    :param names_file: relative path to the files 'names'
+    :return: pandas dataframe with the data
     """
     assert os.path.exists(names_file), ("file `%s` does not exist. Make sure you downloaded the "
-        "databases from ncbi." % names_file)
+                                        "databases from ncbi." % names_file)
     df = pd.read_csv(names_file, sep="|", header=None, index_col=False,
                      names=["tax_id", "name_txt", "unique_name", "name_class"])
     df["name_txt"] = df["name_txt"].apply(strip)
@@ -71,8 +78,12 @@ def load_names(names_file):
 
 
 def load_synonyms(names_file):
-    """Loads names.dmp and converts it into a pandas.DataFrame.
+    """
+    Loads names.dmp and converts it into a pandas.DataFrame.
         Includes only names which are viewed as synonym by ncbi.
+
+    :param names_file: relative path to the files 'names'
+    :return: pandas dataframe with the data
     """
     assert os.path.exists(names_file), ("file `%s` does not exist. Make sure you downloaded "
                                         "the databases from ncbi." % names_file)
@@ -101,8 +112,9 @@ class Parser:
         # self.initialize()
 
     def initialize(self):
-        """ The data itself are not stored in __init__. Instead every time the function is loaded
-        if it has not yet been run during a run - was important for pickle.
+        """
+         The data itself are not stored in __init__. Instead every time the function is loaded
+        if it has not yet been run during a run - was important for pickle. Might therefore not be needed anymore
         """
         print("Initialize NODES and NAMES!!")
         global nodes
@@ -163,25 +175,33 @@ class Parser:
             return False
 
     def get_rank(self, tax_id):
-        """ Get rank for given ncbi tax id.
+        """
+        Get rank for given ncbi tax id.
+
+        :param tax_id: ncbi taxon id
+        :return: rank
         """
         if nodes is None:
             self.initialize()
         rank = nodes[nodes["tax_id"] == tax_id]["rank"].values[0]
         return rank
 
-    def get_downtorank_id(self, tax_id, downtorank="species"):
+    def get_downtorank_id(self, tax_id, downtorank=None):
         """
         Recursive function to find the parent id of a taxon as defined by downtorank.
 
         Returns the taxonomic id of the specified rank to the taxon id provided,
         e.g. user gives a taxon id of a species and wants to find the corresponding family id.
 
-        :param tax_id:
+        :param tax_id: ncbi taxon id
         :param downtorank: rank provided as string, e.g. 'species'. Rank must be known by ncbi,
-        :return:
+        :return: rank id as defined by downtorank
         """
         # debug("get downtorank")
+        # print(tax_id)
+        if downtorank is None:
+            sys.stderr.write("You try to get downtorank without supplying a rank.")
+            return tax_id
         if downtorank == 'no rank':
             sys.stderr.write("Cannot provide an id of a given taxon id corresponding to 'no rank'.")
             sys.exit(-5)
@@ -206,7 +226,7 @@ class Parser:
         if rank != "species":
             if downtorank == "species":
                 if (nodes[nodes["tax_id"] == tax_id]["rank"].values[0] != "varietas"
-                    and nodes[nodes["tax_id"] == tax_id]["rank"].values[0] != "subspecies"):
+                        and nodes[nodes["tax_id"] == tax_id]["rank"].values[0] != "subspecies"):
                     return tax_id
         if nodes[nodes["tax_id"] == tax_id]["rank"].values[0] == downtorank:
             return tax_id
@@ -221,15 +241,14 @@ class Parser:
         """
         Recursive function to find out if tax_id is part of mrca_id.
 
-        :param tax_id: ncbi taxon id of otu to be checked
+        :param tax_id: ncbi taxon id of otu that should be checked
         :param mrca_id: provided mrca ncbi taxon id
         :return: taxon id (= mrca id) if matches, if not 0
-        """
-        """ 
         """
         debug("match_id_to_mrca")
         if nodes is None:
             self.initialize()
+        # do id testing
         id_known = self.taxid_is_valid(tax_id)
         if id_known == False:
             sys.stderr.write("Taxon id is not known known by nodes. Probably to new.\n'.")
@@ -284,7 +303,11 @@ class Parser:
             return self.match_id_to_mrca(parent_id, mrca_id)
 
     def get_name_from_id(self, tax_id):
-        """ Find the scientific name for a given ID.
+        """
+        Find the scientific name for a given ID.
+
+        :param tax_id: ncbi taxon id to be checked
+        :return: taxon name
         """
         # debug("get name from id")
         if names is None:

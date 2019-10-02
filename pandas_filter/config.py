@@ -17,7 +17,7 @@ def is_number(s):
 
 
 class ConfigObj(object):
-    def __init__(self, configfi, workdir, interactive=None):
+    def __init__(self, configfi, workdir, interactive=True):
         """
         Build a configuration class.
 
@@ -98,14 +98,14 @@ class ConfigObj(object):
             self.num_threads = int(os.environ.get('SLURM_JOB_CPUS_PER_NODE'))
         debug(self.num_threads)
 
-        # todo currently not used
-        self.gb_id_filename = config["blast"].get("gb_id_filename", False)
-        if self.gb_id_filename is not False:
-            if self.gb_id_filename == "True" or self.gb_id_filename == "true":
-                self.gb_id_filename = True
-            else:
-                self.gb_id_filename = False
-        debug("shared blast folder? {}".format(self.gb_id_filename))
+        # # todo currently not used
+        # self.gb_id_filename = config["blast"].get("gb_id_filename", False)
+        # if self.gb_id_filename is not False:
+        #     if self.gb_id_filename == "True" or self.gb_id_filename == "true":
+        #         self.gb_id_filename = True
+        #     else:
+        #         self.gb_id_filename = False
+        # debug("shared blast folder? {}".format(self.gb_id_filename))
 
         self.delay = int(config["blast"]["delay"])
         assert is_number(self.delay), ("value `%s`is not a number" % self.delay)
@@ -119,15 +119,14 @@ class ConfigObj(object):
         self.maxlen = float(config["phy_filter"]["max_len"])
         assert 1 < self.maxlen, ("value `%s` is not larger than 1" % self.maxlen)
 
-        # todo currently not used
-        self.add_lower_taxa = config["phy_filter"]["add_lower_taxa"]
-        if self.add_lower_taxa == "True" or self.add_lower_taxa == "true":
-            self.add_lower_taxa = True
+        self.different_level = config["phy_filter"]["different_level"]
+        if self.different_level == "True" or self.different_level == "true":
+            self.different_level = True
         else:
-            self.add_lower_taxa = False
-        assert self.add_lower_taxa in [True, False], ("self.add_lower_taxa `%s` is not True or False" % self.add_lower_taxa)
+            self.different_level = False
+        assert self.different_level in [True, False], ("self.different_level `%s` is not True or False" % self.different_level)
 
-        # todo: currently unused
+        # todo: currently unused - implement length
         self.filtertype = config["phy_filter"]["filtertype"]
         assert self.filtertype in ['blast', 'length'], ("self.filtertype `%s` is not 'blast' or 'length'" % self.filtertype)
 
@@ -136,6 +135,11 @@ class ConfigObj(object):
             self.backbone = True
         else:
             self.backbone = False
+        self.update_tree = config["phy_filter"]["update_tree"]
+        if self.update_tree == "True" or self.update_tree == "true":
+            self.update_tree = True
+        else:
+            self.update_tree = False
 
         self.threshold = int(config["phy_filter"]["threshold"])
         self.downtorank = config["phy_filter"]["downtorank"]
@@ -154,7 +158,9 @@ class ConfigObj(object):
 
         ####
         # check database status
-        print(interactive)
+
+        #todo: check how to make it interactive again.
+        print('Status for interactive is {}'.format(interactive))
         if interactive is None:
             interactive = sys.stdin.isatty()
             if interactive is False:
