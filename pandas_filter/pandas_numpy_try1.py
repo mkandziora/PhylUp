@@ -13,10 +13,10 @@ from . import write_msg_logfile
 
 
 # DONE TODO: write concat class
-# TODO: write mrca list for non-monophyletic
+# DONE TODO: write mrca list for non-monophyletic
 # TODO: add add_lower_taxa function (palms dataset) - work in progress
 # TODO: write tests
-# todo: otu filter by length - work in progress
+# DONE todo: otu filter by length - work in progress
 # todo: write files to tmp...
 
 class Update_data:
@@ -36,12 +36,11 @@ class Update_data:
         self.add_seq_to_table()
         self.mrca = None
         self.set_mrca(config, mrca)
-        #self.different_level = False  # todo add to config - done
 
     def set_back_data_in_table(self):
         if self.config.different_level == True and self.status == 0:
             self.table['date'] = pd.Timestamp.strptime('01/01/00', '%d/%m/%y')
-            self.table.loc[self.table['status'] > 0, 'status'] = self.status
+            self.table.loc[self.table['status'] > 0.5, 'status'] = self.status
             self.config.update_tree = False
 
     def set_mrca(self, config, mrca):
@@ -64,10 +63,13 @@ class Update_data:
             else:
                 print('get mrca of no input!')
                 mrca_list = self.table['ncbi_txid'].to_list()
-            ncbi_parser = ncbi_data_parser.Parser(names_file=config.ncbi_parser_names_fn,
-                                                  nodes_file=config.ncbi_parser_nodes_fn)
-            mrca_aln = ncbi_parser.get_mrca(mrca_list)
-            self.mrca = mrca_aln
+
+            # # not needed because of mrca_list
+            # ncbi_parser = ncbi_data_parser.Parser(names_file=config.ncbi_parser_names_fn,
+            #                                       nodes_file=config.ncbi_parser_nodes_fn)
+            # mrca_aln = ncbi_parser.get_mrca(mrca_list)
+            # self.mrca = mrca_aln
+            self.mrca = mrca_list
 
     def build_table_from_file(self, id_to_spn):
         """
@@ -117,9 +119,11 @@ class Update_data:
         :param taxon_namespace: needs taxon_namespace from aln so that they match
         :return: tre als dendropy object
         """
-        tre = Tree.get(path=self.tr_fn, schema=self.tr_schema,
-                       taxon_namespace=taxon_namespace, preserve_underscores=True)
+        if taxon_namespace:
+            tre = Tree.get(path=self.tre_fn, schema=self.tr_schema,
+                           taxon_namespace=taxon_namespace, preserve_underscores=True)
         assert tre.taxon_namespace == taxon_namespace
+        print(tre.as_string('newick'))
         return tre
 
     def read_in_aln(self):

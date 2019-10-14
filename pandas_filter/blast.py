@@ -56,7 +56,7 @@ def get_taxid_from_acc(gb_acc, blastdb, workdir):
     f.close()
     return tax_id_l
 
-
+# todo: not used
 def get_taxid_from_acc_stdout(gb_acc, blastdb, workdir):
     """
     Use the blastdb to get the taxon id from a queried gb acc.
@@ -202,6 +202,8 @@ def get_full_seq_stdout(gb_acc, blast_seq, workdir, blastdb, db):
     full_seq = check_directionality(blast_seq, seq)
     return full_seq
 
+#todo get full seq tmp and stdout both not used, I still use the one using the file...
+
 
 def get_full_seq_tmp(gb_acc, blast_seq, workdir, blastdb, db):
     """
@@ -261,6 +263,7 @@ def get_full_seq(gb_acc, blast_seq, workdir, blastdb, db):
     :return: full sequence, the whole submitted sequence, not only the part that matched the blast query sequence
     """
     # print("get full seq")
+    # print(gb_acc, blast_seq, workdir, blastdb, db)
     if db is not "Genbank":  # no need to make a db first (it already exists), we just open it and get full seq
         seq_set = False
         seq, seq_set = get_seq_from_file(gb_acc, blastdb, seq_set)
@@ -270,7 +273,11 @@ def get_full_seq(gb_acc, blast_seq, workdir, blastdb, db):
     else:
         if not os.path.exists("{}/tmp".format(workdir)):
             os.mkdir("{}/tmp".format(workdir))
-        if not os.path.exists("{}/tmp/full_seq_{}.fasta".format(workdir, gb_acc)):
+        full_seq_fn = "{}/tmp/full_seq_{}.fasta".format(workdir, gb_acc)
+        if os.path.exists(full_seq_fn):
+            if not os.stat(full_seq_fn).st_size > 0:
+                os.remove(full_seq_fn)
+        if not os.path.exists(full_seq_fn):
             # print('get full seq blast query')
             fn = "{}/tmp/tmp_search.csv".format(workdir)
             fn_open = open(fn, "w+")
@@ -279,6 +286,7 @@ def get_full_seq(gb_acc, blast_seq, workdir, blastdb, db):
             db_path = "{}".format(blastdb)
             cmd1 = "blastdbcmd -db {}/nt_v5  -entry_batch {} " \
                    "-outfmt %f -out {}/tmp/full_seq_{}.fasta".format(db_path, fn, workdir, gb_acc)
+            # print(cmd1)
             os.system(cmd1)
         # else:
         #     print('get full seq blast query done earlier')
@@ -328,6 +336,9 @@ def check_directionality(blast_seq, seq):
     :param seq: Genbank full seq as saved
     :return: full seq in correct directionality
     """
+    assert blast_seq is not "", blast_seq
+    assert seq is not "", seq
+    #print(blast_seq, seq)
     orig = Seq(seq, generic_dna)
     dna_comp = orig.complement()
     dna_rcomp = orig.reverse_complement()
@@ -403,11 +414,11 @@ def run_blast_query(query_seq, taxon, db_path, db_name, config):
     toblast.write("{}\n".format(query_seq))
     toblast.close()
 
+    # this format (6) allows to get the taxonomic information at the same time
+    # outfmt = " -outfmt 5"  # format for xml file type
     outfmt = " -outfmt '6 sseqid staxids sscinames pident evalue bitscore sseq salltitles sallseqid'"
     if db_name == "Genbank":
         with cd(db_path):
-            # this format (6) allows to get the taxonomic information at the same time
-            # outfmt = " -outfmt 5"  # format for xml file type
             # TODO MK: blast+ v. 2.8 code - then we can limit search to taxids: -taxids self.mrca_ncbi
             blastcmd = "blastn -query " + input_fn + " -db {}/nt_v5 -out ".format(db_path) + query_output_fn + \
                        " {} -num_threads {}".format(outfmt, config.num_threads) + \
@@ -478,16 +489,11 @@ def read_blast_query_pandas(blast_fn, config, db_name):
                 # if we found all taxon_ids present in the initial list, stop looking for more
                 if len(found_taxids) == len(all_taxids_set):
                     break  # this leaves the for loop, no need to iterate through if we have all ids
-
                 tax_id = all_taxids[i]
                 if tax_id in found_taxids:
                     #print('continue')
                     continue  # this goes back to beginning of for loop
                 gb_acc = get_acc_from_blast(shortened.loc[i])
-                if gb_acc in queried_acc:
-                    # print("set to true")
-                    # stop_while = True
-                    break
                 spn = ncbi_parser.get_name_from_id(tax_id)
                 split_df = redundant.loc[[idx]]
                 split_df['accession'] = gb_acc
@@ -497,16 +503,14 @@ def read_blast_query_pandas(blast_fn, config, db_name):
                 found_taxids.add(tax_id)
                 queried_acc.add(gb_acc)
                 count += 1
-            # if blast_fn == 'S_glaber':
-            #     sys.exit(-4)
         if len(all_taxids_set) != 1:
             more_than_one = True
     if len(redundant) > 0 and more_than_one is True:
-        assert len(non_redundant_redundant) > len(redundant), (len(non_redundant_redundant), len(redundant),
-                                                               non_redundant_redundant['accession'], redundant['accession;gi'])
+        assert len(non_redundant_redundant) > len(redundant), \
+            (len(non_redundant_redundant), len(redundant), non_redundant_redundant['accession'], redundant['accession;gi'])
     elif len(redundant) > 0 and more_than_one is False:
-        assert len(non_redundant_redundant) == len(redundant), (len(non_redundant_redundant), len(redundant),
-                                                               non_redundant_redundant['accession'], redundant['accession;gi'])
+        assert len(non_redundant_redundant) == len(redundant), \
+            (len(non_redundant_redundant), len(redundant), non_redundant_redundant['accession'], redundant['accession;gi'])
 
     new_seqs = pd.concat([non_redundant_redundant, non_redundant], sort=True, ignore_index=True)
     new_seqs['sseq'] = new_seqs['sseq'].str.replace("-", "")
@@ -537,5 +541,4 @@ def wrapper_get_fullseq(config, new_blast_seq_dict, db):
             full_seq = get_full_seq(gb_acc, new_blast_seq_dict.loc[idx, "sseq"], config.workdir, blastdb, db)
             new_blast_seq_dict.loc[idx, "sseq"] = full_seq
     return new_blast_seq_dict
-
 

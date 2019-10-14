@@ -11,8 +11,9 @@ import pandas as pd
 import logging
 import re
 import multiprocessing
+import datetime
 
-from . import debug
+from . import debug, get_user_input
 
 nodes = None
 names = None
@@ -106,10 +107,54 @@ class Parser:
     The files need to be updated regularly, best way to always do it when a new blast database was loaded.
     """
 
-    def __init__(self, names_file, nodes_file):
+    def __init__(self, names_file, nodes_file, interactive=False):
         self.names_file = names_file
         self.nodes_file = nodes_file
         # self.initialize()
+        if interactive == True:
+            self._download_ncbi_parser()
+
+
+    def _download_ncbi_parser(self):
+        """Check if files are present and if they are up to date.
+        If not files will be downloaded.
+        """
+        print(self.nodes_file)
+        if not os.path.isfile(self.names_file):
+            print("Do you want to download taxonomy databases from ncbi? Note: This is a US government website! "
+                  "You agree to their terms. \n")
+            x = get_user_input()
+            if x == "yes":
+                os.system("wget -c 'ftp://ftp.ncbi.nlm.nih.gov/pub/taxonomy/taxdump.tar.gz' -P ./tests/data/")
+                os.system("gunzip -f -cd ./data/taxdump.tar.gz | (tar xvf - names.dmp nodes.dmp)")
+                os.system("mv nodes.dmp ./data/")
+                os.system("mv names.dmp ./data/")
+                os.system("rm ./data/taxdump.tar.gz")
+            else:
+                sys.stderr.write(
+                    "You have no taxonomic database, which is needed to run PhyFilter. Restart and type 'yes'. \n")
+                sys.exit(-10)
+        else:
+            download_date = os.path.getmtime(self.nodes_file)
+            download_date = datetime.datetime.fromtimestamp(download_date)
+            today = datetime.datetime.now()
+            time_passed = (today - download_date).days
+            if time_passed >= 30:
+                print("Do you want to update taxonomy databases from ncbi? Note: This is a US government website! "
+                      "You agree to their terms. \n")
+                x = get_user_input()
+                if x == "yes":
+                    os.system("wget -c 'ftp://ftp.ncbi.nlm.nih.gov/pub/taxonomy/taxdump.tar.gz' -P ./data/")
+                    os.system("gunzip -f -cd ./data/taxdump.tar.gz | (tar xvf - names.dmp nodes.dmp)")
+                    # os.system("mv nodes.dmp ./tests/data/")
+                    # os.system("mv names.dmp ./tests/data/")
+                    os.system("rm ./data/taxdump.tar.gz")
+                elif x == "no":
+                    print("You did not agree to update data from ncbi. Old database files will be used.")
+                else:
+                    print("You did not type yes or no!")
+        if x == 'yes':
+            make_lineage_table()
 
     def initialize(self):
         """
@@ -207,22 +252,17 @@ class Parser:
             sys.exit(-5)
         id_known = self.taxid_is_valid(tax_id)
         if id_known == False:
-            sys.stderr.write("Taxon id is not known by nodes. Probably to new.\n'.")
+            sys.stderr.write("Taxon id is not known by nodes. Probably to new.\n.")
             sys.exit(-6)
 
         if nodes is None:
             self.initialize()
         if type(tax_id) != int:
-            # sys.stdout.write("WARNING: mrca_id {} is no integer. Will convert value to int\n".format(mrca_id))
             tax_id = int(tax_id)
         # following statement is to get id of taxa if taxa is higher ranked than specified
         rank = nodes[nodes["tax_id"] == tax_id]["rank"].values[0]
-        # try:
-        #     rank = nodes[nodes["tax_id"] == tax_id]["rank"].values[0]
-        # except IndexError:
-        #     sys.stderr.write("Cannot provide an id of a given taxon id corresponding to 'no rank'.")
-        #     rank = None
-        #     return rank
+        # next one is used to return id if rank of taxid was always higher than species
+        # todo: should be working with any kind rank
         if rank != "species":
             if downtorank == "species":
                 if (nodes[nodes["tax_id"] == tax_id]["rank"].values[0] != "varietas"
@@ -237,6 +277,34 @@ class Parser:
             parent_id = int(nodes[nodes["tax_id"] == tax_id]["parent_tax_id"].values[0])
             return self.get_downtorank_id(parent_id, downtorank)
 
+    def check_mrca_input(self, mrca_id):
+        if type(mrca_id) == set:
+            mrca_id_set = set()
+            for item in mrca_id:
+                id_known = self.taxid_is_valid(item)
+                if id_known == True:
+                    mrca_id_set.add(item)
+                else:
+                    sys.stderr.write("mrca id {}  is not known by nodes. Probably to new."
+                                     " ID will be removed from mrca set.\n.".format(item))
+        else:
+            id_known = self.taxid_is_valid(mrca_id)
+            if id_known == False:
+                sys.stderr.write("mrca id {} is not known by nodes. Probably to new.\n.".format(mrca_id))
+                sys.exit(-6)
+            # do mrca format check
+        if type(mrca_id) == set:
+            if len(mrca_id) == 1:
+                mrca_id = next(iter(mrca_id))
+                mrca_id = int(mrca_id)
+            # else:
+            #     print('DO NOTHING. KEEP AS SET')
+                #mrca_id = self.get_mrca(mrca_id)
+            # mrca_id = int(mrca_id)
+        elif type(mrca_id) != int:
+            mrca_id = int(mrca_id)
+        return mrca_id
+
     def match_id_to_mrca(self, tax_id, mrca_id):
         """
         Recursive function to find out if tax_id is part of mrca_id.
@@ -245,51 +313,30 @@ class Parser:
         :param mrca_id: provided mrca ncbi taxon id
         :return: taxon id (= mrca id) if matches, if not 0
         """
+        # todo rewrite to return true/false
         debug("match_id_to_mrca")
         if nodes is None:
             self.initialize()
         # do id testing
         id_known = self.taxid_is_valid(tax_id)
         if id_known == False:
-            sys.stderr.write("Taxon id is not known known by nodes. Probably to new.\n'.")
-            sys.exit(-6)
-        id_known = self.taxid_is_valid(mrca_id)
-        if id_known == False:
-            sys.stderr.write("mrca id is not known by nodes. Probably to new.\n'.")
-            sys.exit(-6)
-
-        if type(mrca_id) == set:
-            if len(mrca_id) == 1:
-                mrca_id = next(iter(mrca_id))
-            else:
-                mrca_id = self.get_mrca(mrca_id)
-            mrca_id = int(mrca_id)
-        elif type(mrca_id) != int:
-            # sys.stdout.write("WARNING: mrca_id {} is no integer. Will convert value to int\n".format(mrca_id))
-            mrca_id = int(mrca_id)
-
+            sys.stderr.write("Taxon id {} is not known by nodes. Probably to new.\n.".format(tax_id))
+            return -500
         if type(tax_id) != int:
-            # sys.stdout.write("WARNING: mrca_id {} is no integer. Will convert value to int\n".format(mrca_id))
             tax_id = int(tax_id)
+        self.check_mrca_input(mrca_id)
 
+        # stop with weird tax ids...
         if tax_id in [81077, 28384, 131567, 1, 0]:  # other sequences/artificial sequences
             debug("artifical")
             tax_id = 0
             return tax_id
 
-        debug([tax_id, mrca_id])
-        rank_mrca = nodes[nodes["tax_id"] == mrca_id]["rank"].values[0]
         rank_tax = nodes[nodes["tax_id"] == tax_id]["rank"].values[0]
-
-        # try:
-        #     rank_tax = nodes[nodes["tax_id"] == tax_id]["rank"].values[0]
-        # except IndexError:
-        #     with open('nodes.err', "a") as log:
-        #         log.write('ncbi taxon id {} not known by nodes. Probably to new.\n'.format(tax_id))
-        #         return tax_id
-        debug([rank_mrca, rank_tax])
-        #todo rewrite to return true/false
         if tax_id == mrca_id:
+            debug("found right rank")
+            return tax_id
+        elif type(mrca_id) == set and tax_id in mrca_id:
             debug("found right rank")
             return tax_id
         elif rank_tax == "superkingdom":
@@ -348,6 +395,7 @@ class Parser:
         try:
             tax_id = names[names["name_txt"] == tax_name]["tax_id"].values[0]
         except IndexError:
+            debug(tax_name)
             debug(names[names["name_txt"] == tax_name])
             if len(tax_name.split(" ")) == 3:
                 tax_name = "{} {}-{}".format(
@@ -401,40 +449,16 @@ class Parser:
         """
         if names is None:
             self.initialize()
+        rank_list = ['tax_id', 'superkingdom', 'phylum', 'class', 'order', 'family', 'tribe', 'genus', 'species']
         rank_mrca = nodes[nodes["tax_id"] == tax_id]["rank"].values[0]
         spn = self.get_name_from_id(tax_id)
-        if rank_mrca in ['tax_id',
-                         'superkingdom',
-                         'phylum',
-                         'class',
-                         'order',
-                         'family',
-                         'tribe',
-                         'genus',
-                         'species']:  # corresponds to what is written into the lineage files.
-
+        if rank_mrca in rank_list:  # corresponds to what is written into the lineage files.
             df = lineages_to_df(rank_mrca, spn)
         else:
-            while rank_mrca not in ['tax_id',
-                                    'superkingdom',
-                                    'phylum',
-                                    'class',
-                                    'order',
-                                    'family',
-                                    'tribe',
-                                    'genus',
-                                    'species']:
+            while rank_mrca not in rank_list:
                 parent_id = int(nodes[nodes["tax_id"] == tax_id]["parent_tax_id"].values[0])
                 rank_mrca = nodes[nodes["tax_id"] == parent_id]["rank"].values[0]
-                if rank_mrca in ['tax_id',
-                                 'superkingdom',
-                                 'phylum',
-                                 'class',
-                                 'order',
-                                 'family',
-                                 'tribe',
-                                 'genus',
-                                 'species']:
+                if rank_mrca in rank_list:
                     df = lineages_to_df(rank_mrca, spn)
         return df['tax_id'].to_list()
 
@@ -451,11 +475,12 @@ def lineages_to_df(rank, name):
     if rank == 'no rank':
         sys.stderr.write("Cannot provide an id of a given taxon id corresponding to 'no rank'.")
         sys.exit(-5)
-    if not os.path.exists(os.path.join('lineages_cols.csv')):
+    if not os.path.exists(os.path.join('./data/lineages_cols.csv')):
         make_lineage_table()
-    lin = pd.read_csv(os.path.join('lineages_cols.csv'))
+    lin = pd.read_csv(os.path.join('./data/lineages_cols.csv'))
     subset = lin[lin[rank] == name]
     return subset
+
 
 # copy from ncbitax2lin
 def make_lineage_table():
@@ -477,6 +502,7 @@ def make_lineage_table():
     global TAXONOMY_DICT
     TAXONOMY_DICT = dict(zip(df.tax_id.values, df.to_dict('records')))
     ncpus = multiprocessing.cpu_count()
+    print(ncpus)
     print('map - takes time and a lot of memory... (multiprocessing)')
     pool = multiprocessing.Pool(ncpus)
     # take about 18G memory
@@ -495,7 +521,7 @@ def make_lineage_table():
             'tribe',
             'genus',
             'species']
-    lineages_df.to_csv(os.path.join('lineages_cols.csv'), index=False, columns=cols)
+    lineages_df.to_csv(os.path.join('./data/lineages_cols.csv'), index=False, columns=cols)
 
     # zipping does not work, byte issue
     # util.backup_file(lineages_csv_output)

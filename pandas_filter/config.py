@@ -107,9 +107,6 @@ class ConfigObj(object):
         #         self.gb_id_filename = False
         # debug("shared blast folder? {}".format(self.gb_id_filename))
 
-        self.delay = int(config["blast"]["delay"])
-        assert is_number(self.delay), ("value `%s`is not a number" % self.delay)
-
         # #############
         # read in phy_filter settings
         self.minlen = float(config["phy_filter"]["min_len"])
@@ -169,6 +166,7 @@ class ConfigObj(object):
             db_updater._download_ncbi_parser(self)
             db_updater._download_localblastdb(self)
         debug("check db file status?: {}".format(interactive))
+
 
         # ###########
         # internal settings
