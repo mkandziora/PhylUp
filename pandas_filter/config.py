@@ -5,6 +5,7 @@ import sys
 import configparser
 from . import db_updater
 from . import debug
+from . import ncbi_data_parser
 
 
 def is_number(s):
@@ -90,6 +91,11 @@ class ConfigObj(object):
             self.ncbi_parser_nodes_fn = config["ncbi_parser"]["nodes_fn"]
             self.ncbi_parser_names_fn = config["ncbi_parser"]["names_fn"]
 
+            # # TODO: test if this would make the whole thing faster, db building takes long, but likely blasting is faster
+            # # make smaller blast database
+            # name = self.make_db_from_taxid(self.mrca)
+            # self.blastdb = '{}/{}_db'.format(self.blastdb, name)
+
         self.num_threads = int(config["blast"].get("num_threads"))
 
         debug("slurm threads")
@@ -163,22 +169,39 @@ class ConfigObj(object):
             if interactive is False:
                 sys.stdout.write("REMEMBER TO UPDATE THE NCBI DATABASES REGULARLY!!\n")
         if interactive is True:
-            db_updater._download_ncbi_parser(self)
             db_updater._download_localblastdb(self)
+            db_updater._download_ncbi_parser(self)
         debug("check db file status?: {}".format(interactive))
 
 
         # ###########
         # internal settings
-        self.logfile = "{}/logfile".format(self.workdir)
+        self.logfile = os.path.join(self.workdir, "logfile")
 
-    #     # more settings
-    #     self.settings = {}
-    #     self.settings['blast_subdir'] = "{}/current_blast_run".format(self.workdir)
-    #
-    #
-    # def add_to_config(self, key, val):
-    #     """Add more settings to config from analysis start file.
-    #     """
-    #     self.settings[key] = val
-    #
+
+
+    def make_db_from_taxid(self, taxid):
+        """
+        Generates a smaller Genbank database, that only contains sequences that are part of the mrca.
+
+        :param taxid:
+        :return:
+        """
+        ncbi_parser = ncbi_data_parser.Parser(names_file=self.ncbi_parser_names_fn,
+                                              nodes_file=self.ncbi_parser_nodes_fn)
+        if type(taxid) == list:
+            mrca_id = ncbi_parser.get_mrca(taxid)
+            taxid = mrca_id
+
+        taxon_list = ncbi_parser.get_lower_from_id(taxid)
+        taxonlist_fn = os.path.join(self.blastdb, "{}_idlist.txt".format(taxid))
+        with open(taxonlist_fn) as fn:
+            fn.write("\n".join(str(item) for item in taxon_list))
+
+        cmd1 = "makeblastdb -dbtype nucl -parse_seqids -taxid_map {} -out {}_db -title {}".format(taxonlist_fn, taxid, taxid)
+        os.system(cmd1)
+        return taxid
+
+
+
+

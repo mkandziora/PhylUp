@@ -2,8 +2,12 @@
 
 data is provided by ncbi - downloaded via db_updater
 
-parts are altered from https://github.com/zyxue/ncbitax2lin/blob/master/ncbitax2lin.py
+parts are altered/copied from https://github.com/zyxue/ncbitax2lin/blob/master/ncbitax2lin.py, I indicated those on top
+of the methods. Those functions have a MIT license.
+
+
 """
+
 
 import os
 import sys
@@ -68,11 +72,7 @@ def load_names(names_file):
     """
     assert os.path.exists(names_file), ("file `%s` does not exist. Make sure you downloaded the "
                                         "databases from ncbi." % names_file)
-    df = pd.read_csv(names_file, sep="|", header=None, index_col=False,
-                     names=["tax_id", "name_txt", "unique_name", "name_class"])
-    df["name_txt"] = df["name_txt"].apply(strip)
-    df["unique_name"] = df["unique_name"].apply(strip)
-    df["name_class"] = df["name_class"].apply(strip)
+    df = make_clean_df(names_file)
     sci_df = df[df["name_class"] == "scientific name"]
     sci_df.reset_index(drop=True, inplace=True)
     return sci_df
@@ -89,14 +89,27 @@ def load_synonyms(names_file):
     assert os.path.exists(names_file), ("file `%s` does not exist. Make sure you downloaded "
                                         "the databases from ncbi." % names_file)
     # print("load synonyms")
+    df = make_clean_df(names_file)
+    sci_df = df[df["name_class"] == "synonym"]
+    sci_df.reset_index(drop=True, inplace=True)
+    return sci_df
+
+
+def make_clean_df(names_file):
     df = pd.read_csv(names_file, sep="|", header=None, index_col=False,
                      names=["tax_id", "name_txt", "unique_name", "name_class"])
     df["name_txt"] = df["name_txt"].apply(strip)
     df["unique_name"] = df["unique_name"].apply(strip)
     df["name_class"] = df["name_class"].apply(strip)
-    sci_df = df[df["name_class"] == "synonym"]
-    sci_df.reset_index(drop=True, inplace=True)
-    return sci_df
+    return df
+
+
+def extract_ncbi_data():
+    os.system("wget -c 'ftp://ftp.ncbi.nlm.nih.gov/pub/taxonomy/taxdump.tar.gz' -P ./data/")
+    os.system("gunzip -f -cd ./data/taxdump.tar.gz | (tar xvf - names.dmp nodes.dmp)")
+    os.system("mv nodes.dmp ./data/")
+    os.system("mv names.dmp ./data/")
+    os.system("rm ./data/taxdump.tar.gz")
 
 
 class Parser:
@@ -106,14 +119,12 @@ class Parser:
     Nodes includes the hierarchical information, names the scientific names and ID's.
     The files need to be updated regularly, best way to always do it when a new blast database was loaded.
     """
-
     def __init__(self, names_file, nodes_file, interactive=False):
         self.names_file = names_file
         self.nodes_file = nodes_file
         # self.initialize()
-        if interactive == True:
+        if interactive is True:
             self._download_ncbi_parser()
-
 
     def _download_ncbi_parser(self):
         """Check if files are present and if they are up to date.
@@ -125,11 +136,7 @@ class Parser:
                   "You agree to their terms. \n")
             x = get_user_input()
             if x == "yes":
-                os.system("wget -c 'ftp://ftp.ncbi.nlm.nih.gov/pub/taxonomy/taxdump.tar.gz' -P ./tests/data/")
-                os.system("gunzip -f -cd ./data/taxdump.tar.gz | (tar xvf - names.dmp nodes.dmp)")
-                os.system("mv nodes.dmp ./data/")
-                os.system("mv names.dmp ./data/")
-                os.system("rm ./data/taxdump.tar.gz")
+                extract_ncbi_data()
             else:
                 sys.stderr.write(
                     "You have no taxonomic database, which is needed to run PhyFilter. Restart and type 'yes'. \n")
@@ -144,11 +151,7 @@ class Parser:
                       "You agree to their terms. \n")
                 x = get_user_input()
                 if x == "yes":
-                    os.system("wget -c 'ftp://ftp.ncbi.nlm.nih.gov/pub/taxonomy/taxdump.tar.gz' -P ./data/")
-                    os.system("gunzip -f -cd ./data/taxdump.tar.gz | (tar xvf - names.dmp nodes.dmp)")
-                    # os.system("mv nodes.dmp ./tests/data/")
-                    # os.system("mv names.dmp ./tests/data/")
-                    os.system("rm ./data/taxdump.tar.gz")
+                    extract_ncbi_data()
                 elif x == "no":
                     print("You did not agree to update data from ncbi. Old database files will be used.")
                 else:
@@ -159,7 +162,9 @@ class Parser:
     def initialize(self):
         """
          The data itself are not stored in __init__. Instead every time the function is loaded
-        if it has not yet been run during a run - was important for pickle. Might therefore not be needed anymore
+        if it has not yet been run during a run.
+
+        It was important when I used pickle. Might therefore not be needed anymore.
         """
         print("Initialize NODES and NAMES!!")
         global nodes
@@ -251,7 +256,7 @@ class Parser:
             sys.stderr.write("Cannot provide an id of a given taxon id corresponding to 'no rank'.")
             sys.exit(-5)
         id_known = self.taxid_is_valid(tax_id)
-        if id_known == False:
+        if id_known is False:
             sys.stderr.write("Taxon id is not known by nodes. Probably to new.\n.")
             sys.exit(-6)
 
@@ -282,14 +287,14 @@ class Parser:
             mrca_id_set = set()
             for item in mrca_id:
                 id_known = self.taxid_is_valid(item)
-                if id_known == True:
+                if id_known is True:
                     mrca_id_set.add(item)
                 else:
                     sys.stderr.write("mrca id {}  is not known by nodes. Probably to new."
                                      " ID will be removed from mrca set.\n.".format(item))
         else:
             id_known = self.taxid_is_valid(mrca_id)
-            if id_known == False:
+            if id_known is False:
                 sys.stderr.write("mrca id {} is not known by nodes. Probably to new.\n.".format(mrca_id))
                 sys.exit(-6)
             # do mrca format check
@@ -297,10 +302,6 @@ class Parser:
             if len(mrca_id) == 1:
                 mrca_id = next(iter(mrca_id))
                 mrca_id = int(mrca_id)
-            # else:
-            #     print('DO NOTHING. KEEP AS SET')
-                #mrca_id = self.get_mrca(mrca_id)
-            # mrca_id = int(mrca_id)
         elif type(mrca_id) != int:
             mrca_id = int(mrca_id)
         return mrca_id
@@ -319,7 +320,7 @@ class Parser:
             self.initialize()
         # do id testing
         id_known = self.taxid_is_valid(tax_id)
-        if id_known == False:
+        if id_known is False:
             sys.stderr.write("Taxon id {} is not known by nodes. Probably to new.\n.".format(tax_id))
             return -500
         if type(tax_id) != int:

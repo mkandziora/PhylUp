@@ -11,18 +11,18 @@ def _download_localblastdb(config):
     """Check if files are present and if they are uptodate.
     If not files will be downloaded.
     """
-    if not os.path.isfile("{}/nt.69.nhr".format(config.blastdb)):
+    if not os.path.isfile("{}/nt_v5.69.nhr".format(config.blastdb)):
         print("Do you want to download the blast nt databases from ncbi? Note: "
               "This is a US government website! You agree to their terms. \n")
         x = get_user_input()
         if x == "yes":
-            os.system("wget -c 'ftp://ftp.ncbi.nlm.nih.gov/blast/db/nt.*'"
-                      "{}/".format(config.blastdb))
-            os.system("wget -c 'ftp://ftp.ncbi.nlm.nih.gov/blast/db/taxdb.tar.gz'"
-                      "{}/".format(config.blastdb))
+            os.system("wget -c 'ftp://ftp.ncbi.nlm.nih.gov/blast/db/v5/nt_v5.*' "
+                      "-P {}/".format(config.blastdb))
+            os.system("wget -c 'ftp://ftp.ncbi.nlm.nih.gov/blast/db/v5/taxdb.tar.gz' "
+                      "-P {}/".format(config.blastdb))
             with cd(config.blastdb):
                 print("update blast db")
-                os.system("update_blastdb nt")
+                os.system("update_blastdb nt_v5")
                 os.system("cat *.tar.gz | tar -xvzf - -i")
                 os.system("gunzip -cd taxdb.tar.gz | (tar xvf - )")
                 os.system("rm *.tar.gz*")
@@ -30,7 +30,7 @@ def _download_localblastdb(config):
             sys.stderr.write("You have no nt database, which is needed to run PhyFilter. Restart and type 'yes'. \n")
             sys.exit(-10)
     else:
-        download_date = os.path.getmtime("{}/nt.60.nhr".format(config.blastdb))
+        download_date = os.path.getmtime("{}/nt_v5.60.nhr".format(config.blastdb))
         download_date = datetime.datetime.fromtimestamp(download_date)
         today = datetime.datetime.now()
         time_passed = (today - download_date).days
@@ -41,7 +41,7 @@ def _download_localblastdb(config):
             x = get_user_input()
             if x == "yes":
                 with cd(config.blastdb):
-                    os.system("update_blastdb nt")
+                    os.system("update_blastdb nt_v5")
                     os.system("cat *.tar.gz | tar -xvzf - -i")
                     os.system("update_blastdb taxdb")
                     os.system("gunzip -cd taxdb.tar.gz | (tar xvf - )")
@@ -71,10 +71,12 @@ def _download_ncbi_parser(config):
             sys.stderr.write("You have no taxonomic database, which is needed to run PhyFilter. Restart and type 'yes'. \n")
             sys.exit(-10)
     else:
+        x = 'no'
         download_date = os.path.getmtime(config.ncbi_parser_nodes_fn)
         download_date = datetime.datetime.fromtimestamp(download_date)
         today = datetime.datetime.now()
         time_passed = (today - download_date).days
+        print(time_passed)
         if time_passed >= 90:
             print("Do you want to update taxonomy databases from ncbi? Note: This is a US government website! "
                   "You agree to their terms. \n")

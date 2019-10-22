@@ -187,12 +187,12 @@ def get_full_seq_stdout(gb_acc, blast_seq, workdir, blastdb, db):
     :param db: type of db - local, filter, Genbank
     :return: full sequence, the whole submitted sequence, not only the part that matched the blast query sequence
     """
-    # print("get full seq")
+    # print("get full seq stdout")
     if db is not "Genbank":  # no need to make a db first (it already exists), we just open it and get full seq
         seq_set = False
         seq, seq_set = get_seq_from_file(gb_acc, blastdb, seq_set)
         if seq_set is False:
-            seq, seq_set = get_seq_from_file(gb_acc, '{}/tmp/query_seq.fas'.format(workdir), seq_set)
+            seq, seq_set = get_seq_from_file(gb_acc, os.path.join(workdir, 'tmp/query_seq.fas'), seq_set)
         assert seq_set is True
     else:
         # for the Genbank db query it runs using stdout
@@ -203,17 +203,17 @@ def get_full_seq_stdout(gb_acc, blast_seq, workdir, blastdb, db):
         db_path = "{}".format(blastdb)
         cmd1 = "blastdbcmd -db {}/nt_v5  -entry_batch {} " \
                "-outfmt %f -out -".format(db_path, fn)
-        # out = os.system(cmd1)
         result = subprocess.check_output(cmd1, shell=True).decode(sys.stdout.encoding)
         seqn = result.split('\n')[1:]
         seperator = ''
         seq = seperator.join(seqn)
         acc_str = result.split('\n')[0]
         assert gb_acc in acc_str, (gb_acc, acc_str)
+        # print(gb_acc)
     full_seq = check_directionality(blast_seq, seq)
     return full_seq
 
-#todo get full seq tmp and stdout both not used, I still use the one using the file...
+# todo get full seq tmp and stdout both not used, I still use the one using the file...
 
 
 def get_full_seq_tmp(gb_acc, blast_seq, workdir, blastdb, db):
@@ -230,12 +230,12 @@ def get_full_seq_tmp(gb_acc, blast_seq, workdir, blastdb, db):
     :param db: type of db - local, filter, Genbank
     :return: full sequence, the whole submitted sequence, not only the part that matched the blast query sequence
     """
-    # print("get full seq")
+    # print("get_full_seq_tmp")
     if db is not "Genbank":  # no need to make a db first (it already exists), we just open it and get full seq
-        seq_set = False
+        seq_set = False  # refactor: put seq_set var into function
         seq, seq_set = get_seq_from_file(gb_acc, blastdb, seq_set)
         if seq_set is False:
-            seq, seq_set = get_seq_from_file(gb_acc, '{}/tmp/query_seq.fas'.format(workdir), seq_set)
+            seq, seq_set = get_seq_from_file(gb_acc, os.path.join(workdir, 'tmp/query_seq.fas'), seq_set)
         assert seq_set is True
     else:
         # for the Genbank db query it runs using stdout
@@ -274,7 +274,6 @@ def get_full_seq(gb_acc, blast_seq, workdir, blastdb, db):
     :return: full sequence, the whole submitted sequence, not only the part that matched the blast query sequence
     """
     # print("get full seq")
-    # print(gb_acc, blast_seq, workdir, blastdb, db)
     if db is not "Genbank":  # no need to make a db first (it already exists), we just open it and get full seq
         seq_set = False
         seq, seq_set = get_seq_from_file(gb_acc, blastdb, seq_set)
@@ -297,12 +296,11 @@ def get_full_seq(gb_acc, blast_seq, workdir, blastdb, db):
             db_path = "{}".format(blastdb)
             cmd1 = "blastdbcmd -db {}/nt_v5  -entry_batch {} " \
                    "-outfmt %f -out {}/tmp/full_seq_{}.fasta".format(db_path, fn, workdir, gb_acc)
-            # print(cmd1)
-            os.system(cmd1)
-        # else:
-        #     print('get full seq blast query done earlier')
-        # read in file to get full seq
-        fn_seq = "{}/tmp/full_seq_{}.fasta".format(workdir, gb_acc)
+            with suppress_stdout():
+                os.system(cmd1)
+            assert os.stat(full_seq_fn).st_size > 0, ('file {} has no content'.format(full_seq_fn))
+        # read in file to get full seqseq
+        fn_seq = os.path.join(workdir, "tmp/full_seq_{}.fasta".format(gb_acc))
         f = open(fn_seq)
         seq = ""
         for line in iter(f):
@@ -349,7 +347,6 @@ def check_directionality(blast_seq, seq):
     """
     assert blast_seq is not "", blast_seq
     assert seq is not "", seq
-    #print(blast_seq, seq)
     orig = Seq(seq, generic_dna)
     dna_comp = orig.complement()
     dna_rcomp = orig.reverse_complement()
@@ -380,6 +377,7 @@ def get_new_seqs(query_seq, taxon, db_path, db_name, config):
     :param config: config obj
     :return: returns the new sequences found via blast
     """
+    # print('get new seqs')
     run_blast_query(query_seq, taxon, db_path, db_name, config)
     new_blastseqs = read_blast_query_pandas(taxon, config, db_name)  # pandas implementation of read_blast_query()
     assert new_blastseqs["ncbi_txn"].isnull() is not None, (new_blastseqs["ncbi_txn"])
@@ -431,6 +429,7 @@ def run_blast_query(query_seq, taxon, db_path, db_name, config):
     if db_name == "Genbank":
         with cd(db_path):
             # TODO MK: blast+ v. 2.8 code - then we can limit search to taxids: -taxids self.mrca_ncbi
+            #  !no mrca information here avail!
             blastcmd = "blastn -query " + input_fn + " -db {}/nt_v5 -out ".format(db_path) + query_output_fn + \
                        " {} -num_threads {}".format(outfmt, config.num_threads) + \
                        " -max_target_seqs {} -max_hsps {}".format(config.hitlist_size, config.hitlist_size)
@@ -446,7 +445,8 @@ def run_blast_query(query_seq, taxon, db_path, db_name, config):
                        " {} -num_threads {}".format(outfmt, config.num_threads) + \
                        " -max_target_seqs {} -max_hsps {}".format(config.hitlist_size, config.hitlist_size)
             os.system(blastcmd)
-            # todo: produces blastn taxdb warning, taxids here not needed and not part of taxdb anyways as local search. I keep it to make it coherent for reading in results.
+            # todo: produces blastn taxdb warning, taxids here not needed and not part of taxdb anyways as local search.
+            #  I keep it to make it coherent for reading in results.
 
 
 def read_blast_query_pandas(blast_fn, config, db_name):
@@ -458,6 +458,7 @@ def read_blast_query_pandas(blast_fn, config, db_name):
     :param db_name: name that specifies if filterrun, unpublished or normal search
     :return: updated self.new_seqs and self.data.gb_dict dictionaries
     """
+    # print('read_blast_query_pandas')
     blast_fn = str(blast_fn)
     if len(blast_fn.split('.')) > 1:
         blast_fn = blast_fn.split('.')[0]
@@ -468,23 +469,57 @@ def read_blast_query_pandas(blast_fn, config, db_name):
     else:
         query_output_fn = os.path.join(config.workdir, "blast/{}.txt".format(blast_fn))
     query_output_fn = os.path.abspath(query_output_fn)
-    queried_acc = set()  # used to test if gb_acc was added before  aka query_dict in physcraper
     colnames = ['accession;gi', 'ncbi_txid', 'ncbi_txn', 'pident', 'evalue', 'bitscore', 'sseq', 'title', 'accession']
     data = pd.read_csv(query_output_fn, names=colnames, sep="\t", header=None)
     assert len(data) > 0, data
     redundant = data[data['accession'].str.contains(';')]
     non_redundant = data[data['accession'].str.contains(';') == False]
-    non_redundant['accession'] = non_redundant['accession'].apply(get_acc_from_blast)  # todo: throws pandas warning about sort, but if added, its reaking
+    non_redundant['accession'] = non_redundant['accession'].apply(get_acc_from_blast)  # todo: throws pandas warning about sort, but if added, its breaking
     # new data frame with split value columns
     assert len(redundant) + len(non_redundant) == len(data)
 
-    acc_column = redundant["accession"].str.split(";", n=-1, expand=True)
+    non_redundant_redundant = get_non_redundant_data(config, redundant)
+
+    new_seqs = pd.concat([non_redundant_redundant, non_redundant], sort=True, ignore_index=True)
+    new_seqs['sseq'] = new_seqs['sseq'].str.replace("-", "")
+    new_seqs['date'] = datetime.datetime.strptime('01/01/00', '%d/%m/%y')
+    # todo this could be made faster by running it on the redundant/non_redundant data first
+    new_seqs = wrapper_get_fullseq(config, new_seqs, db_name)
+    return new_seqs
+
+
+def get_non_redundant_data(config, redundant):
+    """
+
+    Get per taxonid the information into a pandas dataframe.
+
+    Structure of redundant data (tab-delimited):
+    gi|429489218|gb|JX895383.1|	1268578;1269244	Senecio provincialis;Senecio provincialis x Senecio lagascanus
+    95.879	0.0	1177
+    AACAAGGTTTCCGTCCAAGAAGTAAGGAATATCTCTTTAATGACCCTAAAGTGTTGTCTCATGACGATGCTTCGACTGCGACCCCAGGTCAGGCGGGATTAGCATATCAAT
+    Senecio provincialis clone JC4662-14 18S ribosomal RNA gene, partial sequence; internal transcribed spacer 1, 5.8S
+    ribosomal RNA gene, and internal transcribed spacer 2, complete sequence; and 28S ribosomal RNA gene,
+    partial sequence<>Senecio provincialis clone JC4659-14 18S ribosomal RNA gene, partial sequence;
+    internal transcribed spacer 1, 5.8S ribosomal RNA gene, and internal transcribed spacer 2, complete sequence;
+    and 28S ribosomal RNA gene, partial sequence<>Senecio provincialis x Senecio lagascanus clone JC3622-8 18S
+    ribosomal RNA gene, partial sequence; internal transcribed spacer 1, 5.8S ribosomal RNA gene, and internal
+    transcribed spacer 2, complete sequence; and 28S ribosomal RNA gene, partial sequence
+    gi|429489218|gb|JX895383.1|;gi|429489247|gb|JX895412.1|;gi|429489255|gb|JX895420.1|
+
+
+    :param config:
+    :param redundant:
+    :return:
+    """
+    colnames = ['accession;gi', 'ncbi_txid', 'ncbi_txn', 'pident', 'evalue', 'bitscore', 'sseq', 'title', 'accession']
     non_redundant_redundant = pd.DataFrame(columns=colnames)
-    # todo: think about making a single df first where unique acc corresponds to taxid and same index val as in redundant, then use that whole df to make new non_redundant_redundant df. - discussion moritz
-    #print(acc_column)
+    queried_acc = set()  # used to test if gb_acc was added before  aka query_dict in physcraper
+
+    acc_column = redundant["accession"].str.split(";", n=-1, expand=True)  # todo: try to expand in row instead of column
+    # todo: think about making a single df first where unique acc corresponds to taxid and same index val
+    #  as in redundant, then use that whole df to make new non_redundant_redundant df. - discussion moritz
     more_than_one = False
     for idx in acc_column.index:
-        #print(idx)
         gb_acc = get_acc_from_blast(redundant.loc[idx, 'accession;gi'])
         all_taxids = get_taxid_from_acc(gb_acc, config.blastdb, config.workdir)
         all_taxids_set = set(all_taxids)
@@ -495,17 +530,15 @@ def read_blast_query_pandas(blast_fn, config, db_name):
             names_file=config.ncbi_parser_names_fn,
             nodes_file=config.ncbi_parser_nodes_fn)
         while len(found_taxids) < len(set(all_taxids_set)):
-            count = 0
             for i in range(len(shortened)):
                 # if we found all taxon_ids present in the initial list, stop looking for more
                 if len(found_taxids) == len(all_taxids_set):
                     break  # this leaves the for loop, no need to iterate through if we have all ids
                 tax_id = all_taxids[i]
                 if tax_id in found_taxids:
-                    #print('continue')
                     continue  # this goes back to beginning of for loop
                 gb_acc = get_acc_from_blast(shortened.loc[i])
-                spn = ncbi_parser.get_name_from_id(tax_id)
+                spn = ncbi_parser.get_name_from_id(tax_id)  # todo could be done later before creating table - for efficiency do later
                 split_df = redundant.loc[[idx]]
                 split_df['accession'] = gb_acc
                 split_df['ncbi_txid'] = tax_id
@@ -513,22 +546,18 @@ def read_blast_query_pandas(blast_fn, config, db_name):
                 non_redundant_redundant = non_redundant_redundant.append(split_df, ignore_index=True, sort=True)
                 found_taxids.add(tax_id)
                 queried_acc.add(gb_acc)
-                count += 1
         if len(all_taxids_set) != 1:
             more_than_one = True
     if len(redundant) > 0 and more_than_one is True:
         assert len(non_redundant_redundant) > len(redundant), \
-            (len(non_redundant_redundant), len(redundant), non_redundant_redundant['accession'], redundant['accession;gi'])
+            (len(non_redundant_redundant), len(redundant), non_redundant_redundant['accession'],
+             redundant['accession;gi'])
     elif len(redundant) > 0 and more_than_one is False:
         assert len(non_redundant_redundant) == len(redundant), \
-            (len(non_redundant_redundant), len(redundant), non_redundant_redundant['accession'], redundant['accession;gi'])
+            (len(non_redundant_redundant), len(redundant), non_redundant_redundant['accession'],
+             redundant['accession;gi'])
 
-    new_seqs = pd.concat([non_redundant_redundant, non_redundant], sort=True, ignore_index=True)
-    new_seqs['sseq'] = new_seqs['sseq'].str.replace("-", "")
-    new_seqs['date'] = datetime.datetime.strptime('01/01/00', '%d/%m/%y')
-    # todo this could be made faster by running it on the redundant/non_redundant data first
-    new_seqs = wrapper_get_fullseq(config, new_seqs, db_name)
-    return new_seqs
+    return non_redundant_redundant
 
 
 def wrapper_get_fullseq(config, new_blast_seq_dict, db):
@@ -540,7 +569,6 @@ def wrapper_get_fullseq(config, new_blast_seq_dict, db):
     :param db: name of the database
     :return: updated blast seq dict, with long seq
     """
-    # print(db)
     if db == 'Genbank':
         blastdb = config.blastdb
     else:
@@ -552,4 +580,3 @@ def wrapper_get_fullseq(config, new_blast_seq_dict, db):
             full_seq = get_full_seq(gb_acc, new_blast_seq_dict.loc[idx, "sseq"], config.workdir, blastdb, db)
             new_blast_seq_dict.loc[idx, "sseq"] = full_seq
     return new_blast_seq_dict
-

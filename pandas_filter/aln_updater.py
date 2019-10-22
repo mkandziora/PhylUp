@@ -10,13 +10,15 @@ import shutil
 import dendropy  # only imported for type checl
 import numpy as np
 from copy import deepcopy
-from dendropy import Tree, DnaCharacterMatrix  # , DataSet, datamodel
+from dendropy import Tree, DnaCharacterMatrix
 from . import ncbi_data_parser  # is the ncbi data parser class and associated functions
 from . import cd
 from . import write_msg_logfile
+from . import suppress_stdout
 
 
 # next class is basically the ATT class of PhyScraper by EJ McTavish
+
 
 def check_align(aln):
     i = 0
@@ -29,6 +31,22 @@ def check_align(aln):
             sys.stderr.write("Alignment is not aligned.")
             return
     return seqlen
+
+
+def resolve_polytomies(tre):
+    """
+    Randomly resolves polytomies in provided dendropy tree.
+
+    :param tre:
+    :return:
+    """
+    print('resolve_polytomies')
+    tre.resolve_polytomies()
+    tre.deroot()
+    tre.as_string(schema='newick')
+    tre_fn = "random_resolve.tre"
+    with open(tre_fn, "w") as tre_file:
+        tre_file.write("{}".format(tre.as_string(schema='newick')))
 
 
 class PhyAlnUpdater(object):
@@ -94,12 +112,13 @@ class PhyAlnUpdater(object):
         assert self.aln.taxon_namespace == self.tre.taxon_namespace
         with cd(self.config.workdir):
             try:
-                subprocess.check_call(["papara_static_x86_64",
-                                       "-t", "random_resolve.tre",
-                                       "-s", "aln_papara.phy",
-                                       #  "-j", "{}".format(self.config.num_threads),  # FIXME: Does not work on some machines, only when it is compiled.
-                                       "-q", self.newseqs_file,
-                                       "-n", papara_runname])
+                with suppress_stdout():
+                    subprocess.check_call(["papara_static_x86_64",
+                                           "-t", "random_resolve.tre",
+                                          "-s", "aln_papara.phy",
+                                          #  "-j", "{}".format(self.config.num_threads),  # FIXME: only works when papara is compiled.
+                                          "-q", self.newseqs_file,
+                                          "-n", papara_runname])
             except subprocess.CalledProcessError as grepexc:
                 print("error code", grepexc.returncode, grepexc.output)
             except OSError as e:
@@ -115,7 +134,7 @@ class PhyAlnUpdater(object):
         msg = "Following papara alignment, aln has {} seqs \n".format(len(self.aln))
         write_msg_logfile(msg, self.config.workdir)
 
-    # todo: move to papara_helper_class (next 3 methods)
+    # todo?: move to papara_helper_class (next 3 methods)
     def write_papara_queryseqs(self):
         """Writes out the query sequence file which is needed by papara.
 
@@ -201,16 +220,16 @@ class PhyAlnUpdater(object):
         self.table[tax.label, 'status'] = -1
         self.table[tax.label, 'status_note'] = "deleted, input conflict"
 
-    def trim(self, aln_fn=False, format=None):
+    def trim(self, aln_fn=False, format_aln=None):
         """ It removes bases at the start and end of alignments, if they are represented by less than the value
-        specified in the config file. E.g. 0.75 given in config.
+        specified in the config file (trim_perc). E.g. 0.75 given in config.
 
         Means, that 75% of the sequences need to have a base present. This ensures, that not whole chromosomes
         get dragged in by cutting the ends of long sequences.
         """
         # print('in trim')
         if aln_fn:
-            aln = DnaCharacterMatrix.get(path=aln_fn, schema=format)
+            aln = DnaCharacterMatrix.get(path=aln_fn, schema=format_aln)
         else:
             aln = self.aln
         seqlen = check_align(aln)
@@ -238,7 +257,8 @@ class PhyAlnUpdater(object):
         # shorten aln to start:stop
         for taxon in aln:
             aln[taxon] = aln[taxon][start:stop]
-        msg = "Trimmed beginning and end of alignment to > {}. Start: {}, stop: {}.\n".format(self.config.trim_perc, start, stop)
+        msg = "Trimmed beginning and end of alignment to > {}. " \
+              "Start: {}, stop: {}.\n".format(self.config.trim_perc, start, stop)
         write_msg_logfile(msg, self.config.workdir)
 
         if not aln_fn:
@@ -285,7 +305,7 @@ class PhyAlnUpdater(object):
         fout.writelines(query_msa)
         fout.close()
 
-        del ref_msa[(len_aln)+1:]
+        del ref_msa[len_aln+1:]
         fout = open("old_seqs_papara.extended", "w")
         fout.writelines(ref_msa)
         fout.close()
@@ -304,14 +324,13 @@ class PhyAlnUpdater(object):
             with cd(self.config.workdir):
                 backbonetre = Tree.get(path=os.path.join(self.config.workdir, "backbone.tre"), schema="newick",
                                        preserve_underscores=True)
-                self.resolve_polytomies(backbonetre)
+                resolve_polytomies(backbonetre)
         self.write_papara_trefile()
 
         with cd(self.config.workdir):
-            #self.resolve_polytomies(self.tre)  # todo: rewrite next code, so that it uses unresolved tree
+            # resolve_polytomies(self.tre)  # todo: rewrite next code, so that it uses unresolved tree
             # get model for epa-ng
             # todo: check number of threads depending on informative aln patterns
-
             try:
                 subprocess.run(['raxml-ng-mpi', '--evaluate', '--msa', "updt_aln.fasta", '--tree', "random_resolve.tre",
                                 '--prefix', 'info', '--model', 'GTR+G', '--threads', '1', '--redo'])
@@ -323,31 +342,17 @@ class PhyAlnUpdater(object):
             # # split does not work, as original aln_papara often shorter than extended:
             # subprocess.call(["epa-ng", "--split", "aln_papara.phy", "papara_alignment.extended"])
             self.truncate_papara_aln()
+            with suppress_stdout():
 
-            subprocess.call(["epa-ng", "--ref-msa", "old_seqs.fasta", "--tree", "random_resolve.tre",
-                             "--query",  "new_seqs.fasta", "--outdir", "./", "--model", 'info.raxml.bestModel',
-                             '--redo'])
-            # make newick tre
-            subprocess.call(["gappa", "examine", "graft",
-                             "--jplace-path", "epa_result.jplace",
-                             "--allow-file-overwriting"])
+                subprocess.call(["epa-ng", "--ref-msa", "old_seqs.fasta", "--tree", "random_resolve.tre",
+                                 "--query",  "new_seqs.fasta", "--outdir", "./", "--model", 'info.raxml.bestModel',
+                                 '--redo'])
+                # make newick tre
+                subprocess.call(["gappa", "examine", "graft",
+                                 "--jplace-path", "epa_result.jplace",
+                                 "--allow-file-overwriting"])
             placetre = Tree.get(path="epa_result.newick", schema="newick")
             placetre.write(path="place_resolve.tre", schema="newick", unquoted_underscores=True)
-
-    def resolve_polytomies(self, tre):
-        """
-        Randomly resolves polytomies in provided dendropy tree.
-
-        :param tre:
-        :return:
-        """
-        print('resolve_polytomies')
-        tre.resolve_polytomies()
-        tre.deroot()
-        tre.as_string(schema='newick')
-        tre_fn = "random_resolve.tre"
-        with open(tre_fn, "w") as tre_file:
-            tre_file.write("{}".format(tre.as_string(schema='newick')))
 
     def est_full_tree_ng(self, path=".", aln_fn='papara_alignment.extended'):
         # todo use trimmed alignment - rewrite trim. - did i fix this by providing trim tree in updt_aln.fasta?
@@ -363,7 +368,6 @@ class PhyAlnUpdater(object):
                 if self.config.backbone is not True:
                     subprocess.call(["raxml-ng-mpi", '--check', '--msa', "{}/{}".format(path, aln_fn),
                                      '--model', 'GTR+G', '--prefix', 'check'])
-
                     subprocess.call(["raxml-ng-mpi",
                                      "--threads", "{}".format(num_threads),
                                      "--msa", "{}/{}".format(path, aln_fn),
@@ -375,7 +379,6 @@ class PhyAlnUpdater(object):
                 else:
                     subprocess.call(["raxml-ng-mpi", '--check', '--msa', "{}/{}".format(path, aln_fn),
                                      '--model', 'GTR+G', '--prefix', 'check'])
-
                     subprocess.call(["raxml-ng-mpi", "--threads", "{}".format(num_threads), "-m",
                                      "--msa", "{}/{}".format(path, aln_fn), '--model', "GTR+G",
                                      "--constraint-tree", "backbone.tre",
@@ -435,10 +438,8 @@ class PhyAlnUpdater(object):
             #                      '--seed', seed, "--threads", "{}".format(str(self.config.num_threads)),
             # except:
             subprocess.call(["raxml-ng-mpi", '--all', "--msa", "{}".format(aln_fn), '--model', "GTR+G", '--bs-trees',
-                             #'tbe',  #
-                             'autoMRE',
-
-                             '--seed', seed, "--threads", "{}".format(self.config.num_threads),
+                             # 'tbe',  #
+                             'autoMRE', '--seed', seed, "--threads", "{}".format(self.config.num_threads),
                              "--prefix", "fulltree"])
         else:
             # subprocess.call(["raxml-ng", "--threads", "{}".format(self.config.num_threads),
@@ -446,23 +447,14 @@ class PhyAlnUpdater(object):
             #                  "--prefix", "fulltree"])
             # do all in once
             subprocess.call(["raxml-ng-mpi", '--all', "--msa", "{}".format(aln_fn), '--model', "GTR+G", '--bs-trees',
-                             #'fbp,tbe',
-                              'autoMRE',
-                             '--seed', seed, "--threads", "{}".format(self.config.num_threads),
+                             # 'fbp,tbe',
+                              'autoMRE', '--seed', seed, "--threads", "{}".format(self.config.num_threads),
                              "--prefix", "fulltree"])
-
-        # subprocess.call(["raxml-ng", '--consense', 'MRE', '--tree', 'RAxML_bestTree.{}'.format(date),
-        #                  "--prefix", 'consMRE'])
-        # subprocess.call(["raxml-ng", '--consense', 'STRICT', '--tree', 'RAxML_bestTree.{}'.format(date),
-        #                  "--prefix", 'consSTRICT'])
-        # subprocess.call(["raxml-ng", '--consense', 'MR', '--tree', 'RAxML_bestTree.{}'.format(date),
-        #                  "--prefix", 'consMR'])
-        # todo change to bootstrap file
-        subprocess.call(["raxml-ng-mpi", '--consense', 'MRE', '--tree', 'fulltree.raxml.bestTree',
+        subprocess.call(["raxml-ng-mpi", '--consense', 'MRE', '--tree', 'fulltree.raxml.bootstraps',
                          "--prefix", 'consMRE'])
-        subprocess.call(["raxml-ng-mpi", '--consense', 'STRICT', '--tree', 'fulltree.raxml.bestTree',
+        subprocess.call(["raxml-ng-mpi", '--consense', 'STRICT', '--tree', 'fulltree.raxml.bootstraps',
                          "--prefix", 'consSTRICT'])
-        subprocess.call(["raxml-ng-mpi", '--consense', 'MR', '--tree', 'fulltree.raxml.bestTree',
+        subprocess.call(["raxml-ng-mpi", '--consense', 'MR', '--tree', 'fulltree.raxml.bootstraps',
                          "--prefix", 'consMR'])
         os.chdir(cwd)
 
@@ -472,16 +464,11 @@ class PhyAlnUpdater(object):
         :return: final data
         """
         print("calculate final tree")
-        self.write_files(treepath="updt_tre_notrim.tre", alnpath="updt_aln_notrim.fasta")
+        self.write_files(treepath="updt_tre.tre", alnpath="updt_aln.fasta")
         self.prune_short()
         self.aln = self.trim(os.path.abspath(os.path.join(self.config.workdir, 'papara_alignment.extended')),
                              format_aln='phylip')
         self.write_files(treepath="updt_tre.tre", alnpath="updt_aln.fasta")
-
-        # if os.path.exists("[]/previous_run".format(self.config.workdir)):
-        #     self.est_full_tree_ng(path="previous_run", aln_fn='updt_aln.fasta')
-        # else:
-        #     self.est_full_tree_ng(aln_fn='updt_aln.fasta')
         self.calculate_bootstrap_ng()
 
     def write_files(self, treepath="PhyFilter.tre", treeschema="newick", alnpath="updt_aln.fasta", alnschema="fasta"):
@@ -545,7 +532,7 @@ class InputCleaner(object):
         self.table = table
         self.aln = self.write_clean_aln(aln_fn)
         self.tre = self.write_clean_tre(tre_fn)
-        if self.config.update_tree == True:  # todo: not the right if here, implemented this to test if different level analyses work
+        if self.config.different_level == False:
             self._reconcile()
         self._reconcile_names()
         # ncbi parser contains information about spn, tax_id, and ranks
@@ -613,19 +600,21 @@ class InputCleaner(object):
             print('Remove data from aln.')
             for item in del_aln:
                 self.aln.taxon_namespace.remove_taxon_label(item.label)  # can only be removed one by one
-                msg = 'RECONCILIATION: {} is only in the alignment, not in the tree. Will be deleted.\n'.format(item.label)
+                msg = 'RECONCILIATION: {} is only in the alignment, not in the tree. ' \
+                      'Will be deleted.\n'.format(item.label)
                 write_msg_logfile(msg, self.config.workdir)
         if del_tre != []:
             print('Remove data from tre.')
             for item in del_tre:
                 self.tre.taxon_namespace.remove_taxon_label(item.label)  # can only be removed one by one
-                msg = 'RECONCILIATION: {} is only in the tree, not in the alignment. Will be deleted.\n'.format(item.label)
+                msg = 'RECONCILIATION: {} is only in the tree, not in the alignment. ' \
+                      'Will be deleted.\n'.format(item.label)
                 write_msg_logfile(msg, self.config.workdir)
         prune_list = list(prune)
         if len(prune) > 0:
-            TF = np.where((self.table.accession.isin(prune_list)), True, False)
-            self.table.loc[TF, 'status'] = -1
-            self.table.loc[TF, 'status_note'] = "deleted in reconciliation"
+            true_false = np.where((self.table.accession.isin(prune_list)), True, False)
+            self.table.loc[true_false, 'status'] = -1
+            self.table.loc[true_false, 'status_note'] = "deleted in reconciliation"
         assert self.aln.taxon_namespace == self.tre.taxon_namespace
 
     def _reconcile_names(self):
@@ -651,7 +640,8 @@ class InputCleaner(object):
                         tax.label = self.table.loc[idx, "accession"]
                         found_label = 1
                 if found_label == 0:
-                    sys.stderr.write("could not match tiplabel {} or {} to an ncbi taxon name\n".format(tax.label, newname))
+                    sys.stderr.write("could not match tiplabel {} or {} to "
+                                     "an ncbi taxon name\n".format(tax.label, newname))
 
     def write_clean_aln(self, aln_fn):
         """
@@ -671,7 +661,7 @@ class InputCleaner(object):
         with open(upd_aln_fn, "w") as aln_file:
             aln_file.write(filedata)
         # use replaced aln as input
-        aln = DnaCharacterMatrix.get(path=upd_aln_fn, schema='fasta') # , taxon_namespace=self.tre.taxon_namespace)
+        aln = DnaCharacterMatrix.get(path=upd_aln_fn, schema='fasta')  # , taxon_namespace=self.tre.taxon_namespace)
         return aln
 
     def write_clean_tre(self, tre_fn):
@@ -692,6 +682,6 @@ class InputCleaner(object):
         with open(upd_tre_fn, "w") as tre_file:
             tre_file.write(filedata)
         # use replaced aln as input
-        tre = Tree.get(path=upd_tre_fn, schema='newick', taxon_namespace=self.aln.taxon_namespace, preserve_underscores=True)
+        tre = Tree.get(path=upd_tre_fn, schema='newick', taxon_namespace=self.aln.taxon_namespace,
+                       preserve_underscores=True)
         return tre
-
