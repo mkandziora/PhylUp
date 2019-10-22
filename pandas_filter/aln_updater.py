@@ -67,17 +67,17 @@ class PhyAlnUpdater(object):
             self.place_query_seqs_epa()
             self.prune_short()
             self.trim()
-            if self.config.update_tree == True:
+            if self.config.update_tree is True:
                 self.calculate_final_tree()   # comment out for development speed up
-                self.tre = Tree.get(path="{}/fulltree.raxml.bestTree".format(self.config.workdir),
+                self.tre = Tree.get(path=os.path.join(self.config.workdir, "fulltree.raxml.bestTree"),
                                     schema="newick",
                                     preserve_underscores=True,
                                     taxon_namespace=self.aln.taxon_namespace)
-                fn = '{}/papara_alignment.extended'.format(self.config.workdir)
+                fn = os.path.join(self.config.workdir, 'papara_alignment.extended')
                 self.aln = DnaCharacterMatrix.get(path=fn, schema="phylip")
-                self.aln.write(path="{}/updt_aln.fasta".format(self.config.workdir), schema='fasta')
-                shutil.copy("{}/fulltree.raxml.bestTree".format(self.config.workdir),
-                            "{}/updt_tre.tre".format(self.config.workdir))
+                self.aln.write(path=os.path.join(self.config.workdir, "updt_aln.fasta"), schema='fasta')
+                shutil.copy(os.path.join(self.config.workdir, "fulltree.raxml.bestTree"),
+                            os.path.join(self.config.workdir, "updt_tre.tre"))
                 sys.stdout.write('Updating of aln and tre done.\n')
 
     def align_query_seqs(self, papara_runname="extended"):
@@ -109,8 +109,8 @@ class PhyAlnUpdater(object):
                 else:
                     # Something else went wrong while trying to run ...
                     raise
-            path = "{}/papara_alignment.{}".format(os.getcwd(), papara_runname)
-            assert os.path.exists(path), "{path} does not exists".format(path=path)
+            path = os.path.join(os.getcwd(), "papara_alignment.{}".format(papara_runname))
+            assert os.path.exists(path), "{} does not exists".format(path)
         self.aln = self.trim()
         msg = "Following papara alignment, aln has {} seqs \n".format(len(self.aln))
         write_msg_logfile(msg, self.config.workdir)
@@ -122,7 +122,7 @@ class PhyAlnUpdater(object):
         Is only used within func align_query_seqs.
         """
         print("write query seq")
-        fi = open("{}/{}".format(self.config.workdir, self.newseqs_file), "w")
+        fi = open(os.path.join(self.config.workdir, self.newseqs_file), "w")
         for idx in self.new_seq_table.index:
             tip_name = self.new_seq_table.loc[idx, 'accession'].split('.')[0]
             fi.write(">{}\n".format(tip_name))
@@ -135,7 +135,7 @@ class PhyAlnUpdater(object):
         Papara needs phylip format for the alignment.
         """
         alnfilename = "aln_papara.phy"
-        self.aln.write(path="{}/{}".format(self.config.workdir, alnfilename), schema="phylip")
+        self.aln.write(path=os.path.join(self.config.workdir, alnfilename), schema="phylip")
 
     def write_papara_trefile(self):
         """This writes out tree files for papara.
@@ -150,7 +150,7 @@ class PhyAlnUpdater(object):
         tmptre = tmptre.replace("'", "_")
 
         filename = "random_resolve.tre"
-        fi = open("{}/{}".format(self.config.workdir, filename), "w")
+        fi = open(os.path.join(self.config.workdir, filename), "w")
         fi.write(tmptre)
         fi.close()
 
@@ -242,9 +242,11 @@ class PhyAlnUpdater(object):
         write_msg_logfile(msg, self.config.workdir)
 
         if not aln_fn:
-            aln_fn = os.path.abspath('{}/updt_aln.fasta'.format(self.config.workdir))
+            aln_fn = os.path.abspath(os.path.join(self.config.workdir, 'updt_aln.fasta'))
         else:
-            aln_fn ='{}_trim'.format(aln_fn)
+            aln_fn = '{}_trim'.format(aln_fn)
+            aln.write(path=os.path.join(self.config.workdir, 'updt_aln.fasta'), schema='fasta')
+
         aln.write(path="{}".format(aln_fn), schema='fasta')
         return aln
 
@@ -300,8 +302,7 @@ class PhyAlnUpdater(object):
         print("place query seq")
         if self.config.backbone is True:
             with cd(self.config.workdir):
-                backbonetre = Tree.get(path="{}/backbone.tre".format(self.config.workdir),
-                                       schema="newick",
+                backbonetre = Tree.get(path=os.path.join(self.config.workdir, "backbone.tre"), schema="newick",
                                        preserve_underscores=True)
                 self.resolve_polytomies(backbonetre)
         self.write_papara_trefile()
@@ -473,7 +474,8 @@ class PhyAlnUpdater(object):
         print("calculate final tree")
         self.write_files(treepath="updt_tre_notrim.tre", alnpath="updt_aln_notrim.fasta")
         self.prune_short()
-        self.aln = self.trim(os.path.abspath('{}/papara_alignment.extended'.format(self.config.workdir)), format='phylip')
+        self.aln = self.trim(os.path.abspath(os.path.join(self.config.workdir, 'papara_alignment.extended')),
+                             format_aln='phylip')
         self.write_files(treepath="updt_tre.tre", alnpath="updt_aln.fasta")
 
         # if os.path.exists("[]/previous_run".format(self.config.workdir)):
@@ -487,12 +489,11 @@ class PhyAlnUpdater(object):
         Outputs dendropy tre and aln as file.
         """
         print("write_files")
-        self.tre.write(path="{}/{}".format(self.config.workdir, treepath),
+        self.tre.write(path=os.path.join(self.config.workdir, treepath),
                        schema=treeschema, unquoted_underscores=True)
-        self.aln.write(path="{}/{}".format(self.config.workdir, alnpath),
+        self.aln.write(path=os.path.join(self.config.workdir, alnpath),
                        schema=alnschema)
 
-    # todo check pandas version works
     def write_labelled(self, treepath=None, alnpath=None):
         """ Output tree and alignment with human readable labels.
 
@@ -502,9 +503,9 @@ class PhyAlnUpdater(object):
         """
         print("write labelled files")
         if treepath is None:
-            treepath = "{}/fulltree.raxml.bestTree".format(self.config.workdir)
+            treepath = os.path.join(self.config.workdir, "fulltree.raxml.bestTree")
         else:
-            treepath = "{}/{}".format(self.config.workdir, treepath)
+            treepath = os.path.join(self.config.workdir, treepath)
         tmp_newick = self.tre.as_string(schema="newick")
         tmp_tre = Tree.get(data=tmp_newick,
                            schema="newick",
@@ -515,13 +516,11 @@ class PhyAlnUpdater(object):
                 present = self.table[self.table['status'] >= 0]
                 for idx in present.index:
                     if present.loc[idx, 'accession'].split('.')[0] in new_tree:
-                        # todo does not yet replace acc names
                         new_tree = new_tree.replace("{}:".format(present.loc[idx, 'accession'].split('.')[0]),
                                                     "{}_{}:".format(present.loc[idx, 'ncbi_txn'].replace(" ", "_"),
                                                                     present.loc[idx, 'accession'].split('.')[0]))
                 fout.write(new_tree)
 
-        # todo: test if this is working - dont think so
         if alnpath is not None:
             tmp_fasta = self.aln.as_string(schema="fasta")
             tmp_aln = DnaCharacterMatrix.get(data=tmp_fasta, schema="fasta",
@@ -663,12 +662,12 @@ class InputCleaner(object):
         with open(aln_fn, "r") as fin:
             filedata = fin.read()
         # Write the file out again
-        with open("{}/orig_inputaln.fasta".format(self.config.workdir), "w") as aln_file:
+        with open(os.path.join(self.config.workdir, "orig_inputaln.fasta"), "w") as aln_file:
             aln_file.write(filedata)
         filedata = filedata.replace("?", "-")
         filedata = filedata.replace(" ", "_")
 
-        upd_aln_fn = "{}/updt_aln.fasta".format(self.config.workdir)
+        upd_aln_fn = os.path.join(self.config.workdir, "updt_aln.fasta")
         with open(upd_aln_fn, "w") as aln_file:
             aln_file.write(filedata)
         # use replaced aln as input
@@ -685,11 +684,11 @@ class InputCleaner(object):
         with open(tre_fn, "r") as fin:
             filedata = fin.read()
         # Write the file out again
-        with open("{}/orig_tre.tre".format(self.config.workdir), "w") as tre_file:
+        with open(os.path.join(self.config.workdir, "orig_tre.tre"), "w") as tre_file:
             tre_file.write(filedata)
         filedata = filedata.replace(" ", "_")
 
-        upd_tre_fn = "{}/updt_tre.tre".format(self.config.workdir)
+        upd_tre_fn = os.path.join(self.config.workdir, "updt_tre.tre")
         with open(upd_tre_fn, "w") as tre_file:
             tre_file.write(filedata)
         # use replaced aln as input

@@ -625,8 +625,8 @@ class FilterNumberOtu(Filter):
         else:
             for_db = filter_dict.drop([idx])
         # filter_seq_db has to be deleted for every new filterun
-        if os.path.exists('{}/tmp/filter_seq_db'.format(self.config.workdir)):
-            os.remove('{}/tmp/filter_seq_db'.format(self.config.workdir))
+        if os.path.exists(os.path.join(self.workdir, 'tmp/filter_seq_db')):
+            os.remove(os.path.join(self.workdir, 'tmp/filter_seq_db'))
         for idx in for_db.index:
             seq_id = for_db.loc[idx, 'accession']
             seq = for_db.loc[idx, 'sseq']

@@ -397,12 +397,12 @@ def run_blast_query(query_seq, taxon, db_path, db_name, config):
         input_fn = "{}/blast/query_seq.fas".format(config.workdir)
         db = 'unpublished_seq_db'
     elif db_name == "filterrun":  # Run a local blast search if the data is unpublished or for filtering.
-        query_output_fn = "{}/tmp/{}.txt".format(config.workdir, taxon)
-        input_fn = "{}/tmp/{}_tobeblasted.fas".format(config.workdir, taxon)
+        query_output_fn = os.path.join(config.workdir, "tmp/{}.txt".format(taxon))
+        input_fn = os.path.join(config.workdir, "tmp/{}_tobeblasted.fas".format(taxon))
         db = 'filter_seq_db'
     elif db_name == "Genbank":
-        query_output_fn = "{}/blast/{}.txt".format(config.workdir, taxon)
-        input_fn = "{}/blast/{}_tobeblasted.fas".format(config.workdir, taxon)
+        query_output_fn = os.path.join(config.workdir, "blast/{}.txt".format(taxon))
+        input_fn = os.path.join(config.workdir, "blast/{}_tobeblasted.fas".format(taxon))
     else:
         print('DOES THIS EVER HAPPEN?')
         print(db_name)
@@ -430,7 +430,7 @@ def run_blast_query(query_seq, taxon, db_path, db_name, config):
                 os.system(blastcmd)
     else:
         print("run against local data")
-        with cd("{}/tmp/".format(config.workdir)):
+        with cd(os.path.join(config.workdir, "tmp")):
             blastcmd = "blastn -query {} -db {} -out ".format(input_fn, db) + query_output_fn + \
                        " {} -num_threads {}".format(outfmt, config.num_threads) + \
                        " -max_target_seqs {} -max_hsps {}".format(config.hitlist_size, config.hitlist_size)
@@ -451,11 +451,11 @@ def read_blast_query_pandas(blast_fn, config, db_name):
     if len(blast_fn.split('.')) > 1:
         blast_fn = blast_fn.split('.')[0]
     if db_name == "filterrun":  # Run a local blast search if the data is unpublished or for filtering.
-        query_output_fn = "{}/tmp/{}.txt".format(config.workdir, blast_fn)
+        query_output_fn = os.path.join(config.workdir, "tmp/{}.txt".format(blast_fn))
     elif db_name == 'unpublished':
-        query_output_fn = "{}/tmp/unpublished_query_result.txt".format(config.workdir)
+        query_output_fn = os.path.join(config.workdir, "tmp/unpublished_query_result.txt")
     else:
-        query_output_fn = "{}/blast/{}.txt".format(config.workdir, blast_fn)
+        query_output_fn = os.path.join(config.workdir, "blast/{}.txt".format(blast_fn))
     query_output_fn = os.path.abspath(query_output_fn)
     queried_acc = set()  # used to test if gb_acc was added before  aka query_dict in physcraper
     colnames = ['accession;gi', 'ncbi_txid', 'ncbi_txn', 'pident', 'evalue', 'bitscore', 'sseq', 'title', 'accession']
@@ -533,7 +533,7 @@ def wrapper_get_fullseq(config, new_blast_seq_dict, db):
     if db == 'Genbank':
         blastdb = config.blastdb
     else:
-        blastdb = '{}/tmp/filter_seq_db'.format(config.workdir)
+        blastdb = os.path.join(config.workdir, 'tmp/filter_seq_db')
     for idx in new_blast_seq_dict.index:
         gb_acc = new_blast_seq_dict.loc[idx, "accession"]
         if len(gb_acc.split(".")) >= 2:  # Do not add sequences that are not in Genbank accession format, e.g. PDB

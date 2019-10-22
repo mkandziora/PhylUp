@@ -64,8 +64,8 @@ class ConfigObj(object):
         self.workdir = workdir
         if not os.path.exists(self.workdir):
             os.makedirs(self.workdir)
-        if not os.path.exists("{}/blast".format(self.workdir)):
-            os.makedirs("{}/blast".format(self.workdir))
+        if not os.path.exists(os.path.join(self.workdir, "blast")):
+            os.makedirs(os.path.join(self.workdir, "blast"))
         assert self.workdir
 
         config = configparser.ConfigParser()
