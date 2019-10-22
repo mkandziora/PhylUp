@@ -19,17 +19,25 @@ def debug(msg):
 
 @contextlib.contextmanager
 def cd(path):
-    # print 'initially inside {0}'.format(os.getcwd())
     cwd = os.getcwd()
     os.chdir(path)
-    # print 'inside {0}'.format(os.getcwd())
     try:
         yield
     except:
         print('Exception caught: ', sys.exc_info()[0])
     finally:
-        # print 'finally inside {0}'.format(os.getcwd())
         os.chdir(cwd)
+
+
+@contextlib.contextmanager
+def suppress_stdout():
+    with open(os.devnull, "w") as devnull:
+        old_stdout = sys.stdout
+        sys.stdout = devnull
+        try:
+            yield
+        finally:
+            sys.stdout = old_stdout
 
 
 def get_user_input():
@@ -37,7 +45,7 @@ def get_user_input():
 
     :return: user input
     """
-    print("get user input")
+    # print("get user input")
     is_valid = 0
     x = None
     while not is_valid:
@@ -59,7 +67,8 @@ def write_msg_logfile(msg, workdir, fn="logfile"):
     :param fn: filename for logging
     :return:
     """
-    lfd = "{}/{}".format(workdir, fn)
+    lfd = os.path.join(workdir, fn)
+    # lfd = "{}/{}".format(workdir, fn)
     with open(lfd, "a") as log:
         log.write(msg)
 
