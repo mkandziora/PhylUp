@@ -1,25 +1,48 @@
+"""
+PhylUp: automatically update alignments and phylogenies.
+Copyright (C) 2019  Martha Kandziora
+martha.kandziora@yahoo.com
+
+Package to automatically update alignments and phylogenies using local and Genbank datasets
+
+Parts of the code are inspired by the program physcraper developed by me and Emily Jane McTavish.
+
+All classes and methods are distributed under the following license.
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <https://www.gnu.org/licenses/>.
+"""
+
 import sys
 import numpy
 import datetime
 import pandas as pd
 import numpy as np
 import os
-from dendropy import DnaCharacterMatrix, Tree
+from dendropy import Tree, DnaCharacterMatrix
+
+import ncbiTAXONparser.ncbi_data_parser as ncbi_data_parser
 
 from . import blast
-from . import ncbi_data_parser
-from . import aln_updater
+from . import phylogen_updater
 from . import write_msg_logfile
+from . import phylogenetic_helpers
 
-
-# DONE TODO: write concat class
-# DONE TODO: write mrca list for non-monophyletic
-# TODO: add add_lower_taxa function (palms dataset) - work in progress
 # TODO: write tests
-# DONE todo: otu filter by length - work in progress
 # todo: write files to tmp...
 
-class Update_data:
+
+class PhylogeneticUpdater:
     def __init__(self, id_to_spn, aln, aln_schema, tre, tre_schema, config, mrca=None, blacklist=None):
         self.date = pd.Timestamp.today()
         self.config = config
@@ -27,19 +50,29 @@ class Update_data:
         self.status = 0  # -1 = deleted, positive values = round, 0 = present at beginning
         self.aln_fn = aln
         self.aln_schema = aln_schema
-        self.aln = None
+        self.aln = DnaCharacterMatrix.get(path=self.aln_fn, schema=self.aln_schema)
         self.tre_fn = tre
         self.tr_schema = tre_schema
         self.tre = None
         self.blacklist = blacklist
-        self.table = self.build_table_from_file(id_to_spn)
-        self.add_seq_to_table()
+        self.table = phylogenetic_helpers.build_table_from_file(id_to_spn, self.config, self.config.downtorank)
+        phylogenetic_helpers.add_seq_to_table(self.aln, self.table)
         self.mrca = None
         self.set_mrca(mrca)
 
     def set_back_data_in_table(self):
+        """
+        Overwrites information in table for all blast date and status of newly added sequences.
+
+        Needed for different_level == True
+
+        :return:
+        """
         if self.config.different_level == True and self.status == 0:
-            self.table['date'] = pd.Timestamp.strptime('01/01/00', '%d/%m/%y')
+            try:
+                self.table['date'] = pd.to_datetime('01/01/00', format='%d/%m/%y')
+            except NotImplementedError:
+                self.table['date'] = pd.Timestamp.strptime('01/01/00', '%d/%m/%y')
             self.table.loc[self.table['status'] > 0, 'status'] = 0.5
             self.config.update_tree = False
 
@@ -57,7 +90,7 @@ class Update_data:
             self.mrca = mrca
         else:
             if type(mrca) is list:
-                print('get mrca of all input!')
+                # print('get mrca of all input!')
                 self.mrca = mrca
             else:
                 print('get mrca of no input!')
@@ -65,71 +98,6 @@ class Update_data:
                 ncbi_parser = ncbi_data_parser.Parser(names_file=self.config.ncbi_parser_names_fn,
                                                       nodes_file=self.config.ncbi_parser_nodes_fn)
                 self.mrca = ncbi_parser.get_mrca(taxid_set=aln_taxids)
-
-    def build_table_from_file(self, id_to_spn):
-        """
-        Build self.table from file. This is the object that basically holds all needed information.
-
-        :param id_to_spn: file that translates tipnames to speciesnames. Must be accepted by ncbi
-        :return: table with all sequence information available
-        """
-        print("Build table with information about sequences and taxa.")
-        table = self.get_txid_for_name_from_file(id_to_spn)  # builds name id link
-        table['status'] = 0
-        table['date'] = pd.Timestamp.strptime('01/01/00', '%d/%m/%y')
-        table['sseq'] = None
-        table['status'] = table['status'].astype(int)
-        table['ncbi_txid'] = table['ncbi_txid'].astype(int)
-        if self.config.downtorank is not None:
-            table['original_ncbi_txid'] = table['ncbi_txid'].astype(int)
-            ncbi_parser = ncbi_data_parser.Parser(names_file=self.config.ncbi_parser_names_fn,
-                                                  nodes_file=self.config.ncbi_parser_nodes_fn)
-            table['ncbi_txid'] = np.vectorize(ncbi_parser.get_downtorank_id)(table['original_ncbi_txid'],
-                                                                             self.config.downtorank)
-        else:
-            table['ncbi_txid'] = table['ncbi_txid'].astype(int)
-        return table
-
-    def add_seq_to_table(self):
-        """
-        Puts input sequences into the pandas table.
-
-        :return:
-        """
-        aln = self.read_in_aln()
-        queried_taxa = []
-        for index in self.table.index:
-            tip_name = self.table.loc[index, 'accession']
-            for taxon, seq in aln.items():
-                if taxon.label == tip_name:
-                    seq = seq.symbols_as_string().replace("-", "").replace("?", "")
-                    self.table.loc[index, 'sseq'] = seq
-                    queried_taxa.append(tip_name)
-        assert tip_name in queried_taxa, (tip_name, queried_taxa)
-
-    def read_in_tree(self, taxon_namespace):
-        """
-        Reads in phylogeny from file.
-
-        :param taxon_namespace: needs taxon_namespace from aln so that they match
-        :return: tre als dendropy object
-        """
-        if taxon_namespace:
-            tre = Tree.get(path=self.tre_fn, schema=self.tr_schema,
-                           taxon_namespace=taxon_namespace, preserve_underscores=True)
-        assert tre.taxon_namespace == taxon_namespace
-        print(tre.as_string('newick'))
-        return tre
-
-    def read_in_aln(self):
-        """
-        Reads text alignment in as dendropy object.
-
-        :return: alignment as dendroppy object
-        """
-        aln = DnaCharacterMatrix.get(path=self.aln_fn, schema=self.aln_schema)
-        assert aln.taxon_namespace
-        return aln
 
     def extend_with_unpublished(self):
         """
@@ -143,42 +111,32 @@ class Update_data:
         present_subset = self.table[self.table['status'] > -1]
         new_seqs_unpubl = pd.DataFrame(columns=['ncbi_txn', 'ncbi_txid', 'status', 'status_note', "date", 'accession',
                                                 'pident', 'evalue', 'bitscore', 'sseq', 'title'])
-        blast.make_local_blastdb(self.config.workdir, db='unpublished', path_to_db=self.config.unpubl_data)
+        # convert name to file
+        ncbi_parser = ncbi_data_parser.Parser(names_file=self.config.ncbi_parser_names_fn,
+                                              nodes_file=self.config.ncbi_parser_nodes_fn)
+        name_txid_unpublished = phylogenetic_helpers.get_txid_for_name_from_file(self.config.unpubl_names, ncbi_parser)
+        name_txid_unpublished[['accession', 'ncbi_txid']].to_csv(os.path.join(self.workdir, 'tmp/unpublished_txid.txt'),
+                                                                 sep=' ', header=False, index=False)
+        blast.make_local_blastdb(self.config.workdir, db='unpublished',
+                                 taxid=os.path.join(self.workdir, 'tmp/unpublished_txid.txt'),
+                                 path_to_db=self.config.unpubl_data)
         # get new seqs from seqs in blast table seq
-        queried_taxa = []
-        for index in present_subset.index:  # should be empty in later rounds...that is why it does not matter that new_seqs_local is reassigned
+        for index in present_subset.index:
             tip_name = self.table.loc[index, 'accession']
             query_seq = self.table.loc[index, 'sseq']
+            # Note: should be empty in later rounds...that is why it does not matter that new_seq_tax is reassigned
             new_seq_tax = blast.get_new_seqs(query_seq, tip_name, self.config.blastdb, "unpublished", self.config)
-            queried_taxa.append(tip_name)
-            assert tip_name in queried_taxa, (tip_name, queried_taxa)
             new_seqs_unpubl = new_seqs_unpubl.append(new_seq_tax, ignore_index=True)
         new_seqs_unpubl = new_seqs_unpubl.drop(['accession;gi', 'ncbi_txid', 'ncbi_txn'], axis=1)
-        name_txid_unpublished = self.get_txid_for_name_from_file(self.config.unpubl_names)
         new_seqs_unpubl = pd.merge(new_seqs_unpubl, name_txid_unpublished, on=['accession'], sort=True)
         new_seqs_unpubl['title'] = 'unpublished'
         new_seqs_unpubl['status'] = self.status
-        # print(new_seqs_unpubl[['accession', 'ncbi_txid', 'ncbi_txn']])
         return new_seqs_unpubl
-
-    def get_txid_for_name_from_file(self, tipname_id_fn):
-        """
-        Get taxon id for tipname, speciesname files using ncbi translation
-
-        :param tipname_id_fn: file with tipname and corresponding species name
-        :return:
-        """
-        columns = ['accession', 'ncbi_txn']
-        name_id = pd.read_csv(tipname_id_fn, names=columns,  sep=",", header=None)
-        ncbi_parser = ncbi_data_parser.Parser(names_file=self.config.ncbi_parser_names_fn,
-                                              nodes_file=self.config.ncbi_parser_nodes_fn)
-        name_id['ncbi_txid'] = name_id['ncbi_txn'].apply(ncbi_parser.get_id_from_name)
-        return name_id
 
     def extend(self):
         """
-        Gets new sequences from thos existing once which have not yet been blasted before.
-        :param new_seqs: pandas dataframe with the new sequences retrieved earlier
+        Gets new sequences from those existing once which have not yet been blasted before.
+
         :return:
         """
         # create list of indice of subset list
@@ -193,31 +151,27 @@ class Update_data:
         new_seqs_local = pd.DataFrame(columns=['ncbi_txn', 'ncbi_txid', 'status', 'status_note', "date", 'accession',
                                                'pident', 'evalue', 'bitscore', 'sseq', 'title'])
         # get new seqs from seqs in blast table seq
-        queried_taxa = []
         msg = present_subset[['accession', 'ncbi_txn',  'status']].to_string()
         write_msg_logfile(msg, self.config.workdir)
-        for index in present_subset.index:  # should be empty in later rounds...that is why it does not matter that new_seqs_local is reassigned
+        for index in present_subset.index:
             tip_name = self.table.loc[index, 'accession']
-            msg = tip_name
-            write_msg_logfile(msg, self.config.workdir)
+            # msg = tip_name
+            # write_msg_logfile(msg, self.config.workdir)
             print('Blast: {}.'.format(tip_name))
             query_seq = self.table.loc[index, 'sseq']
-            bef = self.table.iloc[index]['date']
             self.table.at[index, 'date'] = today  # this is the new version of pd.set_value(), sometimes it's iat
-            aft = self.table.iloc[index]['date']
-            assert bef != aft, (bef, aft)
             new_seq_tax = blast.get_new_seqs(query_seq, tip_name, self.config.blastdb, "Genbank", self.config)
-            queried_taxa.append(tip_name)
-            assert tip_name in queried_taxa, (tip_name, queried_taxa)
             new_seqs_local = new_seqs_local.append(new_seq_tax, ignore_index=True)
         assert len(new_seqs_local) > 0, new_seqs_local
         if self.blacklist is not None:
+            assert type(self.blacklist) == list, (type(self.blacklist), self.blacklist)
             new_seqs_local = self.remove_blacklist_items(new_seqs_local)
         return new_seqs_local
 
     def remove_blacklist_items(self, new_seqs):
         """
-        Removes accession numbers specified in the config file that shall not be added
+        Removes accession numbers specified in the config file that shall not be added.
+
         :param new_seqs:  pandas dataframe with the new sequences retrieved earlier
         :return:
         """
@@ -227,7 +181,7 @@ class Update_data:
 
     def add_new_seqs(self, new_seqs):
         """
-        Adds new sequences to table, after removing those which were already present
+        Adds new sequences to table, after removing those which were already present.
 
         :param new_seqs:  pandas dataframe with the new sequences retrieved earlier
         :return: new_seqs without seqs that were added earlier
@@ -240,9 +194,8 @@ class Update_data:
         assert self.table['status'].hasnans == False, self.table['status'].hasnans
         assert len(subcols) == len(self.table[self.table['status'] == self.status]), \
             (len(subcols), len(self.table[self.table['status'] == self.status]), subcols['accession'])
-        msg = "add_new_seqs has lowered the new seqs df from {} to {}.\n".format(len(new_seqs), len(subcols))
-        write_msg_logfile(msg, self.config.workdir)
-        return subcols
+        new_seqs_upd_index = self.table[self.table['status'] == self.status]
+        return new_seqs_upd_index
 
     def call_filter(self, new_seqs, aln):
         """
@@ -257,30 +210,28 @@ class Update_data:
         # everyone's filter
         new_seqs = new_seqs[~new_seqs['accession'].isin(self.table['accession'])]  # ~ is the pd not in/!
         print('Length of new seqs before filtering: {}'.format(len(new_seqs)))
-
-        new_seqs = self.basic_filters(aln, self.mrca, new_seqs)
-        # next filter need infos in table
-        new_seqs = self.add_new_seqs(new_seqs)
+        if len(new_seqs) > 0:
+            print(new_seqs.columns)
+            new_seqs = self.basic_filters(aln, self.mrca, new_seqs)
+            # next filter need infos in table
+            new_seqs = self.add_new_seqs(new_seqs)
 
         for idx in new_seqs.index:
-            assert self.table.index.contains(idx), (idx, self.table.index)
+            assert idx in self.table.index, (idx, self.table.index)
         # filter for seq identity process
         new_seqs = self.compare_filter(new_seqs)
         return new_seqs
 
     def compare_filter(self, new_seqs):
         """
-        This filter alteres entries in the table.
+        Function calls filters, that alter entries in the table.
 
         :param new_seqs: pandas dataframe with the new sequences retrieved/not filtered from earlier
         :return:
         """
         if len(new_seqs) > 0:
             for idx in new_seqs.index:
-                # print(idx)
-                assert self.table.index.contains(idx), (idx, self.table.index)
-
-            # #######################
+                assert idx in self.table.index, (idx, self.table.index)
             f = FilterSeqIdent(self.config, self.table, self.status)
             msg = "Time before Filter {}: {}.\n".format(f, datetime.datetime.now())
             write_msg_logfile(msg, self.config.workdir)
@@ -289,10 +240,17 @@ class Update_data:
             new_seqs = f.upd_new_seqs  # assign new_seqs to last upd from filter before
             self.table = f.table
             del_seq = f.del_table
-            assert len(del_seq) + len(new_seqs) == before_filter, (
-                len(del_seq), len(new_seqs), before_filter)
+
+            assert any(
+                x in del_seq['accession'].to_list() for x in self.table.loc[self.table['status'] >= 0, 'accession'].to_list()) == False, \
+                ([i for i in del_seq['accession'].to_list() if i in self.table.loc[self.table['status'] >= 0, 'accession'].to_list()])
+            assert len(del_seq) + len(new_seqs) == before_filter, (len(del_seq), len(new_seqs), before_filter)
             assert new_seqs.index.is_unique is True, new_seqs.index
             assert self.table.index.is_unique is True, self.table.index
+            assert len(new_seqs) == len(self.table[self.table['status'] == self.status]), \
+                (len(new_seqs), len(self.table[self.table['status'] == self.status]),
+                 new_seqs['accession'], self.table[self.table['status'] == self.status]['accession'])
+
             # filter for number otu
             f = FilterNumberOtu(self.config, self.table, self.status)
             msg = "Time before Filter {}: {}.\n".format(f, datetime.datetime.now())
@@ -316,7 +274,6 @@ class Update_data:
         columns = ['ncbi_txn', 'ncbi_txid', 'status', 'status_note', "date",
                    'accession', 'pident', 'evalue', 'bitscore', 'sseq', 'title']
         all_del = pd.DataFrame(columns=columns)
-
         remove_basics = [FilterUniqueAcc(self.config, self.table),
                          FilterBLASTThreshold(self.config),
                          FilterLength(self.config, aln),
@@ -330,10 +287,8 @@ class Update_data:
             new_seqs = f.upd_new_seqs
             del_seq = f.del_table
             all_del = all_del.append(del_seq, ignore_index=True)
-            assert len(del_seq) + len(new_seqs) == internal_new_seq, (
-                len(del_seq), len(new_seqs), internal_new_seq)
+            assert len(del_seq) + len(new_seqs) == internal_new_seq, (len(del_seq), len(new_seqs), internal_new_seq)
         assert len(all_del) + len(new_seqs) == orig_len, (len(all_del), len(new_seqs), orig_len, all_del, new_seqs)
-        # all_del.to_csv('{}/deleted_early.csv'.format(self.config.workdir), mode='a')
         return new_seqs
 
     def run(self):
@@ -349,13 +304,7 @@ class Update_data:
                    'accession', 'pident', 'evalue', 'bitscore', 'sseq', 'title']
         all_new_seqs = pd.DataFrame(columns=columns)
 
-        aln = self.read_in_aln()
-        tre = self.read_in_tree(aln.taxon_namespace)
-        cleaner = aln_updater.InputCleaner(tre, aln, self.tre_fn, self.aln_fn, self.table, self.config, self.mrca)
-        self.aln = cleaner.aln
-        self.tre = cleaner.tre
-        self.table = cleaner.table
-        self.mrca = cleaner.mrca
+        self.call_input_cleaner()
 
         retrieved_seqs = 1
         if os.path.exists(os.path.join(self.workdir, 'all_new_seqs.updated')):
@@ -376,20 +325,15 @@ class Update_data:
                     new_seqs = self.extend()  # todo rename to find new seqs
                     msg = "Time after BLAST: {}.\n".format(datetime.datetime.now())
                     write_msg_logfile(msg, self.config.workdir)
-                new_seqs = self.call_filter(new_seqs, aln)
+                new_seqs = self.call_filter(new_seqs, self.aln)
                 new_seqs = new_seqs[~new_seqs['accession'].isin(all_new_seqs['accession'])]  # ~ is the pd not in/!
-                # all_new_seqs = all_new_seqs.append(new_seqs, ignore_index=True)
-                # all_new_seqs = new_seqs  # i replaces the one above for the different filter setting - TODO can probable all be removed - assert, etc
+                all_new_seqs = all_new_seqs.append(new_seqs, ignore_index=True)
                 print('Length of new seqs after filtering: {}'.format(len(new_seqs)))
                 retrieved_seqs = len(new_seqs)
                 msg = "Newly found seqs: {}.\n".format(len(new_seqs))
                 write_msg_logfile(msg, self.config.workdir)
-                # following assert is probably only important for debugging and all_new_seqs_table not used otherwise
-                # all_new_seqs_table = self.table[self.table['status'] > 0]
-                # assert len(all_new_seqs_table) == len(all_new_seqs), (len(all_new_seqs_table), len(all_new_seqs))
                 if self.config.unpublished is True:
                     self.config.unpublished = False
-                    # retrieved_seqs = 0
             msg = "Time before update tre/aln: {}.\n".format(datetime.datetime.now())
             write_msg_logfile(msg, self.config.workdir)
             msg = "Newly found seqs will be added to aln and tre: {}.\n".format(len(all_new_seqs))
@@ -401,16 +345,56 @@ class Update_data:
                     os.rename(os.path.join(self.workdir, 'table.updated'),
                               os.path.join(self.workdir, "table_updated_tmp"))
             self.table.to_csv(os.path.join(self.workdir, 'table.updated'))
-        self.update_aln_tre()
+        self.update_aln()
+        if self.tre is None:
+            self.tre_fn = os.path.abspath(os.path.join(self.config.workdir, "updt_aln.fasta.tree"))
+            self.tre = Tree.get(path=os.path.join(self.config.workdir, self.tre_fn),
+                                schema="newick",
+                                preserve_underscores=True,
+                                taxon_namespace=self.aln.taxon_namespace)
+        self.update_tre()
         msg = "Time finished: {}.\n".format(datetime.datetime.now())
         write_msg_logfile(msg, self.config.workdir)
 
-    def update_aln_tre(self):
-        aln = self.read_in_aln()
-        tre = self.read_in_tree(aln.taxon_namespace)
-        aln_upd = aln_updater.PhyAlnUpdater(tre, aln, self.status, self.table, self.config)
-        aln_upd.update_data()
-        aln_upd.write_labelled('updt_tre.tre')
+    def call_input_cleaner(self):
+        """
+        Calls InputCleaner class and updates input data.
+        :return:
+        """
+        cleaner = phylogen_updater.InputCleaner(self.tre_fn, self.aln_fn, self.table, self.config, self.mrca)
+        self.aln = cleaner.aln
+        if self.tre_fn is not None:
+            self.tre = cleaner.tre
+        self.table = cleaner.table
+        self.mrca = cleaner.mrca
+
+    def update_aln(self):
+        """
+        Call the alignment updater class.
+
+        :return:
+        """
+        aln = phylogenetic_helpers.read_in_aln(self.aln_fn, self.aln_schema)
+        if self.tre_fn is None:
+            tre = None
+        else:
+            tre = Tree.get(path=self.tre_fn, schema='newick',
+                           taxon_namespace=aln.taxon_namespace, preserve_underscores=True)
+        phylogen_updater.AlnUpdater(self.config, aln, self.status, self.table, tre)
+        self.aln = DnaCharacterMatrix.get(path=os.path.abspath(os.path.join(self.workdir, 'updt_aln.fasta')), schema='fasta')
+        msg = 'Updating of aln done.\n'
+        write_msg_logfile(msg, self.config.workdir)
+
+    def update_tre(self):
+        """
+        Call the tree updater class.
+
+        :return:
+        """
+        print(self.tre_fn)
+        tre = phylogenetic_helpers.read_in_tree(self.tre_fn, self.tr_schema)
+        aln = phylogenetic_helpers.read_in_aln(self.aln_fn, self.aln_schema)
+        phylogen_updater.PhyUpdater(self.config, aln, self.table, tre)
         msg = 'Updating of aln and tre done.\n'
         write_msg_logfile(msg, self.config.workdir)
 
@@ -437,7 +421,9 @@ class Filter(object):
         """
         assert all(x in new_seqs['accession'].tolist() for x in self.upd_new_seqs['accession'].tolist())
 
-        assert all(x in new_seqs['accession'].tolist() for x in self.del_table['accession'].tolist())
+        assert all(x in new_seqs['accession'].tolist() for x in self.del_table['accession'].tolist() )
+
+
         assert any(x in self.upd_new_seqs['accession'].tolist() for x in self.del_table['accession'].tolist()) == False, \
             ([i for i in self.upd_new_seqs['accession'].tolist() if i in self.del_table['accession'].tolist()])
 
@@ -465,7 +451,7 @@ def assert_new_seqs_table(new_seqs, table, status):
     assert new_seqs.index.is_unique is True, new_seqs.index
     assert new_seqs['ncbi_txid'].hasnans == False, new_seqs[['ncbi_txid', 'accession']].hasnans
     for idx in new_seqs.index:
-        assert table.index.contains(idx), (idx, table.index)
+        assert idx in table.index, (idx, table.index)
 
 
 def calculate_mean_sd(bitscores):
@@ -501,10 +487,9 @@ class FilterNumberOtu(Filter):
         assert_new_seqs_table(new_seqs, self.table, self.status)
         print("filter FilterNumberOtu")
         # get all seqs and ids from aln and before for next filter
-        # #############
         present = self.table[self.table['status'] > -1]
         added_before = present[present['status'].astype(int) < self.status]
-        # #######################
+
         if downtorank is None:
             tax_ids = new_seqs['ncbi_txid']
             table_otu_df = added_before['ncbi_txid']
@@ -513,24 +498,20 @@ class FilterNumberOtu(Filter):
             table = self.set_downtorank(added_before, downtorank)
             tax_ids = new_seqs['downtorank']
             table_otu_df = table['downtorank']
-        assert len(new_seqs) == len(self.table[self.table['status'] == self.status]), \
-            (len(new_seqs), len(self.table[self.table['status'] == self.status]),
-             new_seqs['accession'], self.table[self.table['status'] == self.status]['accession'])
 
         for txid in set(tax_ids):
             # generate taxon_subsets
-            print('filter per otu')
+            # print('filter per otu')
             ns_otu_dict = new_seqs[tax_ids == txid]
-
+            table_otu_dict = added_before[table_otu_df == txid]
+            table_otu_dict = table_otu_dict[table_otu_dict['status'] >= 0]
             if downtorank is not None and downtorank not in ['species', 'subspecies', 'variety']:
                 # figure out which lower rank are already available
                 avail_txid = table_otu_dict['ncbi_txid'].tolist()
                 # filter ns_otu_dict to remove lower ranks already available
                 ns_otu_dict = ns_otu_dict[~ns_otu_dict['ncbi_txid'].isin(avail_txid)]
-
-            table_otu_dict = added_before[table_otu_df == txid]
-            table_otu_dict = table_otu_dict[table_otu_dict['status'] >= 0]
-            if len(table_otu_dict) < self.config.threshold:  # if we still want to add - might be obsolete
+            # if we still want to add
+            if len(table_otu_dict) < self.config.threshold:
                 if len(ns_otu_dict) + len(table_otu_dict) > self.config.threshold:  # filter
                     if len(table_otu_dict) == 0:  # new taxa, select random seq for blast
                         # print('taxa new')
@@ -567,28 +548,36 @@ class FilterNumberOtu(Filter):
             else:
                 print('sample size correct - nothing to add')
                 filtered = pd.DataFrame()
-            assert self.upd_new_seqs.index.is_unique is True, (self.upd_new_seqs.index, filtered[['accession', 'status']])
+
+            assert self.upd_new_seqs.index.is_unique is True, \
+                (self.upd_new_seqs.index, filtered[['accession', 'status']])
 
         not_selected = list(set(new_seqs['accession'].values) - set(self.upd_new_seqs['accession'].values))
-        selected = list(set(self.upd_new_seqs.index))
         del_tab = new_seqs[new_seqs['accession'].isin(not_selected)]
         self.del_table = del_tab
-
         if len(not_selected) > 0:
             self.table.loc[self.table['accession'].isin(not_selected), 'status'] = -1
             self.table.loc[self.table['accession'].isin(not_selected), 'status_note'] = 'too many seqs of same tax_id'
-        added = self.table[self.table['status'] == self.status]
 
+        self.assert_number_otu(del_tab, new_seqs, not_selected)
+
+        msg = "Filter FilterNumberOtu reduced the new seqs from {} to {}.\n".format(len(new_seqs),
+                                                                                    len(self.upd_new_seqs))
+        write_msg_logfile(msg, self.config.workdir)
+
+    def assert_number_otu(self, del_tab, new_seqs, not_selected):
+        added = self.table[self.table['status'] == self.status].index
+        selected = list(set(self.upd_new_seqs.index))
+        assert len(self.table[self.table['status'] == self.status].index.tolist()) == len(
+            list(set(self.upd_new_seqs.index))), \
+            (len(self.table[self.table['status'] == self.status].index.tolist()),
+             len(list(set(self.upd_new_seqs.index))))
         assert len(selected) + len(not_selected) == len(new_seqs), (len(selected), len(not_selected), len(new_seqs))
         assert len(self.del_table) + len(self.upd_new_seqs) == len(new_seqs), \
             (len(self.del_table), len(self.upd_new_seqs), len(new_seqs))
         assert len(del_tab) == len(not_selected), (len(del_tab), len(not_selected))
         assert len(added) == len(selected), \
             (len(added), len(selected), added[['accession', 'status']], self.upd_new_seqs[['accession', 'status']])
-
-        msg = "Filter FilterNumberOtu has lowered the new seqs df from {} to {}.\n".format(len(new_seqs),
-                                                                                           len(self.upd_new_seqs))
-        write_msg_logfile(msg, self.config.workdir)
 
     def set_downtorank(self, new_seqs, downtorank):
         """
@@ -640,10 +629,11 @@ class FilterNumberOtu(Filter):
         get subsample of new seqs for otu_sample by selecting random new seqs of taxa that are completely new or for
         random existing seq.
 
-        :param filter_dict:
-        :param exist_dict:
-        :param columnname:
-        :param txid:
+        :param filter_dict: table with all new seqs
+        :param exist_dict: table with all available/added seqs
+        :param columnname: depending on columnname, filter_dict is being altered to remove the one seqs that is used
+                            for the blasting
+        :param txid: ncbi taxon id
         :return:
         """
         # print('wrapper_filter_blast_otu')
@@ -695,6 +685,12 @@ class FilterNumberOtu(Filter):
 
 
 def remove_mean_sd_nonfit(filter_blast_seqs):
+    """
+    Remove blast results that are outside of the bitscore range.
+
+    :param filter_blast_seqs:
+    :return:
+    """
     # remove non fitting entries - too far from blast query seq....
     mean_sd = calculate_mean_sd(filter_blast_seqs['bitscore'])
     subfilter_blast_seqs = pd.DataFrame()
@@ -707,7 +703,7 @@ def remove_mean_sd_nonfit(filter_blast_seqs):
         #     print('filter thresh too large')
     return subfilter_blast_seqs
 
-
+#todo table probably not needed anymore
 class FilterSeqIdent(Filter):
     """
     Filters new sequences that are identical (seq and taxon id) to something already in the data.
@@ -720,13 +716,151 @@ class FilterSeqIdent(Filter):
         assert self.table['ncbi_txid'].hasnans == False, self.table['ncbi_txid'].hasnans
         assert self.table['sseq'].hasnans == False, self.table['sseq']
 
+    #def filter_remove_duplicate(self, new_seqs):
     def filter(self, new_seqs):
         assert_new_seqs_table(new_seqs, self.table, self.status)
+        print("filter FilterSeqIdent rm duplicate")
+        before = len(new_seqs)
+        self.upd_new_seqs = new_seqs
+
+        #self.upd_new_seqs = self.upd_new_seqs.drop_duplicates(['ncbi_txid', 'sseq'], keep='first')
+
+        # drop all sequences that are identical (seq and ncbi_txid) from new_seqs
+        dupl_df = self.upd_new_seqs[self.upd_new_seqs.duplicated(['ncbi_txid', 'sseq'], keep='first')]
+        for ind in dupl_df.index:
+            to_del = new_seqs.loc[ind]
+            self.del_table = self.del_table.append(to_del)
+            self.upd_new_seqs = self.upd_new_seqs.drop([ind])
+        after = len(self.upd_new_seqs)
+        print(before, after)
+        for idx in set(self.upd_new_seqs.index):
+            # generate seq and compare it
+            txid_compare = new_seqs.loc[idx, 'ncbi_txid']
+            seq_compare = new_seqs.loc[idx, 'sseq']
+            #print((new_seqs.sseq.str.contains(seq_compare)) & (new_seqs['ncbi_txid'] == txid_compare))
+
+            # go through new_seqs to check if there is more than one identical (1 is the one we compare here)
+
+            same_seqs = self.upd_new_seqs[(self.upd_new_seqs.sseq.str.contains(seq_compare)) & (self.upd_new_seqs['ncbi_txid'] == txid_compare)]
+            # print(idx in same_seqs.index)
+            # print(len(same_seqs.index))
+            if len(same_seqs.index) > 1:
+                print("identical seq new")
+                # print(same_seqs['accession'].tolist())
+                to_del = new_seqs.loc[idx]
+                self.del_table = self.del_table.append(to_del)
+                self.upd_new_seqs = self.upd_new_seqs.drop([idx])
+                # print(len(self.upd_new_seqs.index))
+
+
+            else:
+                print('else')
+                # print(self.status)
+                same_table = self.table[self.table['status'].between(-1,self.status, inclusive=False)]
+                # print(same_table["status"].tolist())
+                # print(len(same_table['accession'].tolist()))
+                # same_tab_txid = same_table[same_table['ncbi_txid'] == int(txid_compare)]
+                # same_txid_seq = same_tab_txid[same_tab_txid.sseq.str.contains(seq_compare)]
+                same_old = same_table[(same_table.sseq.str.contains(seq_compare)) & (same_table['ncbi_txid'] == int(txid_compare))]
+                # print(same_old["accession"].tolist())
+                # print(len(same_old.index))
+                # print(len(same_tab_txid.index))
+                # print(len(same_txid_seq.index))
+                # print(seq_compare)
+
+                # go through avail seq in table to check if there is one identical
+                if len(same_old.index) > 0:
+                    print("identical old")
+                    to_del = new_seqs.loc[idx]
+                    self.del_table = self.del_table.append(to_del)
+
+                    self.upd_new_seqs = self.upd_new_seqs.drop([idx])
+                    # print(len(self.upd_new_seqs.index))
+                    assert idx not in self.upd_new_seqs.index
+            print(len(self.upd_new_seqs))
+
+            # if str(txid_compare) == str(1886449):
+            #     print("compare")
+            #     print(new_seqs.loc[idx, "accession"])
+            #     print(any(same_table.sseq.str.contains(seq_compare)))  # note: is in same table
+            #     print(any(same_table.ncbi_txid.str.contains(txid_compare)))  # note: is in same table
+            #
+            #     print(self.del_table["accession"].tolist())
+            #     print(self.upd_new_seqs["accession"].tolist())
+            #     self.table.to_csv("table.debug")
+            #     print(self.table.loc[2, "accession"])
+            #     print(self.table.loc[2, "ncbi_txid"])
+            #     print(type(self.table.loc[2, "ncbi_txid"]))
+            #     print(type(txid_compare))
+            #     print(self.table.loc[2, "sseq"])
+            #     print(type(self.table.loc[2, "sseq"]))
+            #     print(type(seq_compare))
+            #
+            #     print("check for new seqs")
+            #     print(self.upd_new_seqs.sseq.str.contains(seq_compare))
+            #     print(type(self.upd_new_seqs.sseq))
+            #     print(type(seq_compare))
+            #     print(self.upd_new_seqs['ncbi_txid'] == txid_compare)
+            #     print(self.upd_new_seqs['ncbi_txid'])
+            #     print(type(self.upd_new_seqs['ncbi_txid']))
+            #     print(type(txid_compare))
+            #
+            #     assert any(self.table.accession == "1020_S_recli")
+            #     assert any(same_table.accession == "1020_S_recli")
+            #     assert any(same_tab_txid.accession == "1020_S_recli")
+            #     assert any(same_txid_seq.accession == "1020_S_recli")
+            #     assert any(same_old.accession == "1020_S_recli")
+            #     print(some)
+
+
+
+
+
+
+
+
+
+        print(len(self.upd_new_seqs), len(self.del_table), len(new_seqs))
+        for index in self.del_table.index:
+            self.table.loc[index, 'status'] = -1
+            self.table.loc[index, 'status_note'] = 'same seq ident'
+
+        self.assert_after_filter(new_seqs)
+        assert self.table['sseq'].hasnans == False, self.table['sseq']
+
+        msg = "Filter FilterSeqIdent reduced the new seqs from {} to {}.\n".format(len(new_seqs),
+                                                                                   len(self.upd_new_seqs))
+        write_msg_logfile(msg, self.config.workdir)
+
+        # check if one of the new seqs is identical but longer than old
+        existing_old = self.table[self.table['status'].between(-1, self.status, inclusive=False)]
+        for idx in existing_old.index:
+            # generate seq and compare it
+            txid_compare = existing_old.loc[idx, 'ncbi_txid']
+            seq_compare = existing_old.loc[idx, 'sseq']
+
+            # use those to compare to new seqs:
+            same_new = self.upd_new_seqs[
+                (self.upd_new_seqs.sseq.str.contains(seq_compare)) & (self.upd_new_seqs['ncbi_txid'] == int(txid_compare))]
+            # go through avail seq in table to check if there is one identical
+            if len(same_new.index) > 0:
+                print("old seq found in new")
+                self.table.loc[index, 'status'] = -1
+                self.table.loc[index, 'status_note'] = 'new seq found - identical but longer'
+                tip_name = self.table.loc[idx, "accession"]
+                self.aln.discard_sequences(tip_name)
+                self.aln.write("updt_aln.fasta")
+
+
+
+
+
+    def filter_old(self, new_seqs):
+        assert_new_seqs_table(new_seqs, self.table, self.status)
         print("filter FilterSeqIdent new")
-        to_add = pd.DataFrame()
+        new_seqs = new_seqs.drop_duplicates(['ncbi_txid', 'sseq'])
         for idx in set(new_seqs.index):
             new_seqs_drop = new_seqs.drop([idx])
-            # if self.table.loc[idx, 'status'] != -1:  # check if here, as sometimes, new seqs are being deleted in earlier round through comparison?
             # generate seq and compare it
             txid_compare = str(new_seqs.loc[idx, 'ncbi_txid'])
             seq_compare = new_seqs.loc[idx, 'sseq']
@@ -749,38 +883,46 @@ class FilterSeqIdent(Filter):
                 found_new = new_seqs_drop_seqs[new_seqs_drop_seqs.str.contains(seq_compare)]
 
                 if found_new.count() >= 1:
-                    print('seq matches new')
+                    # print('seq matches new')
                     # check if taxid is the same
                     idx_ident_new_seqs = new_seqs_drop['sseq'][new_seqs_drop['sseq'].str.contains(seq_compare) == True].index
-                    txid_new_seqident = self.get_taxid_of_same_seq(idx_ident_new_seqs, new_seqs)
+                    txid_new_seqident = get_taxid_using_table(idx_ident_new_seqs, new_seqs)
                     if txid_compare in txid_new_seqident:  # seq matches and taxid is the same
                         # look which sequence is longer
                         new_seqs_sametxid = new_seqs[new_seqs['ncbi_txid'] == txid_compare]  # entries with same taxid as the one we compare
                         new_seqs_same = new_seqs_sametxid[new_seqs_sametxid.index.isin(idx_ident_new_seqs)]  # entries with same (but maybe longer) seq
-                        print(new_seqs_same)
+                        # print(new_seqs_same)
                         if len(new_seqs_same) > 0:
                             # if we find identical seqs, we don't need to add the one we compare, as longer seq is avail
-                            to_del = new_seqs.loc[idx]  #.to_frame()  # can be series if len == 1
+                            to_del = new_seqs.loc[idx]
                             self.del_table = self.del_table.append(to_del)
                         else:
-                            print('compare seq has different taxid - add')
+                            # print('compare seq has different taxid - add')
                             self.upd_new_seqs = self.upd_new_seqs.append(new_seqs.loc[idx])
                     else:  # add compare seq as taxid is different
                         self.upd_new_seqs = self.upd_new_seqs.append(new_seqs.loc[idx])
                 elif found_old.count() >= 1:
-                    print('matches old')
+                    # print('matches old')
                     # check if taxid is the same
                     idx_ident_old_seqs = all_old_data['sseq'][all_old_data['sseq'].str.contains(seq_compare) == True].index
-                    txid_old_seqident = self.get_taxid_of_same_seq(idx_ident_old_seqs, all_old_data)
+                    txid_old_seqident = get_taxid_using_table(idx_ident_old_seqs, all_old_data)
                     if txid_compare in txid_old_seqident:  # seq matches and taxid is the same
                         old_seqs_sametxid = all_old_data[
                             all_old_data['ncbi_txid'] == txid_compare]  # entries with same taxid as the one we compare
                         old_seqs_same = old_seqs_sametxid[old_seqs_sametxid.index.isin(
                             idx_ident_old_seqs)]  # entries with same (but maybe longer) seq
-                        if len(old_seqs_same) > 0:
-                            # if we find identical seqs, we don't need to add the one we compare, as longer seq is avail
+                        print(old_seqs_same)
+                        identical_seqs = all_old_data_seqs[all_old_data_seqs.str.contains(seq_compare) == True]
+                        print(identical_seqs)
+                        print(len(identical_seqs))
+                        if len(identical_seqs)>0:
+                            print('same as old')
                             to_del = new_seqs.loc[idx]
                             self.del_table = self.del_table.append(to_del)
+                        # if len(old_seqs_same) > 0:
+                        #     # if we find identical seqs, we don't need to add the one we compare, as longer seq is avail
+                        #     to_del = new_seqs.loc[idx]
+                        #     self.del_table = self.del_table.append(to_del)
                         else:
                             self.upd_new_seqs = self.upd_new_seqs.append(new_seqs.loc[idx])
                     else:  # add compare seq as taxid is different
@@ -789,7 +931,7 @@ class FilterSeqIdent(Filter):
                     print('should not happen')
                     sys.exit(-77)
             else:
-                print('sequence ident never matches')  # add as sequence is unique
+                # print('sequence ident never matches')  # add as sequence is unique
                 self.upd_new_seqs = self.upd_new_seqs.append(new_seqs.loc[idx])
         assert self.table['sseq'].hasnans == False, self.table['sseq']
 
@@ -800,26 +942,33 @@ class FilterSeqIdent(Filter):
 
         self.assert_after_filter(new_seqs)
         for idx in self.upd_new_seqs.index:
-            assert self.table.index.contains(idx), (idx, self.table.index)
+            assert idx in self.table.index, (idx, self.table.index)
             assert self.table.loc[idx, 'status'] != -1, (idx, self.table[idx])
+            all_avail_data = self.table.loc[self.table['status'].between(0, self.status, inclusive=True), 'sseq']
+            assert all_avail_data[all_avail_data.str.contains(seq_compare)].count() <= 1, all_avail_data[
+                all_avail_data.str.contains(seq_compare)]
+
         assert self.table['sseq'].hasnans == False, self.table['sseq']
 
-        msg = "Filter FilterSeqIdent has lowered the new seqs df from {} to {}.\n".format(len(new_seqs), len(to_add))
+        msg = "Filter FilterSeqIdent reduced the new seqs from {} to {}.\n".format(len(new_seqs),
+                                                                                   len(self.upd_new_seqs))
         write_msg_logfile(msg, self.config.workdir)
 
-    def get_taxid_of_same_seq(self, idx_ident_new_seqs, new_seqs):
-        """
-        Get the taxonids for entrys which have the same sequence as the one we compare in main function.
 
-        :param idx_ident_new_seqs:
-        :param new_seqs:
-        :return:
-        """
-        try:
-            txid_new_seqident = set(new_seqs.loc[idx_ident_new_seqs, 'ncbi_txid'].to_list())
-        except AttributeError:  # series vs something else issue
-            txid_new_seqident = set(new_seqs.loc[idx_ident_new_seqs, 'ncbi_txid'].tolist())
-        return txid_new_seqident
+def get_taxid_using_table(idx_ident_new_seqs, new_seqs):
+    """
+    Get the taxon ids using the index and the corresponding table.
+    Used for entrys which have the same sequence as the one we compare in main function.
+
+    :param idx_ident_new_seqs: index of sequence we want to get the taxon id from.
+    :param new_seqs: table with new sequences
+    :return:
+    """
+    try:
+        txid_new_seqident = set(new_seqs.loc[idx_ident_new_seqs, 'ncbi_txid'].to_list())
+    except AttributeError:  # series vs something else issue
+        txid_new_seqident = set(new_seqs.loc[idx_ident_new_seqs, 'ncbi_txid'].tolist())
+    return txid_new_seqident
 
 
 class FilterMRCA(Filter):
@@ -840,12 +989,15 @@ class FilterMRCA(Filter):
             self.initialize(self.config)
 
         to_del = pd.DataFrame()
+        print(new_seqs.columns)
+        print(len(new_seqs))
         for tax_id in set(new_seqs['ncbi_txid'].astype(int)):
             tax_id = int(tax_id)
             mrca_tx = self.ncbi_parser.match_id_to_mrca(tax_id, self.mrca)
             select_tf = new_seqs['ncbi_txid'].astype(int) == tax_id
             if type(self.mrca) == int:
-                #print('DO I still get to this, or is it always set?')  # TODO: make to always set - single id is type int
+                # TODO: make self.mrca to be a set - single id is type int
+                print("DO I EVER GET HERE - MRCA IS INT")
                 if mrca_tx == self.mrca:
                     to_add = new_seqs[select_tf]
                     assert len(to_add) != 0, len(to_add)
@@ -856,7 +1008,7 @@ class FilterMRCA(Filter):
                     to_del.loc[:, 'status'] = 'deleted - mrca'
                     self.del_table = pd.concat([self.del_table, to_del], axis=0, sort=True)
             elif type(self.mrca) == set:
-                print(mrca_tx in self.mrca, mrca_tx, self.mrca)
+                # print(mrca_tx in self.mrca, mrca_tx, self.mrca)
                 if mrca_tx in self.mrca:
                     to_add = new_seqs[select_tf]
                     assert len(to_add) != 0, len(to_add)
@@ -873,8 +1025,7 @@ class FilterMRCA(Filter):
             (len(self.del_table), len(self.upd_new_seqs), len(new_seqs))
         assert self.upd_new_seqs.index.is_unique is True, self.upd_new_seqs.index
 
-        msg = "Filter FilterMRCA has lowered the new seqs df from {} to {}.\n".format(len(new_seqs),
-                                                                                      len(self.upd_new_seqs))
+        msg = "Filter FilterMRCA reduced the new seqs from {} to {}.\n".format(len(new_seqs), len(self.upd_new_seqs))
         write_msg_logfile(msg, self.config.workdir)
         if len(to_del) > 0:
             to_del.to_csv(os.path.join(self.config.workdir, 'wrong_mrca.csv'), mode='a')
@@ -894,12 +1045,11 @@ class FilterBLASTThreshold(Filter):
         deltab = new_seqs[tf_eval != True]
         deltab['status_note'] = 'deleted - evalue'
         assert len(deltab) + len(upd_new_seqs) == len(new_seqs), (len(deltab), len(upd_new_seqs), len(new_seqs))
-
         self.del_table = deltab
         self.upd_new_seqs = upd_new_seqs
         assert self.upd_new_seqs.index.is_unique == True, self.upd_new_seqs.index
-        msg = "Filter FilterBLASTThreshold has lowered the new seqs df " \
-              "from {} to {}.\n".format(len(new_seqs), len(upd_new_seqs))
+        msg = "Filter FilterBLASTThreshold reduced the new seqs from {} to {}.\n".format(len(new_seqs),
+                                                                                         len(upd_new_seqs))
         write_msg_logfile(msg, self.config.workdir)
         if len(deltab) > 0:
             deltab.to_csv(os.path.join(self.config.workdir, 'low_blast_threshold.csv'), mode='a')
@@ -919,10 +1069,8 @@ class FilterUniqueAcc(Filter):
         new_seqs_unique = new_seqs.drop_duplicates(subset=['accession'], keep='first')
         drop = new_seqs.drop(new_seqs_unique.index.tolist())
         assert len(drop) + len(new_seqs_unique) == len(new_seqs), (len(drop), len(new_seqs_unique), len(new_seqs))
-
         self.upd_new_seqs = new_seqs_unique
         self.del_table = drop
-
         assert self.upd_new_seqs.index.is_unique == True, self.upd_new_seqs.index
         msg = "FilterUniqueAcc has lowered the new seqs df from {} to {}.\n".format(len(new_seqs), len(new_seqs_unique))
         write_msg_logfile(msg, self.config.workdir)
@@ -981,7 +1129,5 @@ class FilterLength(Filter):
         self.upd_new_seqs = filter_new_seqs
         self.del_table = del_seq
 
-        msg = "Filter FilterLength has lowered the new seqs df" \
-              " from {} to {}.\n".format(len(new_seqs), len(filter_new_seqs))
+        msg = "Filter FilterLength reduced the new seqs from {} to {}.\n".format(len(new_seqs), len(filter_new_seqs))
         write_msg_logfile(msg, self.config.workdir)
-

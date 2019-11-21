@@ -1,9 +1,9 @@
 import pandas as pd
-from pandas_filter import pandas_numpy_try1, config, aln_updater
+from PhylUp import phyl_up, config, phylogen_updater
 
 
 def test_filterlen():
-    workdir = "tests/test_runs"
+    workdir = "tests/output/test_runs"
     trfn = "data/tiny_test_example/test.tre"
     schema_trf = "newick"
     id_to_spn = "data/tiny_test_example/test_nicespl.csv"
@@ -12,9 +12,9 @@ def test_filterlen():
     configfi = "data/localblast.config"
 
     conf = config.ConfigObj(configfi, workdir, interactive=False)
-    test = pandas_numpy_try1.Update_data(id_to_spn, seqaln, mattype, trfn, schema_trf, conf, mrca=18794)
+    test = phyl_up.PhylogeneticUpdater(id_to_spn, seqaln, mattype, trfn, schema_trf, conf, mrca=18794)
 
-    aln = test.read_in_aln()
+    aln = phylogenetic_helpers.read_in_aln(test.aln_fn, test.aln_schema)
 
     extra_long = {'ncbi_txn': ['extra_long'],
                   'ncbi_txid': [123],
@@ -31,7 +31,7 @@ def test_filterlen():
     new_seqs = pd.DataFrame(extra_long)
     before = len(new_seqs)
 
-    f = pandas_numpy_try1.FilterLength(test.config, aln)
+    f = phyl_up.FilterLength(test.config, aln)
     f.filter(new_seqs)
     new_seqs = f.upd_new_seqs
 
@@ -56,7 +56,7 @@ def test_filterlen():
     new_seqs = pd.DataFrame(extra_short)
     before = len(new_seqs)
 
-    f = pandas_numpy_try1.FilterLength(test.config, aln)
+    f = phyl_up.FilterLength(test.config, aln)
     f.filter(new_seqs)
     new_seqs = f.upd_new_seqs
 

@@ -1,3 +1,29 @@
+"""
+PhylUp: automatically update alignments and phylogenies.
+Copyright (C) 2019  Martha Kandziora
+martha.kandziora@yahoo.com
+
+Package to automatically update alignments and phylogenies using local and Genbank datasets
+
+Parts are inspired by the program physcraper developed by me and Emily Jane McTavish.
+
+All classes and methods are distributed under the following license.
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <https://www.gnu.org/licenses/>.
+"""
+
+
 # user settings class
 
 import os
@@ -5,7 +31,11 @@ import sys
 import configparser
 from . import db_updater
 from . import debug
-from . import ncbi_data_parser
+#from . import ncbi_data_parser
+import ncbiTAXONparser.ncbi_data_parser as ncbi_data_parser
+
+
+# TODO: make global blast folders that can be shared across runs
 
 
 def is_number(s):
@@ -24,7 +54,6 @@ class ConfigObj(object):
 
         During the initializing process the following self objects are generated:
             * self.workdir**: working directory
-            * **self.email**: email address used for blast queries
             * **self.e_value_thresh**: the defined threshold for the e-value during Blast searches, check out:
                 https://blast.ncbi.nlm.nih.gov/Blast.cgi?CMD=Web&PAGE_TYPE=BlastDocs&DOC_TYPE=FAQ
             * **self.hitlist_size**: the maximum number of sequences retrieved by a single blast search
@@ -33,25 +62,22 @@ class ConfigObj(object):
                     * self.blastdb: this defines the path to the local blast database
                     * self.ncbi_parser_nodes_fn: path to 'nodes.dmp' file, that contains the hierarchical information
                     * self.ncbi_parser_names_fn: path to 'names.dmp' file, that contains the different ID's
-
-
             * **self.num_threads**: number of cores to be used during a run
-            * **self.gb_id_filename**: Set to True, if you want to reuse gb query files
-            * **self.delay**: defines when to reblast sequences in days
             * **self.minlen**: value from 0 to 1. Defines how much shorter new seq can be compared to input
             * **self.trim_perc**: value that determines how many seq need to be present before the beginning and end
                                     of alignment will be trimmed
             * **self.maxlen**: max length for values to add to aln
-            * **self.add_lower_taxa**: T/F, enables to re-access formerly filtered seq by allowing them be passed
-                                       into remove_identical. Used if we first filter for higher rank and then want
-                                       to filter for a lower rank.
+            * **self.different_level**: T/F, used to first filter for higher rank and then to a lower rank.
         * **self.filtertype**: either 'blast' or 'length'; filter number per otu by blast or choose longest
         * **self.backbone**: T/F; calculate complete tree or add to backbone
+        * **self.update_tree**: T/F; update tree (T) or just update alignment
         * **self.threshold**: number of seq per otu
         * **self.downtorank**: filter number otu to specific rank
         * **self.unpublished**: T/F; add unpublished local sequences
-        * **self.logfile**: file where some things are logged
+        * **self.modeltest_criteria** BIC, AIC or AICc
 
+        * **interactive**: T/F; checks if databases need to be updated
+        * **self.logfile**: file location where some information during the run is logged
 
         :param configfi: a configuration file in a specific format. The file needs to have a heading of the format:
                         [blast] and then somewhere below that heading as string, e.g. e_value_thresh = value
@@ -59,7 +85,6 @@ class ConfigObj(object):
         :param interactive: defaults to True, is used to interactively update the local blast databases
         """
         sys.stdout.write("Building config object\n")
-        debug(configfi)
         assert os.path.isfile(configfi), "file `%s` does not exists" % configfi
 
         self.workdir = workdir
@@ -73,79 +98,68 @@ class ConfigObj(object):
         config.read_file(open(configfi))
 
         # read in blast settings
-        self.email = config["blast"]["Entrez.email"]
-        assert "@" in self.email, "your email `%s` does not have an @ sign" % self.email
-
         self.e_value_thresh = config["blast"]["e_value_thresh"]
         assert is_number(self.e_value_thresh), ("value `%s` does not exists" % self.e_value_thresh)
 
         self.hitlist_size = int(config["blast"]["hitlist_size"])
-        assert is_number(self.hitlist_size), ("value `%s`is not a number" % self.e_value_thresh)
+        assert is_number(self.hitlist_size), ("value `%s`is not a number" % self.hitlist_size)
 
         self.blast_loc = config["blast"]["location"]
         assert self.blast_loc in ["local"], ("your blast location `%s` is not local" % self.blast_loc)
         if self.blast_loc == "local":
             self.blastdb = config["blast"]["localblastdb"]
-            if not os.path.exists(self.blastdb):
-                os.makedirs(self.blastdb)
+            assert os.path.exists(self.blastdb), self.blastdb
             self.ncbi_parser_nodes_fn = config["ncbi_parser"]["nodes_fn"]
             self.ncbi_parser_names_fn = config["ncbi_parser"]["names_fn"]
-
             # # TODO: test if this would make the whole thing faster, db building takes long, but likely blasting is faster
             # # make smaller blast database
             # name = self.make_db_from_taxid(self.mrca)
             # self.blastdb = '{}/{}_db'.format(self.blastdb, name)
 
+        print("slurm threads")
         self.num_threads = int(config["blast"].get("num_threads"))
-
-        debug("slurm threads")
-        debug(os.environ.get('SLURM_JOB_CPUS_PER_NODE'))
+        #print(os.environ.get('SLURM_JOB_CPUS_PER_NODE'))
         if os.environ.get('SLURM_JOB_CPUS_PER_NODE'):
             self.num_threads = int(os.environ.get('SLURM_JOB_CPUS_PER_NODE'))
-        debug(self.num_threads)
-
-        # # todo currently not used
-        # self.gb_id_filename = config["blast"].get("gb_id_filename", False)
-        # if self.gb_id_filename is not False:
-        #     if self.gb_id_filename == "True" or self.gb_id_filename == "true":
-        #         self.gb_id_filename = True
-        #     else:
-        #         self.gb_id_filename = False
-        # debug("shared blast folder? {}".format(self.gb_id_filename))
+        print(self.num_threads)
 
         # #############
-        # read in phy_filter settings
-        self.minlen = float(config["phy_filter"]["min_len"])
+        # read in phylup settings
+        self.minlen = float(config["phylup"]["min_len"])
         assert 0 < self.minlen <= 1, ("value `%s` is not between 0 and 1" % self.minlen)
-        self.trim_perc = float(config["phy_filter"]["trim_perc"])
+        self.trim_perc = float(config["phylup"]["trim_perc"])
         assert 0 < self.trim_perc < 1, ("value `%s` is not between 0 and 1" % self.trim_perc)
-        self.maxlen = float(config["phy_filter"]["max_len"])
+        self.maxlen = float(config["phylup"]["max_len"])
         assert 1 < self.maxlen, ("value `%s` is not larger than 1" % self.maxlen)
 
-        self.different_level = config["phy_filter"]["different_level"]
+        self.different_level = config["phylup"]["different_level"]
         if self.different_level == "True" or self.different_level == "true":
             self.different_level = True
         else:
             self.different_level = False
-        assert self.different_level in [True, False], ("self.different_level `%s` is not True or False" % self.different_level)
+        assert self.different_level in [True, False], ("self.different_level `%s` "
+                                                       "is not True or False" % self.different_level)
 
-        # todo: currently unused - implement length
-        self.filtertype = config["phy_filter"]["filtertype"]
-        assert self.filtertype in ['blast', 'length'], ("self.filtertype `%s` is not 'blast' or 'length'" % self.filtertype)
+        self.filtertype = config["phylup"]["filtertype"]
+        assert self.filtertype in ['blast', 'length'], ("self.filtertype `%s` "
+                                                        "is not 'blast' or 'length'" % self.filtertype)
 
-        self.backbone = config["phy_filter"]["backbone"]
+        self.backbone = config["phylup"]["backbone"]
         if self.backbone == "True" or self.backbone == "true":
             self.backbone = True
         else:
             self.backbone = False
-        self.update_tree = config["phy_filter"]["update_tree"]
+        self.update_tree = config["phylup"]["update_tree"]
         if self.update_tree == "True" or self.update_tree == "true":
             self.update_tree = True
         else:
             self.update_tree = False
+        self.modeltest_criteria = config['phylup']['modeltest_criteria']
+        assert self.modeltest_criteria in ['AIC', 'AICc', 'BIC'], ("self.modeltest_criteria `%s` "
+                                                        "is not AIC, AICc or BIC" % self.modeltest_criteria)
 
-        self.threshold = int(config["phy_filter"]["threshold"])
-        self.downtorank = config["phy_filter"]["downtorank"]
+        self.threshold = int(config["phylup"]["threshold"])
+        self.downtorank = config["phylup"]["downtorank"]
 
         self.unpublished = config["blast"]['unpublished']
         if self.unpublished == "True" or self.unpublished == "true":
@@ -161,8 +175,6 @@ class ConfigObj(object):
 
         ####
         # check database status
-
-        #todo: check how to make it interactive again.
         print('Status for interactive is {}'.format(interactive))
         if interactive is None:
             interactive = sys.stdin.isatty()
@@ -173,12 +185,9 @@ class ConfigObj(object):
             db_updater._download_ncbi_parser(self)
         debug("check db file status?: {}".format(interactive))
 
-
         # ###########
         # internal settings
         self.logfile = os.path.join(self.workdir, "logfile")
-
-
 
     def make_db_from_taxid(self, taxid):
         """
@@ -198,10 +207,7 @@ class ConfigObj(object):
         with open(taxonlist_fn) as fn:
             fn.write("\n".join(str(item) for item in taxon_list))
 
-        cmd1 = "makeblastdb -dbtype nucl -parse_seqids -taxid_map {} -out {}_db -title {}".format(taxonlist_fn, taxid, taxid)
+        cmd1 = "makeblastdb -dbtype nucl -parse_seqids -taxid_map {} " \
+               "-out {}_db -title {}".format(taxonlist_fn, taxid, taxid)
         os.system(cmd1)
         return taxid
-
-
-
-

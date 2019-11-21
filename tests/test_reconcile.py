@@ -1,8 +1,8 @@
 
-from pandas_filter import pandas_numpy_try1, config, aln_updater
+from PhylUp import phyl_up, config, phylogen_updater
 
 def test_reconcile():
-    workdir = "tests/test_runs"
+    workdir = "tests/output/test_runs"
     trfn = "data/tiny_test_example/test.tre"
     schema_trf = "newick"
     id_to_spn = "data/tiny_test_example/test_nicespl.csv"
@@ -16,45 +16,39 @@ def test_reconcile():
 
     conf = config.ConfigObj(configfi, workdir, interactive=False)
     print('###################### RUN 1 ######################')
-    test = pandas_numpy_try1.Update_data(id_to_spn, seqaln, mattype, trfn, schema_trf, conf, mrca=18794)
+    test = phyl_up.PhylogeneticUpdater(id_to_spn, seqaln, mattype, trfn, schema_trf, conf, mrca=18794)
 
+    cleaner = phylogen_updater.InputCleaner(trfn, seqaln, test.table, test.config, test.mrca)
 
-    aln = test.read_in_aln()
-    tre = test.read_in_tree(aln.taxon_namespace)
-
-    cleaner = aln_updater.InputCleaner(tre, aln, seqaln, test.table, test.config, test.mrca)
-
+    len_tre = len(cleaner.tre.taxon_namespace)
     len_aln = (len(cleaner.aln.taxon_namespace))
+    tre_asstring = cleaner.tre.as_string(schema='newick')
+
     # ################################
     print('###################### RUN 2 ######################')
 
-    test = pandas_numpy_try1.Update_data(id_to_spn, seqalnmiss, mattype, trfn, schema_trf, conf, mrca=18794)
+    test = phyl_up.PhylogeneticUpdater(id_to_spn, seqalnmiss, mattype, trfn, schema_trf, conf, mrca=18794)
 
-    aln = test.read_in_aln()
-    tre = test.read_in_tree(aln.taxon_namespace)
-
-    cleaner = aln_updater.InputCleaner(tre, aln, seqalnmiss, test.table, test.config, test.mrca)
+    cleaner = phylogen_updater.InputCleaner(trfn, seqalnmiss, test.table, test.config, test.mrca)
 
     len_aln_missaln = (len(cleaner.aln))
-    #len_tre_missaln = (len(cleaner.tre))
-    tre_asstring = cleaner.tre.as_string(schema='newick')
+
     print('###################### RUN 3 ######################')
 
 
-    test = pandas_numpy_try1.Update_data(id_to_spn, seqaln, mattype, treefilemiss, schema_trf, conf, mrca=18794)
+    test = phyl_up.PhylogeneticUpdater(id_to_spn, seqaln, mattype, treefilemiss, schema_trf, conf, mrca=18794)
+    test.config.update_tree == True
 
-    aln = test.read_in_aln()
-    tre = test.read_in_tree(aln.taxon_namespace)
-
-    cleaner = aln_updater.InputCleaner(tre, aln, seqaln, test.table, test.config, test.mrca)
+    cleaner = phylogen_updater.InputCleaner(treefilemiss, seqaln, test.table, test.config, test.mrca)
 
     len_aln_misstre = (len(cleaner.aln))
-    #len_tre_misstre = (len(cleaner.tre))
     tre_asstring_misstre = cleaner.tre.as_string(schema='newick')
 
 
 
     print(len_aln, len_aln_missaln, len_aln_misstre)
     assert len_aln != len_aln_missaln
-    assert len_aln == len_aln_misstre
+    assert len_aln != len_aln_misstre
+    assert len_aln == len_tre
+
     assert tre_asstring != tre_asstring_misstre

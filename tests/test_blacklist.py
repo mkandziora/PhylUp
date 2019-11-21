@@ -1,10 +1,7 @@
-
-import pandas as pd
-
-from pandas_filter import pandas_numpy_try1, config, aln_updater
+from PhylUp import phyl_up, config, phylogen_updater
 
 def test_blacklist():
-    workdir = "tests/test_runs"
+    workdir = "tests/output/test_runs"
     trfn = "data/tiny_test_example/test.tre"
     schema_trf = "newick"
     id_to_spn = "data/tiny_test_example/test_nicespl.csv"
@@ -15,15 +12,13 @@ def test_blacklist():
     blacklist = ['JX895419.1']
 
     conf = config.ConfigObj(configfi, workdir, interactive=False)
-    test = pandas_numpy_try1.Update_data(id_to_spn, seqaln, mattype, trfn, schema_trf, conf, mrca=18794)
+    test = phyl_up.PhylogeneticUpdater(id_to_spn, seqaln, mattype, trfn, schema_trf, conf, mrca=18794)
 
-    new_seqs = None
-    new_seqs = test.extend(new_seqs)
+    new_seqs = test.extend()
     len_no_bl = len(new_seqs)
 
-    test = pandas_numpy_try1.Update_data(id_to_spn, seqaln, mattype, trfn, schema_trf, conf, mrca=18794, blacklist=blacklist)
-    new_seqs = None
-    new_seqs = test.extend(new_seqs)
+    test = phyl_up.PhylogeneticUpdater(id_to_spn, seqaln, mattype, trfn, schema_trf, conf, mrca=18794, blacklist=blacklist)
+    new_seqs = test.extend()
     len_bl = len(new_seqs)
 
     assert len_no_bl > len_bl

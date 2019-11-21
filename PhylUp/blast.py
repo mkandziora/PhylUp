@@ -1,4 +1,30 @@
-# class sequence and id retrieval
+"""
+PhylUp: automatically update alignments and phylogenies.
+Copyright (C) 2019  Martha Kandziora
+martha.kandziora@yahoo.com
+
+Package to automatically update alignments and phylogenies using local and Genbank datasets
+
+Parts are inspired by the program physcraper developed by me and Emily Jane McTavish.
+
+All classes and methods are distributed under the following license.
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <https://www.gnu.org/licenses/>.
+"""
+
+# sequence and id retrieval methods
+
 import os
 import sys
 import datetime
@@ -8,7 +34,7 @@ import pandas as pd
 from Bio.Seq import Seq
 from Bio.Alphabet import generic_dna
 
-from . import ncbi_data_parser  # is the ncbi data parser class and associated functions
+import ncbiTAXONparser.ncbi_data_parser as ncbi_data_parser  # is the ncbi data parser class and associated functions
 from . import cd
 from . import suppress_stdout
 
@@ -64,9 +90,8 @@ def get_taxid_from_acc(gb_acc, blastdb, workdir):
     f.close()
     return tax_id_l
 
+
 # todo: not used
-
-
 def get_taxid_from_acc_stdout(gb_acc, blastdb, workdir):
     """
     Use the blastdb to get the taxon id from a queried gb acc.
@@ -121,7 +146,7 @@ def write_local_blast_files(workdir, seq_id, seq, db=False, fn=None):
     fi_o.close()
 
 
-def make_local_blastdb(workdir, db, path_to_db=None):
+def make_local_blastdb(workdir, db, taxid, path_to_db=None):
     """
     Adds sequences into a  new blast database, which then can be used to blast aln seq against it
     and adds sequences that were found to be similar to input.
@@ -130,11 +155,13 @@ def make_local_blastdb(workdir, db, path_to_db=None):
 
     :param workdir:  where to write the files
     :param db: string that defines, if local, genbank or filter
+    :param taxid: taxon id/name of file
     :param path_to_db: path where db is stored
     :return: writes local blast databases for the local sequences
     """
     # print("make_local_blastdb")
     if db == "unpublished":
+        taxid_map = os.path.abspath(taxid)
         print('Make local blast database from: {}'.format(path_to_db))
         localfiles = os.listdir(path_to_db)
         if os.path.exists(os.path.join(workdir, 'tmp/unpublished_seq_db')):
@@ -151,11 +178,13 @@ def make_local_blastdb(workdir, db, path_to_db=None):
             content = [x.strip() for x in content]
             count = 0
             gb_id_l = content[::2]
-            seq_l = content[1::2]
             gb_id_l = list(filter(None, gb_id_l))
+
+            seq_l = content[1::2]
             seq_l = list(filter(None, seq_l))
             # note: a file with multiple seqs can be read in as well
             assert len(gb_id_l) == len(seq_l), (gb_id_l, seq_l)
+
             len_gb = len(gb_id_l)
             for i in range(0, len_gb):
                 key = gb_id_l[i].replace(">", "")
@@ -165,12 +194,14 @@ def make_local_blastdb(workdir, db, path_to_db=None):
         path_db = os.path.join(workdir, './tmp/unpublished_seq_db')
         db = os.path.abspath(path_db)
         with cd(path_to_db):
-            cmd1 = "makeblastdb -in {} -dbtype nucl".format(db)
-            os.system(cmd1)
+            cmd1 = "makeblastdb -in {} -dbtype nucl -taxid_map {} -parse_seqids".format(db, taxid_map)
+            with suppress_stdout():
+                os.system(cmd1)
     elif db == "filterrun":
         with cd(workdir):
-            cmd1 = "makeblastdb -in ./tmp/filter_seq_db -dbtype nucl"
-            os.system(cmd1)
+            cmd1 = "makeblastdb -in ./tmp/filter_seq_db -dbtype nucl -parse_seqids -taxid {}".format(int(taxid))
+            with suppress_stdout():
+                os.system(cmd1)
 
 
 def get_full_seq_stdout(gb_acc, blast_seq, workdir, blastdb, db):
@@ -221,6 +252,7 @@ def get_full_seq_tmp(gb_acc, blast_seq, workdir, blastdb, db):
     Get full sequence from gb_acc that was retrieved via blast.
 
     Currently only used for local searches,
+
     Genbank database sequences are retrieving them in batch mode, which is hopefully faster.
 
     :param gb_acc: unique sequence identifier (often genbank accession number)
@@ -296,6 +328,7 @@ def get_full_seq(gb_acc, blast_seq, workdir, blastdb, db):
             db_path = "{}".format(blastdb)
             cmd1 = "blastdbcmd -db {}/nt_v5  -entry_batch {} " \
                    "-outfmt %f -out {}/tmp/full_seq_{}.fasta".format(db_path, fn, workdir, gb_acc)
+            # print(cmd1)
             with suppress_stdout():
                 os.system(cmd1)
             assert os.stat(full_seq_fn).st_size > 0, ('file {} has no content'.format(full_seq_fn))
@@ -366,7 +399,7 @@ def check_directionality(blast_seq, seq):
     return full_seq
 
 
-def get_new_seqs(query_seq, taxon, db_path, db_name, config):
+def get_new_seqs(query_seq, taxon, db_path, db_name, config, mrca=None):
     """
     Produces the pandas df with the new sequences. Main function of this class.
 
@@ -375,16 +408,17 @@ def get_new_seqs(query_seq, taxon, db_path, db_name, config):
     :param db_path: path to blast db
     :param db_name: name of blast db
     :param config: config obj
+    :param mrca: ncbi id to limit blast results
     :return: returns the new sequences found via blast
     """
     # print('get new seqs')
-    run_blast_query(query_seq, taxon, db_path, db_name, config)
+    run_blast_query(query_seq, taxon, db_path, db_name, config, mrca)
     new_blastseqs = read_blast_query_pandas(taxon, config, db_name)  # pandas implementation of read_blast_query()
     assert new_blastseqs["ncbi_txn"].isnull() is not None, (new_blastseqs["ncbi_txn"])
     return new_blastseqs
 
 
-def run_blast_query(query_seq, taxon, db_path, db_name, config):
+def run_blast_query(query_seq, taxon, db_path, db_name, config, mrca=None):
     """
     Contains the cmds used to run a local blast query.
 
@@ -415,6 +449,7 @@ def run_blast_query(query_seq, taxon, db_path, db_name, config):
     else:
         print('DOES THIS EVER HAPPEN?')
         print(db_name)
+        sys.exit(-33)
     query_output_fn = os.path.abspath(query_output_fn)
     input_fn = os.path.abspath(input_fn)
 
@@ -423,27 +458,33 @@ def run_blast_query(query_seq, taxon, db_path, db_name, config):
     toblast.write("{}\n".format(query_seq))
     toblast.close()
 
-    # this format (6) allows to get the taxonomic information at the same time
-    # outfmt = " -outfmt 5"  # format for xml file type
+    # print('run blastn')
     outfmt = " -outfmt '6 sseqid staxids sscinames pident evalue bitscore sseq salltitles sallseqid'"
     if db_name == "Genbank":
-        with cd(db_path):
-            # TODO MK: blast+ v. 2.8 code - then we can limit search to taxids: -taxids self.mrca_ncbi
-            #  !no mrca information here avail!
-            blastcmd = "blastn -query " + input_fn + " -db {}/nt_v5 -out ".format(db_path) + query_output_fn + \
-                       " {} -num_threads {}".format(outfmt, config.num_threads) + \
-                       " -max_target_seqs {} -max_hsps {}".format(config.hitlist_size, config.hitlist_size)
-            # needs to run from within the folder:
-            if not os.path.isfile(query_output_fn):
-                os.system(blastcmd)
-            elif not os.stat(query_output_fn).st_size > 0:
-                os.system(blastcmd)
+        #with cd(db_path):
+        # print(os.getcwd())
+        # TODO MK: blast+ v. 2.8 code - then we can limit search to taxids: -taxids self.mrca_ncbi
+        #  !no mrca information here avail! - needs also some form of taxonomy db - unsure which
+        blastcmd = "blastn -query " + input_fn + " -db {}/nt_v5 -out ".format(db_path) + query_output_fn + \
+                   " {} -num_threads {}".format(outfmt, config.num_threads) + \
+                   " -max_target_seqs {} -max_hsps {}".format(config.hitlist_size, config.hitlist_size)
+                    # "-evalue {} - taxids {}".format(config.evalue, mrca)
+        # needs to run from within the folder:
+        # with suppress_stdout():
+        print(query_output_fn)
+        print(not os.path.isfile(query_output_fn))
+        if not os.path.isfile(query_output_fn):
+            os.system(blastcmd)
+            print(blastcmd)
+        elif not os.stat(query_output_fn).st_size > 0:
+            os.system(blastcmd)
     else:
         print("run against local data")
         with cd(os.path.join(config.workdir, "tmp")):
             blastcmd = "blastn -query {} -db {} -out ".format(input_fn, db) + query_output_fn + \
                        " {} -num_threads {}".format(outfmt, config.num_threads) + \
                        " -max_target_seqs {} -max_hsps {}".format(config.hitlist_size, config.hitlist_size)
+            # with suppress_stdout():
             os.system(blastcmd)
             # todo: produces blastn taxdb warning, taxids here not needed and not part of taxdb anyways as local search.
             #  I keep it to make it coherent for reading in results.
@@ -522,6 +563,19 @@ def get_non_redundant_data(config, redundant):
     for idx in acc_column.index:
         gb_acc = get_acc_from_blast(redundant.loc[idx, 'accession;gi'])
         all_taxids = get_taxid_from_acc(gb_acc, config.blastdb, config.workdir)
+
+        # ##################################
+        # #todo: moritz suggestions
+        # all_accs = redundant.loc[idx, 'accession'].str.split(';')  # get list of all accs
+        # for i in len(all_taxids):
+        #     if txid not in used_txids:
+        #         # get all relevant data - create new line for those
+        #
+        #         # add txid to used_taxids
+        #
+        # # todo: to make it faster get indices of txids
+        # ##################################
+
         all_taxids_set = set(all_taxids)
         found_taxids = set()
         t = acc_column.loc[idx]
@@ -546,17 +600,18 @@ def get_non_redundant_data(config, redundant):
                 non_redundant_redundant = non_redundant_redundant.append(split_df, ignore_index=True, sort=True)
                 found_taxids.add(tax_id)
                 queried_acc.add(gb_acc)
-        if len(all_taxids_set) != 1:
-            more_than_one = True
-    if len(redundant) > 0 and more_than_one is True:
-        assert len(non_redundant_redundant) > len(redundant), \
+        # if len(all_taxids_set) != 1:
+        #     more_than_one = True
+    # if len(redundant) > 0 and more_than_one is True:
+    if len(redundant) > 0:
+        # note: >= was > with the more_than_one option
+        assert len(non_redundant_redundant) >= len(redundant), \
             (len(non_redundant_redundant), len(redundant), non_redundant_redundant['accession'],
              redundant['accession;gi'])
-    elif len(redundant) > 0 and more_than_one is False:
-        assert len(non_redundant_redundant) == len(redundant), \
-            (len(non_redundant_redundant), len(redundant), non_redundant_redundant['accession'],
-             redundant['accession;gi'])
-
+    # elif len(redundant) > 0 and more_than_one is False:
+    #     assert len(non_redundant_redundant) == len(redundant), \
+    #         (len(non_redundant_redundant), len(redundant), non_redundant_redundant['accession'],
+    #          redundant['accession;gi'])
     return non_redundant_redundant
 
 

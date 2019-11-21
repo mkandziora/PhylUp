@@ -1,9 +1,35 @@
+"""
+PhylUp: automatically update alignments and phylogenies.
+Copyright (C) 2019  Martha Kandziora
+martha.kandziora@yahoo.com
+
+Package to automatically update alignments and phylogenies using local and Genbank datasets
+
+Parts are inspired by the program physcraper developed by me and Emily Jane McTavish.
+
+All classes and methods are distributed under the following license.
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <https://www.gnu.org/licenses/>.
+"""
+
 # load and update Genbank
 import os
 import sys
 import datetime
 from . import get_user_input, cd
-from . import ncbi_data_parser
+#from . import ncbi_data_parser
+import ncbiTAXONparser.ncbi_data_parser as ncbi_data_parser
 
 # Get the different needed databases.
 
@@ -27,7 +53,7 @@ def _download_localblastdb(config):
                 os.system("gunzip -cd taxdb.tar.gz | (tar xvf - )")
                 os.system("rm *.tar.gz*")
         else:
-            sys.stderr.write("You have no nt database, which is needed to run PhyFilter. Restart and type 'yes'. \n")
+            sys.stderr.write("You have no nt database, which is needed to run PhylUp. Restart and type 'yes'. \n")
             sys.exit(-10)
     else:
         download_date = os.path.getmtime("{}/nt_v5.60.nhr".format(config.blastdb))
@@ -35,7 +61,7 @@ def _download_localblastdb(config):
         today = datetime.datetime.now()
         time_passed = (today - download_date).days
         if time_passed >= 90:
-            print("""Your databases might not be uptodate anymore. 
+            print("""Your databases might not be up to date anymore. 
                   You downloaded them {} days ago. Do you want to update the blast databases from ncbi? 
                   Note: This is a US government website! You agree to their terms.\n""".format(time_passed))
             x = get_user_input()
@@ -68,7 +94,8 @@ def _download_ncbi_parser(config):
             os.system("mv names.dmp ./data/")
             os.system("rm ./data/taxdump.tar.gz")
         else:
-            sys.stderr.write("You have no taxonomic database, which is needed to run PhyFilter. Restart and type 'yes'. \n")
+            sys.stderr.write("You have no taxonomic database, which is needed to run PhylUp. "
+                             "Restart and type 'yes'. \n")
             sys.exit(-10)
     else:
         x = 'no'
@@ -94,3 +121,7 @@ def _download_ncbi_parser(config):
     if x == 'yes':
         ncbi_data_parser.make_lineage_table()
 
+
+def _download_edirect():
+    os.system("sh -c '$(curl -fsSL ftp://ftp.ncbi.nlm.nih.gov/entrez/entrezdirect/install-edirect.sh)'")
+    os.system("source ./install-edirect.sh")
