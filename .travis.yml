@@ -3,31 +3,71 @@ python:
   - "3.5"
 # command to install dependencies
 
+# get newer gnu/gcc version
+matrix:
+      include:
+        # works on Precise and Trusty
+        - os: linux
+          addons:
+            apt:
+              sources:
+                - ubuntu-toolchain-r-test
+              packages:
+                - g++-7
+          env:
+            - MATRIX_EVAL="CC=gcc-7 && CXX=g++-7"
+
 before_install:
+  - eval "${MATRIX_EVAL}"
   - sudo apt-get update
 
-  # get newer cmake version for raxml-ng
-  # first we create a directory for the CMake binaries
-  - DEPS_DIR="${TRAVIS_BUILD_DIR}/deps"
-  - mkdir ${DEPS_DIR} && cd ${DEPS_DIR}
-  # we use wget to fetch the cmake binaries
-  - travis_retry wget --no-check-certificate https://cmake.org/files/v3.3/cmake-3.3.2-Linux-x86_64.tar.gz
-  # this is optional, but useful:
-  # do a quick md5 check to ensure that the archive we downloaded did not get compromised
-  - echo "f3546812c11ce7f5d64dc132a566b749 *cmake-3.3.2-Linux-x86_64.tar.gz" > cmake_md5.txt
-  - md5sum -c cmake_md5.txt
-  # extract the binaries; the output here is quite lengthy,
-  # so we swallow it to not clutter up the travis console
-  - tar -xvf cmake-3.3.2-Linux-x86_64.tar.gz > /dev/null
-  - mv cmake-3.3.2-Linux-x86_64 cmake-install
-  # add both the top-level directory and the bin directory from the archive
-  # to the system PATH. By adding it to the front of the path we hide the
-  # preinstalled CMake with our own.
-  - PATH=${DEPS_DIR}/cmake-install:${DEPS_DIR}/cmake-install/bin:$PATH
-  # don't forget to switch back to the main build directory once you are done
-  - cd ${TRAVIS_BUILD_DIR}
 
-  ### install blast+ version 2.9.
+
+#  # get newer cmake version for raxml-ng
+#  # first we create a directory for the CMake binaries
+#  - DEPS_DIR="${TRAVIS_BUILD_DIR}/deps"
+#  - mkdir ${DEPS_DIR} && cd ${DEPS_DIR}
+#  # we use wget to fetch the cmake binaries
+#  - travis_retry wget --no-check-certificate https://cmake.org/files/v3.3/cmake-3.3.2-Linux-x86_64.tar.gz
+#  # this is optional, but useful:
+#  # do a quick md5 check to ensure that the archive we downloaded did not get compromised
+#  - echo "f3546812c11ce7f5d64dc132a566b749 *cmake-3.3.2-Linux-x86_64.tar.gz" > cmake_md5.txt
+#  - md5sum -c cmake_md5.txt
+#  # extract the binaries; the output here is quite lengthy,
+#  # so we swallow it to not clutter up the travis console
+#  - tar -xvf cmake-3.3.2-Linux-x86_64.tar.gz > /dev/null
+#  - mv cmake-3.3.2-Linux-x86_64 cmake-install
+#  # add both the top-level directory and the bin directory from the archive
+#  # to the system PATH. By adding it to the front of the path we hide the
+#  # preinstalled CMake with our own.
+#  - PATH=${DEPS_DIR}/cmake-install:${DEPS_DIR}/cmake-install/bin:$PATH
+#  # don't forget to switch back to the main build directory once you are done
+#  - cd ${TRAVIS_BUILD_DIR}
+
+  # raxml-ng
+  - mkdir RAxML-ng
+  - cd RAxML-ng
+  - wget https://github.com/amkozlov/raxml-ng/releases/download/0.9.0/raxml-ng_v0.9.0_linux_x86_64_MPI.zip
+  - unzip raxml-ng_v0.9.0_linux_x86_64_MPI.zip
+  - sudo apt-get install flex bison libgmp3-dev
+
+  - mkdir build && cd build
+  - cmake -DUSE_MPI=ON ..
+  - make
+  - cd ..
+
+  - rm -r build
+  - mkdir build && cd build
+  - cmake ..
+  - make
+  - cd ..
+  - cd bin
+  - echo export PATH="$PATH:$(pwd)" >> ~/.bashrc
+  - cd ..
+  - cd ..
+
+
+  # install blast+ version 2.9.
   - wget ftp://ftp.ncbi.nlm.nih.gov/blast/executables/LATEST/ncbi-blast-2.9.0+-x64-linux.tar.gz
   - tar -xvf ncbi-blast-2.9.0+-x64-linux.tar.gz
 
@@ -64,27 +104,6 @@ before_install:
   - cd ..
   - cd ..
 
-    # raxml-ng
-  - mkdir RAxML-ng
-  - cd RAxML-ng
-  -  wget https://github.com/amkozlov/raxml-ng/releases/download/0.9.0/raxml-ng_v0.9.0_linux_x86_64_MPI.zip
-  - unzip raxml-ng_v0.9.0_linux_x86_64_MPI.zip
-  - sudo apt-get install flex bison libgmp3-dev
-
-  - mkdir build && cd build
-  - cmake -DUSE_MPI=ON ..
-  - make
-  - cd ..
-
-  - rm -r build
-  - mkdir build && cd build
-  - cmake ..
-  - make
-  - cd ..
-  - cd bin
-  - echo export PATH="$PATH:$(pwd)" >> ~/.bashrc
-  - cd ..
-  - cd ..
 
     # install modeltest-ng
   - mkdir modeltest-ng
@@ -95,14 +114,10 @@ before_install:
   - sudo apt-get install qt5-default
   - ./build.sh
 
-
 install:
   # install requirements of physcraper
   - pip install --quiet -r requirements.txt
   - pip install --quiet .
-
-
-
 
 # command to run tests
 script:
@@ -113,93 +128,3 @@ script:
 
 after_success:
   - curl -s https://codecov.io/bash | bash
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-  #### install papara
-  - wget 'https://sco.h-its.org/exelixis/resource/download/software/papara_nt-2.5-static_x86_64.tar.gz'
-  - gunzip  -cd papara_nt-2.5-static_x86_64.tar.gz | (tar xvf - )
-  #- mv papara_static_x86_64 papara
-  - export PATH="$PATH:$(pwd)"
-  #- papara
-
-  ##### to use RAXML we need conda
-  - wget http://repo.continuum.io/miniconda/Miniconda-latest-Linux-x86_64.sh -O miniconda.sh
-  - chmod +x miniconda.sh
-  - bash miniconda.sh -b -p $HOME/miniconda
-  - export PATH="$HOME/miniconda/bin:$PATH"
-  - conda config --set always_yes yes --set changeps1 no
-  - conda update -q conda
-  - conda create -q -n test-environment python=$TRAVIS_PYTHON_VERSION
-  - source activate test-environment
-  - pip install --force-reinstall numpy==1.14.5
-  - conda install -c bioconda raxml
-  - pip install numpy
-  - python setup.py install
-
-#  #### ete fails now, because of conda
-#  - conda install -c etetoolkit ete2
-#  - export PATH=~/anaconda_ete/bin:$PATH
-
-  #### check build documentation with sphinx
-  - pip install sphinx
-  - make -C docs
-
-#  #### needed for mpi4py which is in requirements
-#  #- sudo apt install libopenmpi-dev
-#  - sudo apt install mpich
-#  - export MPICC=mpiicc
-
-install:
-  # install requirements of physcraper
-  - pip install --quiet -r requirements.txt
-  - pip install --quiet .
-
-
-# command to run tests
-script:
-  - wget 'https://ftp.ncbi.nlm.nih.gov/pub/taxonomy/taxdump.tar.gz'
-  - gunzip  -cd taxdump.tar.gz | (tar xvf - names.dmp nodes.dmp)
-  - mv *.dmp taxonomy/
-  - echo 'no' | python tests/testfilesetup.py
-  #- py.test tests/ --setup-only
-  - pytest tests/test_*
-
-after_success:
-  - curl -s https://codecov.io/bash | bash
-
