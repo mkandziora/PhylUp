@@ -28,7 +28,7 @@ before_install:
   # Run your build commands next
 
 
-
+  # use raxml-ng from bioconda - there are compilation errors...
   - wget http://repo.continuum.io/miniconda/Miniconda-latest-Linux-x86_64.sh -O miniconda.sh
   - chmod +x miniconda.sh
   - bash miniconda.sh -b -p $HOME/miniconda
@@ -131,9 +131,11 @@ before_install:
   - cd modeltest-ng-0.1.6/
   - sudo apt-get install qt5-default
   - ./build.sh
+  - cd ..
 
 install:
-  # install requirements of physcraper
+  # install requirements
+  - echo pwd
   - pip install --quiet -r requirements.txt
   - pip install --quiet .
 
