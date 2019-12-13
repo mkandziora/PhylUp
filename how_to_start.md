@@ -1,3 +1,5 @@
+# PhylUp - automatic updating of phylogenetic alignments    
+![](/home/blubb/sync-TP-T470s/PANDAS_phyfilter_v1/manuscript/images/PhylUp_aln_schema.png)   
     
 ## Short introduction to the tool:
 
