@@ -1,4 +1,4 @@
-from PhylUp import phyl_up, config
+from PhylUp import phyl_up, config, phylogenetic_helpers
 from copy import deepcopy
 
 

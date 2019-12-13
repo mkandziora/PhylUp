@@ -1,5 +1,5 @@
 import pandas as pd
-from PhylUp import phyl_up, config, phylogen_updater
+from PhylUp import phyl_up, config, phylogenetic_helpers
 
 
 def test_filterlen():

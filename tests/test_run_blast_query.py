@@ -4,50 +4,6 @@ import os
 from PhylUp import phyl_up, config, blast
 from PhylUp import cd
 
-# taxon = 'Senecio_test'
-# query_seq = 'GATTGCATTGAAACTTGCTTCTTTATAATCATAAACGACTCTCGGCAACGGATATCTCGGCTCACGCATCGATGAAGAACGTAGCAAAATGCGATACTTGGTGTGAATTGCAGAATCCCGTGAACCATCGAGTTTTTGAACGCAAGTTGCGCCCGAAGCCTTTTGGTTGAGGGCACGTCTGCCTGGGCGTCACACATCGCGTCGCCCCCATCACACCTCTTGACGGGGATGTT'
-#
-# workdir = "tests/test_runs"
-# configfi = "data/localblast.config"
-# conf = config.ConfigObj(configfi, workdir, interactive=False)
-#
-# db_path = conf.blastdb
-#
-# input_fn = "{}/blast/{}_tobeblasted.fas".format(conf.workdir, taxon)
-# input_fn = os.path.abspath(input_fn)
-# toblast = open(input_fn, "w")
-# toblast.write(">{}\n".format(taxon))
-# toblast.write("{}\n".format(query_seq))
-# toblast.close()
-#
-# outfmt = " -outfmt '6 sseqid staxids sscinames pident evalue bitscore sseq salltitles sallseqid'"
-#
-# out_fn = os.path.abspath('{}/testfile.blastn'.format(workdir))
-#
-#
-# with cd(db_path):
-#     # this format (6) allows to get the taxonomic information at the same time
-#     # outfmt = " -outfmt 5"  # format for xml file type
-#     # TODO MK: update to blast+ v. 2.8 code - then we can limit search to taxids: -taxids self.mrca_ncbi
-#     blastcmd = "blastn -query " + input_fn + \
-#                " -db {}/nt_v5 -out ".format(db_path) + out_fn + \
-#                " {} -num_threads {}".format(outfmt, conf.num_threads) + \
-#                " -max_target_seqs {} -max_hsps {}".format(conf.hitlist_size,
-#                                                           conf.hitlist_size)
-#     # needs to run from within the folder:
-#     print('run blastcmd')
-#     if not os.path.isfile(out_fn):
-#
-#         print(blastcmd)
-#         os.system(blastcmd)
-#     elif not os.stat(out_fn).st_size > 0:
-#         print(blastcmd, 'xxxx')
-#         os.system(blastcmd)
-#     assert os.path.isfile(out_fn)
-
-
-
-
 def test_run_blast_query():
     workdir = "tests/output/test_runs"
     trfn = "data/tiny_test_example/test.tre"

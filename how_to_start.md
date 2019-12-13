@@ -1,21 +1,20 @@
     
-## Short introduction into what the tool actually does
+## Short introduction to the tool:
 
 PhylUp is a command-line tool written in python3 to automatically update alignments and phylogenies.
-As input it needs a phylogeny, the corresponding alignment and 
+As input it needs a alignment (and if available a phylogeny) and 
 a file with the information about the tip names and the corresponding species names. 
 PhylUp will take every input sequence and blasts it against the ncbi GenBank database. 
 Sequences that are similar to the input sequence will be added to the alignment, 
-if they are a different species and/or they are longer than existing sequences or differ in at least one point mutation.
-Newly added sequence will be blasted again and this continues until no new sequences were found.
-Finally, it it will place the newly found sequences onto the tree, which is then used as a starting tree for a full RAxML run.
+if they are a different taxon and/or they are longer than existing sequences or differ in at least one point mutation.
+Newly found sequence will be blasted again and this continues until no new sequences were found.
+Finally, it will place the newly found sequences into the alignment and if enabled to update phylogenies.
 
 After the single-gene datasets are updated, the data can be concatenated. 
-Either, the user specifies which sequences are combined or the tool decides randomly which sequences to combine 
-if there are more than a single sequence for a taxon in one of the alignments.
+The tool decides randomly which sequences to combine if there are more than a single sequence for a taxon in one of the alignments.
 
 
-## Short tutorial:
+## Tutorial:
 
 ### Before you can start
 
@@ -23,9 +22,11 @@ if there are more than a single sequence for a taxon in one of the alignments.
 
 * [PaPaRa](http://sco.h-its.org/exelixis/web/software/papara/index.html) - alignment tool
 * [RAxML-NG](https://github.com/amkozlov/raxml-ng/archive/master.zip) - tree estimation program
-* [BLAST+](https://blast.ncbi.nlm.nih.gov/Blast.cgi?CMD=Web&PAGE_TYPE=BlastDocs&DOC_TYPE=Download) - it's needed for filter runs and when using local BLAST databases. Setup and installation information can be found [here](https://www.ncbi.nlm.nih.gov/books/NBK1762/).
+* [BLAST+](https://blast.ncbi.nlm.nih.gov/Blast.cgi?CMD=Web&PAGE_TYPE=BlastDocs&DOC_TYPE=Download) - It needs blast+ v.2.9 or higher. It is needed for filter runs and when using local BLAST databases. Setup and installation information can be found [here](https://www.ncbi.nlm.nih.gov/books/NBK1762/).
 * [EPA-NG](https://github.com/Pbdas/epa-ng/archive/master.zip) - places new sequences into the phylogeny
 * [gappa](https://github.com/lczech/gappa/archive/master.zip) - transforms the output from EPA-NG into a readable output
+
+On a Linux machine check [here](./install_req.bash) for an example bash code on how to install the required dependencies.
 
 make sure the programs are accessible from everywhere, thus add them to your PATH using the command line:
 * UNIX: `export PATH=$PATH:/path/to/my/program`
@@ -35,7 +36,7 @@ make sure the programs are accessible from everywhere, thus add them to your PAT
 (! set PATH=%PATH%:  it takes the current path and sets PATH to it.)
 
 #### 2.a) download PhylUp using the command line:
-* as a normal package: `git clone https://github.com/blubbundbla/PhylUp.git`
+* as a normal package: `wget  https://github.com/blubbundbla/PhylUp/archive/master.zip`
 * as a git repository: `git clone 'git@github.com:blubbundbla/PhylUp.git'`
 
 #### 2.b) install a virtual environment
@@ -61,37 +62,21 @@ run from within the PhylUp main folder:
 
 #### 4. install a local instance of the BLAST database: 
 
-<!-- decide for a BLASTing method:
-
-Depending on the size of your tree to be updated, there are things to consider.
-
-  * **web BLAST service**: If the tree is not too large and/or you have enough time, you can run the tool with the main settings, that uses the web BLAST service. The web service is not intended for large amounts of queries and if there are too many searchs being submitted by a user, the searches are being slowed down. Another down side is, that the species name retrieval can be difficult sometimes. Advantage is that it is the most up to date database to blast against.
-  * **Amazon cloud service**: If you do not have a fast computer, there are options to pay for a pre-installed cloud service using [amazon](https://aws.amazon.com/marketplace/pp/B00N44P7L6/ref=mkt_wir_ncbi_blast).
-  * **local blast database**: This is the __recommended method__, as it is the fastest and does not heavily depend on good internet connection. Especially, if the trees are bigger and/or you have a relatively fast computer, this might be the best option. Ncbi regularly publishes the databases, that can easily be downloaded and initiated. -->
-
-  * **Install a local Blast database:**
-
-      General information about the BLAST database can be found here: ftp://ftp.ncbi.nlm.nih.gov/blast/documents/blastdb.html.
-
-      We are currently working on implementing a version that uses the online blast searches, but this is not yet working reliable.
-
-      In Linux to install the BLAST database do the following (for Windows and MAC please use google to figure it out, there should be plenty of information.):
-
+  General information about the BLAST database can be found here: ftp://ftp.ncbi.nlm.nih.gov/blast/documents/blastdb.html.
+ 
+  *  **Install the blast database:**
+  
+      On a  Linux machine to install the BLAST database do the following:
+    
       * `open a terminal`
       * `cd /to/the/folder/of/your/future/blastdb`  
-      * `sudo apt-get install ncbi-blast+` # if not already installed earlier
-      * `wget 'https://ftp.ncbi.nlm.nih.gov/blast/db/v5/nt.*'`  # this downloads all nt-compressed files
-      * `update_blastdb nt`
+      * `wget 'https://ftp.ncbi.nlm.nih.gov/blast/db/v5/nt_v5.*'`  # this downloads all nt-compressed files
       * `cat *.tar.gz | tar -xvzf - -i`  # macOS `tar` does not support the `-i` flag,  you need to use homebrew to `brew install gnu-tar` and replace the `tar` command by `gtar`
-      * `blastdbcmd -db nt -info`
+      * `blastdbcmd -db nt -info`  # checks if it works
       * `rm *.tar.gz*`
         
-       The last command shows you if it worked correctly. 'nt' means, we are making the nucleotide database.
-       The database needs to be update regularly, the program will check the dates of your databases and will ask you to update the databases after 60 days. If your databases are older, you will be asked for input, if you want to update the databases. 
-       <!---
-       Interactive input does not work on remote machines, to stop the program from asking, change the following line in your analysis file from `conf = ConfigObj(configfi)` to `conf = ConfigObj(configfi, interactive=False)`.
-       -->
-       If you want to update the databases earlier go back to step 1.
+      'nt' means, we are making the nucleotide database.
+          
        
   *  **Install the taxonomy database:**
       
@@ -109,22 +94,22 @@ Depending on the size of your tree to be updated, there are things to consider.
        *  `rm taxdump.tar.gz`
 
          
-  * **Update the databases:**
-  
-       The databases need to be update regularly, the program will check the dates of your databases and will ask you to update the databases after 60 days. If your databases are older, you will be asked for input, if you want to update the databases. 
-       Interactive input does not work on remote machines, to stop the program from asking, change the following line in your analysis file from `conf = ConfigObj(configfi)` to `conf = ConfigObj(configfi, interactive=False)`.
-       
-       If you want to update the databases earlier:
+  * **Update the databases:**       
+    
+    The databases need to be updated regularly, the program will check the dates of your databases and will remember you to update the databases. If you set your analysis to run interactive and your databases are older, you will be asked for input, if you want to update them. 
+    Please note, that the interactive mode does not work on remote machines with scheduling systems, to stop the program from asking, change the following line in your analysis file from `conf = ConfigObj(configfi, workdir)` to `conf = ConfigObj(configfi, workdir,  interactive=False)`.
+    
+    If you want to update the databases by hand:
 
-    * blast db: repeat the steps listed under 'Install a local Blast database'
-    * taxonomy db: run `update_blastdb taxdb`
-    * rank db: repeat the steps listed under 'install the taxonomic rank database'
+       * blast db: repeat the steps listed under 'Install a local Blast database'
+       * taxonomy db: run `update_blastdb taxdb`
+       * rank db: repeat the steps listed under 'install the taxonomic rank database'
    
 ### Set up a run
 
 #### **1. edit major settings in the config file**
 
-There is an example config file in `tests/data/localblast.config`
+There is an example config file in `./data/localblast.config`
   * **BLAST settings**:
     * **e_value_thresh**: 
       This is the e-value that can be retrieved from BLAST searches and is used to limit the BLAST results to sequences that are similar to the search input sequence.
@@ -143,7 +128,7 @@ There is an example config file in `tests/data/localblast.config`
     * **unpubl_data**: path to folder with sequence files - no files other than unpublished seqs are allowed - unpubl names needs to go somewhere else
     * **unpubl_names**: path to file with sequence names corresponding to ncbi taxon names
 
-  * **Sequence settings**:
+  * **Alignment settings**:
     * **min_len:** minimum length a new sequence can have
     * **max_len**: maximum length of sequences that are added to alignment, must be greater than 1.
     * **trim_perc**: How many sequences need to have information at the beginning and end of an alignment, to not be trimed.
@@ -156,7 +141,6 @@ There is an example config file in `tests/data/localblast.config`
                           If the taxon is likely monophyletic the distances will be similar and thus all sequences will fall within the mean and standard deviation of sequence similarity.
                         If there are a few outlier sequences only, this seems to be likely a misidentification or mis-labeling in GenBank, outlier sequences will not be added, as they are most likely outside the allowed range of mean +/- SD.
                         If the taxon is likely not monophyletic and sequences diverge a lot from each other, the mean and SD will be larger and allows to randomly pick sequences, that represent the divergence.
-
                         As value for sequence similarity, we use bit-scores.  Bit-scores are log-scaled scores and a score is a numerical value that describes the overall quality of an alignment (thus from the blasted sequence against the other available sequences). Higher numbers correspond to higher similarity. While scores are depending on database size, the rescaled bit-scores do not. Check out https://www.ncbi.nlm.nih.gov/BLAST/tutorial/Altschul-1.html for more detail.
                         From the sequences that path the sequence similarity, random sequences are chosen.
         * **length**:  Instead of randomly choosing between sequences that are within the criteria of the blast search using sequence divergence as a criteria, here the longest sequences will be selected.
@@ -167,28 +151,30 @@ There is an example config file in `tests/data/localblast.config`
                      It can be set to None and then for all taxa, there will be the maximum number of threshold sequences retrieved.
                     If it is set to species, there will no more than the maximum number of sequences randomly choosen from all sequences available for all the subspecies.
                         It can be set to any ranks defined in the ncbi taxonomy browser.
-    * **different_level:** True or False. Makes hierachical adding of sequences possible.
+    * **different_level:** True or False. Makes hierachical adding of sequences possible - see Asteroideae example.
 
   * **Tree Calculation**:
-    * **backbone:** True or False. Set to true if you only want to add new sequences to existing tree, without recalculatin the full tree. 
-    * **update_tree:** True or False. Set to true if you want to calculate an updated phylogeny from within the program. Often not advisable as HighPerformanceClusters are often set up in different ways and the tool might not make the use of the power of the cluster.
+    *	**update_tree:** True or False. Set to true if you want to calculate an updated phylogeny from within the program. Often not advisable as HighPerformanceClusters are often set up in different ways and the tool might not make the use of the power of the cluster.
 
+    * **backbone:** True or False. Set to true if you only want to add new sequences to existing tree, without recalculating the full tree. 
+  
   
   * **Internal settings:**
+  
     Will follow, if you are looking for it and it's not here, send us an email.
     
 
 #### **2. write your analysis file**
 ##### A. standard run 
 
-This is explaining how to set up a "standard run", which will add all sequences, that are similar and long enough 
+This is explaining how to set up an analysis, which will add sequences, that are similar and long enough 
 to the alignment as long as they are no subsequences of an already existing sequence, until the taxon reached the threshold.
 
-The sequences retrieved from the BLAST search/during a standard run, are being filtered according to some user input. This is particularly of use, if there is no need to have every single sequence available being represented in your phylogeny.
+The sequences retrieved from the BLAST search/during a the updating are being filtered according to some user input. This is particularly of use, if there is no need to have every single sequence available being represented in your phylogeny.
 
 Optional arguments are explained in the following section.
 
-There is an example file in `XXXXXXXXX.py`, it comes with a tiny sample dataset in `tests/data/tiny_example`.
+There is an example file in `example_analysis.py`, it comes with a tiny sample dataset in `tests/data/tiny_example`.
 
 * **seqaln**: give the path to your alignment file, must be a single gene alignment
 * **mattype**: file format of your alignment - currently supported: “fasta”, “newick”, “nexus”, “nexml”, “phylip”
@@ -201,80 +187,67 @@ There is an example file in `XXXXXXXXX.py`, it comes with a tiny sample dataset 
 Note: Specified paths have to start either from your root directory (e.g. `/home/USER/PhylUp/path/to/file`), or can be relative from within the PhylUp main folder (`./path/to/file`).
 
 Beside the standard definition, there are more input options. Currently supported are:
-* **blacklist**: a list of sequences, that shall not be added or were identified to be removed later. This needs to be formatted as a python list containing the GenBank identifiers (e.g. `[accession number, accession number]`).
-* **mrca**: define the clade of interest by providing the ncbi taxonomic identifier
+* **blacklist**: A list of sequences, that shall not be added or were identified to be removed later. This needs to be formatted as a python list containing the GenBank identifiers (e.g. `[accession number, accession number]`).
+* **mrca**: Define the clade of interest by providing the ncbi taxonomic identifier.
+    Often phylogenies include outgroups, and someone might not be interested in updating that part of the tree. 
+    This can be avoided by defining the most recent common ancestor. 
+    It requires the ncbi taxon identifier for the group of interest, which can be obtained from [here](https://www.ncbi.nlm.nih.gov/taxonomy) or by using a provided script:
+
+	`python3 ./data/spn_to_taxid.py NAME_OF_MRCA`
+
+	Please note that in the case that the mrca is a species name, the space between the two names needs to be replaced with an '_'
 
 
-##### B. PALMS DATASET IDEA:
 
+##### B. hierachical updating - Asteroidea example:
 
-2. using your own files:
-There is an example file in `docs/example_scripts/own_data_filter_blast.py`.  The corresponding function to use in your file setup is `filter_data_run()`.
+Update an alignment with different settings of mrca, threshold and downtorank settings.
 
+There is an example file in `example_different_levels.py`.
 
 ##### C. Add unpublished data
 
-3. Use a local folder as sequence database:
-
-     Instead of using GenBank as the source of new sequences, we can specify a folder which contains sequences in fasta format and this folder will be used as a sequence database. Then before running a standard or filter run, sequences from that folder can be added to the alignment/phylogeny if the folder contains sequences that are similar to the sequences already present in the alignment. This is intended to be used for newly sequenced material, which is not yet published on GenBank.
+ Instead of using GenBank as the source of new sequences, we can specify a folder which contains sequences in fasta format and this folder will be used as a sequence database. 
+ Before using the BLAST database to find new sequences, sequences from that folder can be added to the alignment/phylogeny if the folder contains sequences that are similar to the sequences already present in the alignment. This is intended to be used for newly sequenced material, which is not yet published on GenBank.
      To use this you need to specify:
      
    * add_unpubl_seq = path to folder with the sequences
    * id_to_spn_addseq_json = path to file which translates the sequences names to species names
      
-    There is an example file in `docs/example_scripts/own_data_localdb.py`, with an example of the input files in `tests/data/local_seqs` and `tests/data/tipnTOspn_localAdd.csv` shows how to write the comma-delimited file.  
+   There is an example file in `example_unpublished.py`, with an example of the input files in `./data/unpublished_seqs` and `./data/unpublished_names.csv` shows how to write the comma-delimited file.
 
 
-#### **3. More settings that can be adjusted:**
-
-There are some more features that can be changed.
-
-1. define the `ingroup_mrca`:
-
-    Often phylogenies include outgroups, and someone might not be interested in updating that part of the tree. 
-    This can be avoided by defining the most recent common ancestor. 
-    It requires the ncbi taxon identifier for the group of interest, which can be obtained from [here](https://www.ncbi.nlm.nih.gov/taxonomy).
-
-
-
-#### **4. start to update your phylogeny:**
+#### **3. start to update your phylogeny:**
 
 This should be straight forward - type in your PhylUp main folder:
 
-`python ./path/to/file/analysis-file.py`
+`python3 ./path/to/file/analysis-file.py`
 
 And now you just need to wait...
 
-#### **5. Concatenate different single-gene PhylUp runs:**
+#### **4. Concatenate different single-gene PhylUp runs:**
     
-After the single-gene PhylUp runs were updated, the data can be combined, see for example `docs/example_scripts/concat_example.py`.
-Either the program randomly decides which sequences to concatenate if there are more sequences available for one loci or the user can specify a file, which sequences shall be concatenated. An example file can be found at `tests/data/concatenation_input.csv`.
+After the single-gene PhylUp runs were updated, the data can be combined, see for example `example_concat.py`.
 
-#### **6. Navigating the output:**
-REWRITE!!!
+
+#### **5. Navigating the output:**
+
 
 During a PhylUp run, several files are being written out:
 Here is a short introduction to what they are:
+ * **all_new_seqs.updated**: csv file with all information available about the newly added sequences
+ * **fulltree.raxml.**: all the files generated by RAxML-NG if the tree updating was enabled
+ * **logfile**: short summary of how many sequences where added/filtered during a PhylUp run
+ * **table.updated**: all sequences that were considered to be added, but of which some have been removed because of the filtering steps - does not include sequences that were not added because they are not part of the mrca or because they were too short - for those see wrong_mrca.csv and wrong_seq_length.csv
+ * **updt_aln.fasta**: updated alignment; there is also a relabeled version with tipnames as a combination of taxon name and accession number
+ * **updt_tre.tre**: updated tree or unresolved tree if no phylogeny was provided as input; there is also a relabeled version with tipnames as a combination of taxon name and accession number
+ * **orig_inputaln.fasta**: data as supplied in the input
+ * **orig_tre.tre**: data as supplied in the input
+ * **blast**: folder that holds all blast results
+ * **tmp**: folder that holds taxonomic information, complete sequences and internally used files.
 
- * folder with previous_run: each PhylUp loop writes out the same sets of files, after finishing one loop, they are copied there before a new round is started
 
- *  all files that end with .p: are pickled files which are needed to rerun the dataset
- *  replaced_inputaln.fasta: is you input alignment, where '?' have been replaced with '-'
- *  **not_added_seq.csv**: contains newly found sequences, that passed the e-filter but where not added because of other reasons (not part of the defined mrca or to short)
- *  aln_ott.phy: used to add the newly found sequences to the alignment
- *  **PhylUp.fas/PhylUp.tre**: alignment and tree after updating with otuPS labels, those files can be used to relabel the tipnames, using `scripts/relabel_tree_file.py`
-  *  **labelled.fas/labelled.tre**: same as PhylUp.fas/tre but with different label
- * PhylUp_final_notrim/trim/fas/tre: trimmed/untrimmed final dataset
- *  **taxon_sampling.csv**: list of taxon names and how often they are represented in the data
- *  **logfile**: short summary of how many sequences where added/filtered during a PhylUp run
- *  **otu_seq_info.csv**: table with all sequences that passed evalue, and length filter and where either added or not, because they where filtered during the taxon filtering.
- * place_resolve.tre: your phylogeny with the new sequences placed onto it
- * random_resolve.tre: 
- * otu_dict.json: like otu_seq_info.csv but in json format
- * **RAxML files**: files produced during a RAxML run
- * **Genbank_information_added_seq.csv**: file that contains the Genbank information of the newly added sequences
-
- #### **7. Common error messages:**
+ #### **6. Common error messages:**
 
 Will be added as soon it becomes clear what are common error messages.
 

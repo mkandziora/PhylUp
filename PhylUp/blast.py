@@ -44,6 +44,7 @@ blastdbcmd outfmt options:
 https://www.ncbi.nlm.nih.gov/books/NBK279684/table/appendices.T.blastdbcmd_application_opti/
 """
 
+
 def get_acc_from_blast(query_string):
     """
     Get the accession number from a blast query using local blast.
@@ -52,12 +53,13 @@ def get_acc_from_blast(query_string):
     :return: genbank accession
     """
     # Note: To get acc is more difficult now, as new seqs not always have gi number, then query changes
-    if len(query_string.split("|")) > 3:
-        gb_acc = query_string.split("|")[3]
-    elif len(query_string.split("|")) == 3:
-        gb_acc = query_string.split("|")[1]
+    query_split = query_string.split("|")
+    if len(query_split) > 3:
+        gb_acc = query_split[3]
+    elif len(query_split) == 3:
+        gb_acc = query_split[1]
     else:
-        gb_acc = query_string.split("|")[0]
+        gb_acc = query_split[0]
     return gb_acc
 
 
@@ -92,6 +94,7 @@ def get_taxid_from_acc(gb_acc, blastdb, workdir):
 
 
 # todo: not used
+
 def get_taxid_from_acc_stdout(gb_acc, blastdb, workdir):
     """
     Use the blastdb to get the taxon id from a queried gb acc.
@@ -385,15 +388,16 @@ def check_directionality(blast_seq, seq):
     dna_rcomp = orig.reverse_complement()
     dna_r = orig[::-1]
     full_seq = str()
-    if blast_seq.replace("-", "") in orig:
+    seq_replace = blast_seq.replace("-", "")
+    if seq_replace in orig:
         full_seq = seq
-    elif blast_seq.replace("-", "") in dna_r:
+    elif seq_replace in dna_r:
         full_seq = dna_r
-    elif blast_seq.replace("-", "") in dna_comp:
+    elif seq_replace in dna_comp:
         full_seq = dna_comp
-    elif blast_seq.replace("-", "") in dna_rcomp:
+    elif seq_replace in dna_rcomp:
         full_seq = dna_rcomp
-    assert blast_seq.replace("-", "") in full_seq, (blast_seq.replace("-", ""), full_seq, seq)
+    assert seq_replace in full_seq, (seq_replace, full_seq, seq)
     full_seq = str(full_seq)
     assert type(full_seq) == str, (type(full_seq))
     return full_seq
@@ -427,6 +431,7 @@ def run_blast_query(query_seq, taxon, db_path, db_name, config, mrca=None):
     :param db_path: path to blast db
     :param db_name: name of blast db
     :param config: config obj
+    :param mrca: optional, new blast+ can limit results to list of taxids - not yet implemented in code
     :return: runs local blast query and writes it to file
     """
     # print("run_blast_query")
@@ -461,25 +466,23 @@ def run_blast_query(query_seq, taxon, db_path, db_name, config, mrca=None):
     # print('run blastn')
     outfmt = " -outfmt '6 sseqid staxids sscinames pident evalue bitscore sseq salltitles sallseqid'"
     if db_name == "Genbank":
-        #with cd(db_path):
-        # print(os.getcwd())
-        # TODO MK: blast+ v. 2.8 code - then we can limit search to taxids: -taxids self.mrca_ncbi
-        #  !no mrca information here avail! - needs also some form of taxonomy db - unsure which
-        blastcmd = "blastn -query " + input_fn + " -db {}/nt_v5 -out ".format(db_path) + query_output_fn + \
-                   " {} -num_threads {}".format(outfmt, config.num_threads) + \
-                   " -max_target_seqs {} -max_hsps {}".format(config.hitlist_size, config.hitlist_size)
-                    # "-evalue {} - taxids {}".format(config.evalue, mrca)
-        # needs to run from within the folder:
-        # with suppress_stdout():
-        print(query_output_fn)
-        print(not os.path.isfile(query_output_fn))
-        if not os.path.isfile(query_output_fn):
-            os.system(blastcmd)
-            print(blastcmd)
-        elif not os.stat(query_output_fn).st_size > 0:
-            os.system(blastcmd)
+        with cd(db_path):
+            # print(os.getcwd())
+            # TODO MK: blast+ v. 2.8 code - then we can limit search to taxids: -taxids self.mrca_ncbi
+            #  !no mrca information here avail! - needs also some form of taxonomy db - unsure which
+            blastcmd = "blastn -query " + input_fn + " -db {}/nt_v5 -out ".format(db_path) + query_output_fn + \
+                       " {} -num_threads {}".format(outfmt, config.num_threads) + \
+                       " -max_target_seqs {} -max_hsps {}".format(config.hitlist_size, config.hitlist_size)
+                        # "-evalue {} - taxids {}".format(config.evalue, mrca)
+            # needs to run from within the folder:
+            # with suppress_stdout():
+            if not os.path.isfile(query_output_fn):
+                os.system(blastcmd)
+                print(blastcmd)
+            elif not os.stat(query_output_fn).st_size > 0:
+                os.system(blastcmd)
     else:
-        print("run against local data")
+        # print("run against local data")
         with cd(os.path.join(config.workdir, "tmp")):
             blastcmd = "blastn -query {} -db {} -out ".format(input_fn, db) + query_output_fn + \
                        " {} -num_threads {}".format(outfmt, config.num_threads) + \
@@ -524,6 +527,10 @@ def read_blast_query_pandas(blast_fn, config, db_name):
     new_seqs = pd.concat([non_redundant_redundant, non_redundant], sort=True, ignore_index=True)
     new_seqs['sseq'] = new_seqs['sseq'].str.replace("-", "")
     new_seqs['date'] = datetime.datetime.strptime('01/01/00', '%d/%m/%y')
+    assert new_seqs['ncbi_txid'].isnull().values.any() == False
+    # ncbi_parser = ncbi_data_parser.Parser(names_file=config.ncbi_parser_names_fn,
+    #                                       nodes_file=config.ncbi_parser_nodes_fn)
+    # new_seqs['ncbi_txid'] = new_seqs['ncbi_txid'].apply(ncbi_parser.get_name_from_id())
     # todo this could be made faster by running it on the redundant/non_redundant data first
     new_seqs = wrapper_get_fullseq(config, new_seqs, db_name)
     return new_seqs
@@ -559,7 +566,6 @@ def get_non_redundant_data(config, redundant):
     acc_column = redundant["accession"].str.split(";", n=-1, expand=True)  # todo: try to expand in row instead of column
     # todo: think about making a single df first where unique acc corresponds to taxid and same index val
     #  as in redundant, then use that whole df to make new non_redundant_redundant df. - discussion moritz
-    more_than_one = False
     for idx in acc_column.index:
         gb_acc = get_acc_from_blast(redundant.loc[idx, 'accession;gi'])
         all_taxids = get_taxid_from_acc(gb_acc, config.blastdb, config.workdir)
@@ -597,21 +603,14 @@ def get_non_redundant_data(config, redundant):
                 split_df['accession'] = gb_acc
                 split_df['ncbi_txid'] = tax_id
                 split_df['ncbi_txn'] = spn
-                non_redundant_redundant = non_redundant_redundant.append(split_df, ignore_index=True, sort=True)
+                # non_redundant_redundant = non_redundant_redundant.append(split_df, ignore_index=True, sort=True)
+                non_redundant_redundant = pd.concat([non_redundant_redundant, split_df], ignore_index=True, sort=True)
                 found_taxids.add(tax_id)
                 queried_acc.add(gb_acc)
-        # if len(all_taxids_set) != 1:
-        #     more_than_one = True
-    # if len(redundant) > 0 and more_than_one is True:
     if len(redundant) > 0:
-        # note: >= was > with the more_than_one option
         assert len(non_redundant_redundant) >= len(redundant), \
             (len(non_redundant_redundant), len(redundant), non_redundant_redundant['accession'],
              redundant['accession;gi'])
-    # elif len(redundant) > 0 and more_than_one is False:
-    #     assert len(non_redundant_redundant) == len(redundant), \
-    #         (len(non_redundant_redundant), len(redundant), non_redundant_redundant['accession'],
-    #          redundant['accession;gi'])
     return non_redundant_redundant
 
 
@@ -633,5 +632,6 @@ def wrapper_get_fullseq(config, new_blast_seq_dict, db):
         if len(gb_acc.split(".")) >= 2:  # Do not add sequences that are not in Genbank accession format, e.g. PDB
             # replace sequence
             full_seq = get_full_seq(gb_acc, new_blast_seq_dict.loc[idx, "sseq"], config.workdir, blastdb, db)
-            new_blast_seq_dict.loc[idx, "sseq"] = full_seq
+            # new_blast_seq_dict.loc[idx, "sseq"] = full_seq
+            new_blast_seq_dict.at[idx, "sseq"] = full_seq  # note: set_value is much faster than .loc method, but deprecated, try at
     return new_blast_seq_dict

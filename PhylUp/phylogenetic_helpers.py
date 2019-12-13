@@ -51,26 +51,25 @@ def truncate_papara_aln(aln):
     # subprocess.call(["epa-ng", "--split", "aln_papara.phy", "papara_alignment.extended"])
     print('truncate papara aln')
     len_aln = len(aln.taxon_namespace)
-
     # read the data file in as a list
-    ref_msa_fn = open(os.path.abspath('papara_alignment.extended'), "r")
+    ref_msa_fn = open(os.path.abspath('papara_alignment.phylip_trim'), "r")
     ref_msa = ref_msa_fn.readlines()
     ref_msa_fn.close()
     query_msa = deepcopy(ref_msa)
 
     del query_msa[1:(len_aln+1)]
-    fout = open("new_seqs_papara.extended", "w")
+    fout = open("new_seqs_papara.phylip", "w")
     fout.writelines(query_msa)
     fout.close()
 
     del ref_msa[len_aln+1:]
-    fout = open("old_seqs_papara.extended", "w")
+    fout = open("old_seqs_papara.phylip", "w")
     fout.writelines(ref_msa)
     fout.close()
 
-    tmpaln = DnaCharacterMatrix.get(path='old_seqs_papara.extended', schema='phylip')
+    tmpaln = DnaCharacterMatrix.get(path='old_seqs_papara.phylip', schema='phylip')
     tmpaln.write(path="old_seqs.fasta", schema='fasta')
-    tmpaln = DnaCharacterMatrix.get(path='new_seqs_papara.extended', schema='phylip')
+    tmpaln = DnaCharacterMatrix.get(path='new_seqs_papara.phylip', schema='phylip')
     tmpaln.write(path="new_seqs.fasta", schema='fasta')
 
 
@@ -85,17 +84,12 @@ def write_papara_trefile(tre, workdir):
     """This writes out tree files for papara.
     """
     print('write papara files')
-
     tre.resolve_polytomies()
     tre.deroot()
-    tmptre = tre.as_string(schema="newick",
-                           unquoted_underscores=True,
-                           suppress_rooting=True)
-    tmptre = tmptre.replace(":0.0;", ";")  # Papara is difficult about root
+    tmptre = tre.as_string(schema="newick", unquoted_underscores=True, suppress_rooting=True)
+    tmptre = tmptre.replace(":0.0;", ";")
     tmptre = tmptre.replace("'", "_")
-
-    filename = "random_resolve.tre"
-    fi = open(os.path.join(workdir, filename), "w")
+    fi = open(os.path.join(workdir, "papara_tre.tre"), "w")
     fi.write(tmptre)
     fi.close()
 
@@ -129,18 +123,55 @@ def write_tre(tre, workdir, treepath="updt_tre.tre", treeschema="newick"):
     tre.write(path=os.path.join(workdir, treepath), schema=treeschema, unquoted_underscores=True, suppress_rooting=True)
 
 
-def replace_uid_with_name(file_path, table):
-    print(os.getcwd())
+def replace_uid_with_name(file_path, table, type):
+    """
+    translate unique ids into species names in file.
+
+    :param file_path:
+    :param table:
+    :param type: aln or tree, defines which type is being relabeled.
+    :return:
+    """
+    # print(os.getcwd())
     with open(file_path, "r") as label_new:
         labelled = label_new.read()
         with open("{}_relabel".format(file_path), "wt") as fout:
             present = table[table['status'] >= 0]
             for idx in present.index:
-                if present.loc[idx, 'accession'].split('.')[0] in labelled:
-                    labelled = labelled.replace("{}:".format(present.loc[idx, 'accession'].split('.')[0]),
-                                                "{}_{}:".format(present.loc[idx, 'ncbi_txn'].replace(" ", "_"),
-                                                                present.loc[idx, 'accession'].split('.')[0]))
+                split_name = present.loc[idx, 'accession'].split('.')[0]
+                if split_name in labelled:
+                    print(split_name)
+                    # print(present.loc[idx, 'ncbi_txn'])
+                    # print(present.loc[idx, 'accession'])
+                    spn = present.loc[idx, 'ncbi_txn'].replace(" ", "_").replace("-", "_").replace("'", "")
+                    if type == 'tree':
+                        labelled = replace_in_tree(idx, labelled, present, split_name, spn)
+                    else:
+                        labelled = replace_in_aln(idx, labelled, present, split_name, spn)
+
             fout.write(labelled)
+
+
+def replace_in_tree(idx, labelled, present, split_name, spn):
+    try:
+        labelled = labelled.replace("{}:".format(split_name), "{}_{}:".format(spn, split_name))
+    except AttributeError:
+        labelled = labelled.replace("{}:".format(split_name),
+                                    "{}_{}:".format(present.loc[idx, 'ncbi_txid'],
+                                                    split_name))
+    return labelled
+
+
+def replace_in_aln(idx, labelled, present, split_name, spn):
+
+    try:
+        labelled = labelled.replace(">{}".format(split_name),
+                                    ">{}_{}".format(spn, split_name))
+    except AttributeError:
+        labelled = labelled.replace(">{}".format(split_name),
+                                    ">{}_{}".format(present.loc[idx, 'ncbi_txid'],
+                                                    split_name))
+    return labelled
 
 
 def check_align(aln):
@@ -173,7 +204,7 @@ def resolve_polytomies(tre, workdir):
     tre.resolve_polytomies()
     tre.deroot()
     tre.as_string(schema='newick')
-    tre_fn = os.path.join(workdir, "random_resolve.tre")
+    tre_fn = os.path.join(workdir, "papara_tre.tre")
     with open(tre_fn, "w") as tre_file:
         tre_file.write("{}".format(tre.as_string(schema='newick', suppress_rooting=True)))
 
@@ -244,16 +275,8 @@ def estimate_number_threads_raxml(workdir, aln_fn, model):
     """
     print('estimate_number_threads_raxml')
     with cd(workdir):
-        print(os.getcwd())
-        try:
-            print('try')
-            print(['raxml-ng-mpi', '--parse', '--msa', aln_fn, '--prefix', 'numthreads', '--model', model, '--redo'])
-            subprocess.run(['raxml-ng-mpi', '--parse', '--msa', aln_fn,
-                            '--prefix', 'numthreads', '--model', model, '--redo'])
-        except FileNotFoundError:
-            print('erroe')
-            subprocess.run(['raxml-ng', '--parse', '--msa', aln_fn,
-                            '--prefix', 'numthreads', '--model', model,  '--redo'])
+        subprocess.run(['raxml-ng-mpi', '--parse', '--msa', aln_fn,
+                        '--prefix', 'numthreads', '--model', model, '--redo'])
         with open('numthreads.raxml.log') as f:
             datafile = f.readlines()
         for line in datafile:
@@ -274,6 +297,7 @@ def build_table_from_file(id_to_spn, config, downtorank=None):
     print("Build table with information about sequences and taxa.")
     ncbi_parser = ncbi_data_parser.Parser(names_file=config.ncbi_parser_names_fn,
                                           nodes_file=config.ncbi_parser_nodes_fn)
+    print(id_to_spn)
     table = get_txid_for_name_from_file(id_to_spn, ncbi_parser)  # builds name id link
     table['status'] = 0
     try:
@@ -333,6 +357,7 @@ def get_txid_for_name_from_file(tipname_id_fn, ncbi_parser):
     :param ncbi_parser: ncbiTAXONparser instance
     :return:
     """
+    print(tipname_id_fn)
     columns = ['accession', 'ncbi_txn']
     name_id = pd.read_csv(tipname_id_fn, names=columns,  sep=",", header=None)
     name_id['ncbi_txid'] = name_id['ncbi_txn'].apply(ncbi_parser.get_id_from_name)
@@ -352,7 +377,7 @@ def add_seq_to_table(aln, table):
         for index in table.index:
             tip_name = table.loc[index, 'accession']
             if taxon.label in tip_name:
-                table.loc[index, 'sseq'] = seq
+                table.at[index, 'sseq'] = seq
                 queried_taxa.append(tip_name)
     assert tip_name in queried_taxa, (tip_name, queried_taxa)
     return table

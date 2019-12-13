@@ -29,6 +29,8 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 import os
 import sys
 import configparser
+import datetime
+
 from . import db_updater
 from . import debug
 #from . import ncbi_data_parser
@@ -175,11 +177,18 @@ class ConfigObj(object):
 
         ####
         # check database status
-        print('Status for interactive is {}'.format(interactive))
+        # print('Status for interactive is {}'.format(interactive))
         if interactive is None:
             interactive = sys.stdin.isatty()
-            if interactive is False:
-                sys.stdout.write("REMEMBER TO UPDATE THE NCBI DATABASES REGULARLY!!\n")
+        if interactive is False:
+            sys.stdout.write("REMEMBER TO UPDATE THE NCBI DATABASES REGULARLY! ")
+            download_date = os.path.getmtime("{}/nt_v5.60.nhr".format(self.blastdb))
+            download_date = datetime.datetime.fromtimestamp(download_date)
+            today = datetime.datetime.now()
+            time_passed = (today - download_date).days
+            sys.stdout.write("Looks like you last updated it {} days ago.\n".format(time_passed))
+            sys.stdout.write("Run the file 'update_databases.py' from the data folder to automatically update. "
+                             "Note, that you are accessing a US government website to do so.\n")
         if interactive is True:
             db_updater._download_localblastdb(self)
             db_updater._download_ncbi_parser(self)

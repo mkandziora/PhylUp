@@ -65,15 +65,15 @@ class AlnUpdater(object):
                                                                   self.config.workdir, self.config.modeltest_criteria)
             self.tre = Tree.get(path=os.path.join(self.config.workdir, self.tre_fn),
                                 schema="newick",
-                                preserve_underscores=True,
-                                taxon_namespace=self.aln.taxon_namespace)
+                                preserve_underscores=True)
             phylogenetic_helpers.write_papara_trefile(self.tre, self.config.workdir)
         else:
             phylogenetic_helpers.write_aln(self.aln, self.config.workdir)
             phylogenetic_helpers.write_tre(self.tre, self.config.workdir)
-        self.new_seq_table = self.table[self.table['status'] > 0]  # gets all new seqs (status>0)
+        self.new_seq_table = self.table[self.table['status'] >= 1]  # gets all new seqs (status>0.5)
         self.newseqs_file = "new_seqs.fasta"
         self.update_data()
+
 
     def update_data(self):
         """
@@ -84,23 +84,20 @@ class AlnUpdater(object):
         print('update data')
         print(len(self.new_seq_table))
         if len(self.new_seq_table) > 0:
+            self.delete_short_seqs()
             self.write_papara_queryseqs()
-            self.align_query_seqs()
+            self.add_query_seqs_to_aln()
             phylogenetic_helpers.write_aln(self.aln, self.config.workdir)
             phylogenetic_helpers.write_tre(self.tre, self.config.workdir)
-            self.prune_short()
-            phylogenetic_helpers.write_aln(self.aln, self.config.workdir)
-            phylogenetic_helpers.write_tre(self.tre, self.config.workdir)
-            self.aln = self.trim(os.path.abspath(os.path.join(self.config.workdir, 'papara_alignment.extended')),
-                                 format_aln='phylip')
-            phylogenetic_helpers.write_aln(self.aln, self.config.workdir)
-            phylogenetic_helpers.write_tre(self.tre, self.config.workdir)
+            # self.aln = self.trim(os.path.abspath(os.path.join(self.config.workdir, 'papara_alignment.phylip')),
+            #                      format_aln='phylip')
+            # phylogenetic_helpers.write_aln(self.aln, self.config.workdir)
+            # phylogenetic_helpers.write_tre(self.tre, self.config.workdir)
         self.write_labelled('updt_aln.fasta')
 
-    def align_query_seqs(self, papara_runname="extended"):
+    def add_query_seqs_to_aln(self):
         """Runs papara to add new sequences to the alignment.
 
-        :param papara_runname:
         :return: writes new extended alignment
         """
         sys.stdout.write("aligning query sequences \n")
@@ -109,45 +106,34 @@ class AlnUpdater(object):
         phylogenetic_helpers.write_papara_alnfile(self.aln, self.config.workdir)
         if self.tre is not None:
             phylogenetic_helpers.write_papara_trefile(self.tre, self.config.workdir)
-            assert self.aln.taxon_namespace == self.tre.taxon_namespace
         with cd(self.config.workdir):
-            self.call_papara(papara_runname)
-            path = os.path.join(os.getcwd(), "papara_alignment.{}".format(papara_runname))
+            self.run_papara()
+            path = os.path.join(os.getcwd(), "papara_alignment.phylip".format())
             assert os.path.exists(path), "{} does not exists".format(path)
-        self.aln = self.trim()
+        aln_old = self.aln
+        self.aln = DnaCharacterMatrix.get(path=os.path.join(self.config.workdir, "papara_alignment.phylip"),
+                                          schema='phylip')
+        self.aln = self.trim(os.path.join(self.config.workdir, 'papara_alignment.phylip'), 'phylip')
+        with cd(self.config.workdir):
+            phylogenetic_helpers.truncate_papara_aln(aln_old)
         msg = "Following papara alignment, aln has {} seqs \n".format(len(self.aln))
         write_msg_logfile(msg, self.config.workdir)
 
-    def call_papara(self, papara_runname="extended"):
+    def run_papara(self):
         """
-        Calls external papara and returns error is program is not installed properly.
+        Runs papara and adds new sequences to the alignment.
 
-        :param papara_runname:  possible file extension name for papara
         :return:
         """
-        try:
-            with suppress_stdout():
-                subprocess.check_call(["papara_static_x86_64",
-                                       "-t", "random_resolve.tre",
-                                       "-s", "aln_papara.phy",
-                                       #  "-j", "{}".format(self.config.num_threads),  # FIXME: only works when papara is compiled.
-                                       "-q", self.newseqs_file,
-                                       "-n", papara_runname])
-        except subprocess.CalledProcessError as grepexc:
-            print("error code", grepexc.returncode, grepexc.output)
-        except OSError as e:
-            if e.errno == os.errno.ENOENT:
-                sys.stderr.write("Failed running papara. Is it installed?\n")
-                sys.exit(-5)
-            else:
-                # Something else went wrong while trying to run ...
-                raise
+        with suppress_stdout():
+            subprocess.check_call(["papara_static_x86_64", "-t", "papara_tre.tre", "-s", "aln_papara.phy",
+                                   #  "-j", "{}".format(self.config.num_threads),  # FIXME: only works when papara is compiled.
+                                   "-q", self.newseqs_file, "-n", 'phylip'])
 
-    # todo?: move to papara_helper_class (next 3 methods)
     def write_papara_queryseqs(self):
         """Writes out the query sequence file which is needed by papara.
 
-        Is only used within func align_query_seqs.
+        Is only used within func add_query_seqs_to_aln.
         """
         print("write query seq")
         fi = open(os.path.join(self.config.workdir, self.newseqs_file), "w")
@@ -158,40 +144,44 @@ class AlnUpdater(object):
             seq = self.new_seq_table.loc[idx]['sseq']
             fi.write("{}\n".format(seq))
 
-    def prune_short(self):
-        """Prunes sequences from alignment if they are shorter than specified in the config file.
+    def delete_short_seqs(self):
+        """Delete sequences from alignment if they are shorter than specified in the config file.
 
-        :return: prunes aln and tre
+        :return: pruned aln and tre
         """
-        orig_seqlen = [len(self.aln[tax].symbols_as_string().replace("-", "").replace("N", "")) for tax in self.aln]
+        orig_seqlen = [len(self.aln[tax].symbols_as_string().replace("-", "").replace("?", "")) for tax in self.aln]
         avg_seqlen = sum(orig_seqlen) / len(orig_seqlen)
         seq_len_cutoff = avg_seqlen * self.config.minlen
-        prune = []
+        delete_seqs = []
         aln_ids = set()
         for tax, seq in self.aln.items():
             aln_ids.add(tax.label)
-            table = str.maketrans(dict.fromkeys('-?'))
-            if len(seq.symbols_as_string().translate(table)) <= seq_len_cutoff:
-                prune.append(tax)
-        if prune:
-            msg = "Taxa pruned from tree and alignment in prune short " \
-                  "step due to sequence shorter than {}:\n".format(seq_len_cutoff)
+            # table = str.maketrans(dict.fromkeys('-?'))
+            # if len(seq.symbols_as_string().translate(table)) <= seq_len_cutoff:
+            if len(seq.symbols_as_string().replace("-", "").replace("?", "")) <= seq_len_cutoff:
+                delete_seqs.append(tax)
+        if delete_seqs:
+            msg = "Taxa deleted from tree and alignment in delete short sequences" \
+                  "as sequences are shorter than %.0f:\n" % seq_len_cutoff
             write_msg_logfile(msg, self.config.workdir)
-            for tax in prune:
+            for tax in delete_seqs:
                 self.remove_taxa_aln_tre(tax.label)
                 msg = '{}, '.format(tax.label)
                 write_msg_logfile(msg, self.config.workdir)
+                self.table.at[self.table['accession'] == tax.label, "status"] = -1
+                self.table.at[self.table['accession'] == tax.label, "status_note"] = "deleted - too short"
             msg = '\n'
             write_msg_logfile(msg, self.config.workdir)
-        for tax in prune:
-            self.table.loc[self.table['accession'] == tax.label, "status"] = -1
-            self.table.loc[self.table['accession'] == tax.label, "status_note"] = "deleted in prune short"
+        self.aln.write(path=os.path.join(self.config.workdir, 'updt_aln.fasta'), schema='fasta')
+        self.tre.write(path=os.path.join(self.config.workdir, 'updt_tre.tre'), schema='newick',
+                       unquoted_underscores=True, suppress_rooting=True)
+        self.table.to_csv(os.path.join(self.config.workdir, 'table.updated'), index=False)
 
     def remove_taxa_aln_tre(self, taxon_label):
-        """Removes taxa from aln and tre, takes a single taxon_label as input.
+        """Removes taxon from aln and tre, takes a single taxon_label as input.
 
         :param taxon_label: taxon_label from dendropy object - aln or phy
-        :return: removes data for taxon_label
+        :return:
         """
         tax = self.aln.taxon_namespace.get_taxon(taxon_label)
         tax2 = self.tre.taxon_namespace.get_taxon(taxon_label)
@@ -203,57 +193,41 @@ class AlnUpdater(object):
         self.tre.prune_taxa([tax2])
         self.tre.prune_taxa_with_labels([taxon_label])
         self.tre.prune_taxa_with_labels([tax2])
-        self.table[tax.label, 'status'] = -1
-        self.table[tax.label, 'status_note'] = "deleted, input conflict"
 
     def trim(self, aln_fn=False, format_aln=None):
-        """ It removes bases at the start and end of alignments, if they are represented by less than the value
-        specified in the config file (trim_perc). E.g. 0.75 given in config.
-
-        Means, that 75% of the sequences need to have a base present. This ensures, that not whole chromosomes
-        get dragged in by cutting the ends of long sequences.
         """
-        # print('in trim')
-        print(aln_fn, format_aln)
+        Removes bases at the start and end of alignment, if they are represented by less than the value
+        specified in the config file (trim_perc).
+
+        Means, that trim_perc (e.g. 0.75 = 75%) of the sequences need to have a base present.
+        This ensures, that not whole chromosomes get dragged in by cutting the ends of long sequences.
+        """
         if aln_fn:
             aln = DnaCharacterMatrix.get(path=aln_fn, schema=format_aln)
         else:
             aln = self.aln
+        if aln_fn:
+            aln_fn_trim = '{}_untrimmed'.format(aln_fn)
+            aln.write(path="{}".format(aln_fn_trim), schema=format_aln)
+        aln.write(path=os.path.join(self.config.workdir, 'updt_aln_untrimmed.fasta'), schema='fasta')
         seqlen = phylogenetic_helpers.check_align(aln)
         start = 0
         stop = seqlen
         cutoff = len(aln) * self.config.trim_perc
-        for i in range(seqlen):
-            counts = {"?": 0, "-": 0}
-            for tax in aln:
-                call = aln[tax][i].label
-                if call in ["?", "-"]:
-                    counts[call] += 1
-            if counts['?'] + counts['-'] <= cutoff:
-                start = i
-                break
-        for i in range(seqlen, 0, -1):
-            counts = {'?': 0, '-': 0}
-            for tax in aln:
-                call = aln[tax][i - 1].label
-                if call in ['?', '-']:
-                    counts[call] += 1
-            if counts['?'] + counts['-'] <= cutoff:
-                stop = i
-                break
+        range_start = range(seqlen)
+        start = get_base_position(aln, cutoff, range_start, start)
+        range_end = range(seqlen - 1, 0, -1)
+        stop = get_base_position(aln, cutoff, range_end, stop)
         # shorten aln to start:stop
         for taxon in aln:
             aln[taxon] = aln[taxon][start:stop]
-        msg = "Trimmed beginning and end of alignment to > {}. " \
-              "Start: {}, stop: {}.\n".format(self.config.trim_perc, start, stop)
+        msg = "Original aln was trimmed from 1-{} to {}-{}.\n".format(seqlen, start, stop)
         write_msg_logfile(msg, self.config.workdir)
 
-        if not aln_fn:
-            aln_fn = os.path.abspath(os.path.join(self.config.workdir, 'updt_aln.fasta'))
-        else:
-            aln_fn = '{}_trim'.format(aln_fn)
-            aln.write(path=os.path.join(self.config.workdir, 'updt_aln.fasta'), schema='fasta')
-        aln.write(path="{}".format(aln_fn), schema='fasta')
+        if aln_fn:
+            aln_fn_trim = '{}_trim'.format(aln_fn)
+            aln.write(path="{}".format(aln_fn_trim), schema=format_aln)
+        aln.write(path=os.path.join(self.config.workdir, 'updt_aln.fasta'), schema='fasta')
         return aln
 
     def write_labelled(self, alnpath):
@@ -262,11 +236,33 @@ class AlnUpdater(object):
         :param alnpath:  optional: full file name (including path) for alignment
         :return: writes out labelled phylogeny and alignment to file
         """
-        print("write labelled files")
-        phylogenetic_helpers.replace_uid_with_name(os.path.join(self.config.workdir, alnpath), self.table)
+        # print("write labelled aln")
+        phylogenetic_helpers.replace_uid_with_name(os.path.join(self.config.workdir, alnpath), self.table, 'aln')
 
 
-class PhyUpdater(object):
+def get_base_position(aln, cutoff, range_val, baseposition):
+    """
+    Find baseposition in aln where sufficient data is available.
+
+    :param aln: alignment as dendropy object
+    :param cutoff: min value that needs to be present in aln
+    :param range_val: range to test for - different for start and stop
+    :param baseposition: position for cutting
+    :return: baseposition
+    """
+    for i in range_val:
+        counts = 0
+        for tax in aln:
+            base = aln[tax][i].label
+            if base in ['?', '-']:
+                counts += 1
+        if counts <= cutoff:
+            baseposition = i
+            break
+    return baseposition
+
+
+class TreeUpdater(object):
     """
     This updates the phylogeny with the new alignment before running.
     """
@@ -281,22 +277,27 @@ class PhyUpdater(object):
         self.table = table
         self.tre = tre
         if self.tre is None:  # generate random tree, e.g. from modeltest
-            self.tre = "updt_aln.fasta.tree"
+            self.tre = Tree.get(path=os.path.join(self.config.workdir, "updt_aln.fasta.tree"), schema="newick",
+                                preserve_underscores=True, taxon_namespace=self.aln.taxon_namespace)
+
         self.config = config
         self.update_phyl()
 
     def update_phyl(self):
+        """
+        Main function of the class. Does the updating of the phylogeny.
+        :return:
+        """
+        print("update phylogeny")
         self.place_query_seqs_epa()
         self.check_tre_in_aln()
         self.calculate_final_tree()  # comment out for development speed up
         if self.config.update_tree is True:
-            self.tre = Tree.get(path=os.path.join(self.config.workdir, "fulltree.raxml.bestTree"),
-                                schema="newick",
-                                preserve_underscores=True,
-                                taxon_namespace=self.aln.taxon_namespace)
-            fn = os.path.join(self.config.workdir, 'papara_alignment.extended')
-            self.aln = DnaCharacterMatrix.get(path=fn, schema="phylip")
-            self.aln.write(path=os.path.join(self.config.workdir, "updt_aln.fasta"), schema='fasta')
+            # self.tre = Tree.get(path=os.path.join(self.config.workdir, "fulltree.raxml.bestTree"),
+            #                     schema="newick", preserve_underscores=True, taxon_namespace=self.aln.taxon_namespace)
+            # fn = os.path.join(self.config.workdir, 'papara_alignment.phylip_trim', taxon_namespace=self.tre.taxon_namespace)
+            # self.aln = DnaCharacterMatrix.get(path=fn, schema="phylip")
+            # self.aln.write(path=os.path.join(self.config.workdir, "updt_aln.fasta"), schema='fasta')
             shutil.copy(os.path.join(self.config.workdir, "fulltree.raxml.bestTree"),
                         os.path.join(self.config.workdir, "updt_tre.tre"))
             sys.stdout.write('Updating of aln and tre done.\n')
@@ -311,8 +312,10 @@ class PhyUpdater(object):
         treed_taxa = set(leaf.taxon.label for leaf in self.tre.leaf_nodes())
         treed_tax_not_in_aln = [tax for tax in treed_taxa if tax not in aln_ids]
         self.tre.prune_taxa(treed_tax_not_in_aln)
-        assert treed_taxa.issubset(aln_ids), (treed_taxa, aln_ids)
-        assert aln_ids.issubset(treed_taxa), (treed_taxa, aln_ids)
+        aln_ids = set(taxon.label for taxon in self.aln)
+        treed_taxa = set(leaf.taxon.label for leaf in self.tre.leaf_nodes())
+        assert treed_taxa.issubset(aln_ids), (len(treed_taxa), len(aln_ids))
+        # assert aln_ids.issubset(treed_taxa),  (len(treed_taxa), len(aln_ids))
 
     def place_query_seqs_epa(self):
         """ Runs epa-ng on the tree, and the combined alignment including the new query seqs.
@@ -329,23 +332,26 @@ class PhyUpdater(object):
 
         with cd(self.config.workdir):
             # get model for epa-ng
-            phylogenetic_helpers.truncate_papara_aln(self.aln)
             with suppress_stdout():
-                subprocess.call(["epa-ng", "--ref-msa", "old_seqs.fasta", "--tree", "random_resolve.tre",
-                                 "--query",  "new_seqs.fasta", "--outdir", "./", "--model", 'GTR+G',
-                                 '--redo'])
+                subprocess.call(["epa-ng", "--ref-msa", "old_seqs.fasta", "--tree", "papara_tre.tre",
+                                 "--query",  "new_seqs.fasta", "--outdir", "./", "--model", 'GTR+G', '--redo'])
                 # make newick tre
-                subprocess.call(["gappa", "examine", "graft",
-                                 "--jplace-path", "epa_result.jplace",
+                subprocess.call(["gappa", "examine", "graft", "--jplace-path", "epa_result.jplace",
                                  "--allow-file-overwriting"])
-            placetre = Tree.get(path="epa_result.newick", schema="newick")
-            placetre.write(path="place_resolve.tre", schema="newick", unquoted_underscores=True, suppress_rooting=True)
+            self.tre = Tree.get(path="epa_result.newick", schema="newick", preserve_underscores=True)
+            #self.tre.write(path="place_resolve.tre", schema="newick", unquoted_underscores=True, suppress_rooting=True)
+            self.tre.write(path="updt_tre.tre", schema="newick", unquoted_underscores=True, suppress_rooting=True)
             # phylogenetic_helpers.evaluate_raxmlng_alignment()
 
-    def est_full_tree_ng(self, aln_fn, best_subst_model, num_threads):
-        """Full raxml run from the placement tree as starting tree.
+    def update_tree(self, aln_fn, best_subst_model, num_threads):
+        """Estimate tree, using correct substitution model and a starting tree.
 
-        the backbone options allows to fix the skeleton of the starting tree and just newly estimates the other parts.
+        The backbone options allows to fix the skeleton of the starting tree and just newly estimates the other parts.
+
+        :param aln_fn: file name of input alignment
+        :param best_subst_model: substitution model
+        :param num_threads: number of threads
+        :return:
         """
         print("est full tree ng")
         with cd(self.config.workdir):
@@ -355,19 +361,13 @@ class PhyUpdater(object):
                              '--model', best_subst_model, '--prefix', 'check'])
             if self.config.update_tree is True:
                 if self.config.backbone is not True:
-                    print('tree')
-                    subprocess.call(["raxml-ng-mpi",
-                                     "--threads", "{}".format(num_threads),
-                                     "--msa", "{}".format(aln_fn),
-                                     # '--model', "GTR+G",
-                                     "--tree", "epa_result.newick",
-                                     "--seed", "{}".format(seed),
-                                     "--prefix", "fulltree"])
-                else:
+                    # print('tree')
                     subprocess.call(["raxml-ng-mpi", "--threads", "{}".format(num_threads),
-                                     "--msa {}".format(aln_fn),
-                                     "--constraint-tree", "backbone.tre",
-                                     "--seed", "{}".format(seed),
+                                     "--msa", "{}".format(aln_fn), "--tree", "epa_result.newick",
+                                     "--seed", "{}".format(seed), "--prefix", "fulltree"])
+                else:
+                    subprocess.call(["raxml-ng-mpi", "--threads", "{}".format(num_threads), "--msa {}".format(aln_fn),
+                                     "--constraint-tree", "backbone.tre", "--seed", "{}".format(seed),
                                      "--prefix", "fulltree"])
             else:
                 todo = 'To update the data run the following command in your working directory.'
@@ -438,17 +438,13 @@ class PhyUpdater(object):
         :return: final data
         """
         print("calculate final tree")
-        if self.config.backbone is True:
-            aln_fn = 'papara_alignment.extended'
-        else:
-            aln_fn = 'updt_aln.fasta'
+        aln_fn = 'updt_aln.fasta'
 
         best_subst_model = phylogenetic_helpers.run_modeltest(aln_fn, self.config.workdir, self.config.modeltest_criteria)
-        num_threads = phylogenetic_helpers.estimate_number_threads_raxml(self.config.workdir,
-                                                                         "updt_aln.fasta", best_subst_model)
+        num_threads = phylogenetic_helpers.estimate_number_threads_raxml(self.config.workdir, aln_fn, best_subst_model)
 
         if self.config.backbone is True:
-            self.est_full_tree_ng(aln_fn, best_subst_model, num_threads)
+            self.update_tree(aln_fn, best_subst_model, num_threads)
         else:
             self.calculate_bootstrap_ng(best_subst_model, num_threads, aln_fn)
 
@@ -458,12 +454,12 @@ class PhyUpdater(object):
         :param treepath: full file name (including path) for phylogeny
         :return: writes out labelled phylogeny and alignment to file
         """
-        print("write labelled files")
+        #print("write labelled files")
         if treepath is None:
             treepath = os.path.join(self.config.workdir, "fulltree.raxml.bestTree")
         else:
             treepath = os.path.join(self.config.workdir, treepath)
-        phylogenetic_helpers.replace_uid_with_name(treepath, self.table)
+        phylogenetic_helpers.replace_uid_with_name(treepath, self.table, 'tree')
 
 
 class InputCleaner(object):
@@ -484,11 +480,13 @@ class InputCleaner(object):
 
         self.table = table
         self.aln = self.write_clean_aln(aln_fn)
+        assert type(self.aln) == DnaCharacterMatrix
+
         if tre_fn is not None:
             self.tre = self.write_clean_tre(tre_fn)
             if self.config.different_level is False:
-                self._reconcile()  # turned of for different level, as tre is not updated between runs, aln is.
-        self._reconcile_names()
+                self.delete_missing()  # turned of for different level, as tre is not updated between runs, aln is.
+        self.clean_inputname()
 
     def format_mrca_set(self, mrca):
         """
@@ -522,19 +520,17 @@ class InputCleaner(object):
         assert type(mrca) in {list, set, int}, ("your ingroup_mrca '%s' is not an integer/list/set." % mrca)
         return mrca
 
-    def _reconcile(self):
-        """Taxa that are only found in the tree, or only in the alignment are deleted.
+    def delete_missing(self):
+        """ Remove taxa if only present in tree or aln.
         """
-        assert type(self.aln) == DnaCharacterMatrix
-
-        print("Reconcile taxa between input data")
+        print("Delete missing")
         treed_taxa = set(leaf.taxon for leaf in self.tre.leaf_nodes())
         aln_tax = set(taxon for taxon in self.aln)
-        prune = treed_taxa ^ aln_tax
+        delete_tax = treed_taxa ^ aln_tax
 
         del_aln = []
         del_tre = []
-        for taxon in prune:
+        for taxon in delete_tax:
             assert (taxon in aln_tax) or (taxon in treed_taxa)
             if taxon in aln_tax:
                 del_aln.append(taxon)
@@ -545,33 +541,34 @@ class InputCleaner(object):
 
         # remove associated taxa from namespace
         if del_aln != []:
-            print('Remove data from aln.')
             for item in del_aln:
                 self.aln.taxon_namespace.remove_taxon_label(item.label)  # can only be removed one by one
                 msg = '{} is only in the alignment, not in the tree and will be deleted.\n'.format(item.label)
                 write_msg_logfile(msg, self.config.workdir)
         if del_tre != []:
-            print('Remove data from tre.')
             for item in del_tre:
                 self.tre.taxon_namespace.remove_taxon_label(item.label)  # can only be removed one by one
                 msg = '{} is only in the tree, not in the alignment and will be deleted.\n'.format(item.label)
                 write_msg_logfile(msg, self.config.workdir)
-        prune_list = list(prune)
-        if len(prune) > 0:
-            true_false = np.where((self.table.accession.isin(prune_list)), True, False)
-            self.table.loc[true_false, 'status'] = -1
-            self.table.loc[true_false, 'status_note'] = "deleted in reconciliation"
+        if len(delete_tax) > 0:
+            true_false = np.where((self.table.accession.isin(list(delete_tax))), True, False)
+            self.table.at[true_false, 'status'] = -1
+            self.table.at[true_false, 'status_note'] = "deleted, was missing in aln or tre"
         assert self.aln.taxon_namespace == self.tre.taxon_namespace
 
-    def _reconcile_names(self):
-        """It rewrites some tip names, which kept being an issue when it starts with a number at the beginning.
-        Then somehow a n was added to the tip names. Only used for own input data
+    def clean_inputname(self):
+        """It rewrites tip names if they start with a number at the beginning of the name.
+        Python adds an 'n' to the name.
 
         :return: replaced tip names
         """
         tipnames = self.table['accession'].tolist()
+        splitnames = []
+        for item in tipnames:
+            splititem = item.split('.')[0]
+            splitnames.append(splititem)
         for tax in self.aln.taxon_namespace:
-            if tax.label in tipnames:
+            if tax.label in splitnames:
                 pass
             else:
                 found_label = 0
@@ -581,17 +578,17 @@ class InputCleaner(object):
                     newname = tax.label[2:]
                     newname = newname[:-1]
                 for idx in self.table.index:
-                    original = self.table.loc[idx, "accession"]
+                    original = self.table.loc[idx, "accession"].split('.')[0]
+                    # print(original, tax.label, newname)
                     if original == tax.label or original == newname:
-                        tax.label = self.table.loc[idx, "accession"]
+                        #tax.label = self.table.loc[idx, "accession"].split('.')[0]
                         found_label = 1
                 if found_label == 0:
-                    sys.stderr.write("could not match tip label {} or {} to "
-                                     "any ncbi taxon name\n".format(tax.label, newname))
+                    sys.stderr.write("could not match tip label {} any ncbi taxon name\n".format(tax.label))
 
     def write_clean_aln(self, aln_fn):
         """
-        Write out original and cleaned alignemnt (? converted to -, no whitespaces)
+        Write out original and cleaned alignemnt (? converted to -, no whitespaces).
 
         :param aln_fn: filename of alignment
         :return:
@@ -608,12 +605,12 @@ class InputCleaner(object):
         with open(upd_aln_fn, "w") as aln_file:
             aln_file.write(filedata)
         # use replaced aln as input
-        aln = DnaCharacterMatrix.get(path=upd_aln_fn, schema='fasta')  # , taxon_namespace=self.tre.taxon_namespace)
+        aln = DnaCharacterMatrix.get(path=upd_aln_fn, schema='fasta')
         return aln
 
     def write_clean_tre(self, tre_fn):
         """
-        Write out original and cleaned tre (no whitespaces)
+        Write out original and cleaned tre (no whitespaces).
 
         :param tre_fn: tree file name
         :return:
@@ -629,7 +626,7 @@ class InputCleaner(object):
             upd_tre_fn = os.path.join(self.config.workdir, "updt_tre.tre")
             with open(upd_tre_fn, "w") as tre_file:
                 tre_file.write(filedata)
-            # use replaced aln as input
+            # use replaced tre as input
             tre = Tree.get(path=upd_tre_fn, schema='newick', taxon_namespace=self.aln.taxon_namespace,
                            preserve_underscores=True)
             return tre
