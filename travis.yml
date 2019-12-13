@@ -6,18 +6,136 @@ python:
 before_install:
   - sudo apt-get update
 
-  ### install blast+
-  # this fails often with connection errors
-  - sudo apt-get install ncbi-blast+
-  - sudo apt-get install muscle
+  ### install blast+ version 2.9.
+  - wget ftp://ftp.ncbi.nlm.nih.gov/blast/executables/LATEST/ncbi-blast-2.9.0+-x64-linux.tar.gz
+  - tar -xvf ncbi-blast-2.9.0+-x64-linux.tar.gz
+
+    #install papara
+  - mkdir PaPaRa
+  - cd PaPaRa
+  - wget https://sco.h-its.org/exelixis/resource/download/software/papara_nt-2.5-static_x86_64.tar.gz
+  - gunzip  -cd papara_nt-2.5-static_x86_64.tar.gz | (tar xvf - )
+    #mv papara_static_x86_64 papara
+  - echo export PATH="$PATH:$(pwd)" >> ~/.bashrc
+  - cd ..
+
+    # install EPA-NG
+  - mkdir EPA-ng
+  - cd EPA-ng
+  - wget https://github.com/Pbdas/epa-ng/archive/master.zip
+  - unzip master.zip
+  - sudo apt-get install autotools-dev libtool flex bison cmake automake autoconf
+  - cd epa-ng-master/
+  - make
+  - cd bin
+  - echo export PATH="$PATH:$(pwd)" >> ~/.bashrc
+  - cd ..
+  - cd ..
+  - cd ..
+
+    # install gappa (for EPA)
+  - mkdir gappa
+  - cd gappa
+  - wget https://github.com/lczech/gappa/archive/master.zip
+  - unzip master.zip
+  - cd gappa-master
+  - make
+  - cd ..
+  - cd ..
+
+    # raxml-ng
+  - mkdir RAxML-ng
+  - cd RAxML-ng
+  -  wget https://github.com/amkozlov/raxml-ng/releases/download/0.9.0/raxml-ng_v0.9.0_linux_x86_64_MPI.zip
+  - unzip raxml-ng_v0.9.0_linux_x86_64_MPI.zip
+  - sudo apt-get install flex bison libgmp3-dev
+
+  - mkdir build && cd build
+  - cmake -DUSE_MPI=ON ..
+  - make
+  - cd ..
+
+  - rm -r build
+  - mkdir build && cd build
+  - cmake ..
+  - make
+  - cd ..
+  - cd bin
+  - echo export PATH="$PATH:$(pwd)" >> ~/.bashrc
+  - cd ..
+  - cd ..
+
+    # install modeltest-ng
+  - mkdir modeltest-ng
+  - cd modeltest-ng
+  - wget https://github.com/ddarriba/modeltest/files/3790686/modeltest-ng-0.1.6.tar.gz
+  - tar -xvf modeltest-ng-0.1.6.tar.gz
+  - cd modeltest-ng-0.1.6/
+  - sudo apt-get install qt5-default
+  - ./build.sh
+
+
+install:
+  # install requirements of physcraper
+  - pip install --quiet -r requirements.txt
+  - pip install --quiet .
+
+
+
+
+# command to run tests
+script:
+  - wget 'https://ftp.ncbi.nlm.nih.gov/pub/taxonomy/taxdump.tar.gz'
+  - gunzip  -cd taxdump.tar.gz | (tar xvf - names.dmp nodes.dmp)
+  - mv *.dmp taxonomy/
+  - pytest tests/test_*
+
+after_success:
+  - curl -s https://codecov.io/bash | bash
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
   #### install papara
   - wget 'https://sco.h-its.org/exelixis/resource/download/software/papara_nt-2.5-static_x86_64.tar.gz'
   - gunzip  -cd papara_nt-2.5-static_x86_64.tar.gz | (tar xvf - )
-  - mv papara_static_x86_64 papara
+  #- mv papara_static_x86_64 papara
   - export PATH="$PATH:$(pwd)"
-  - papara
+  #- papara
 
   ##### to use RAXML we need conda
   - wget http://repo.continuum.io/miniconda/Miniconda-latest-Linux-x86_64.sh -O miniconda.sh
