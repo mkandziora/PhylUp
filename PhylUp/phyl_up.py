@@ -1,26 +1,14 @@
 """
-PhylUp: automatically update alignments and phylogenies.
+PhylUp: automatically update alignments.
 Copyright (C) 2019  Martha Kandziora
 martha.kandziora@yahoo.com
 
-Package to automatically update alignments and phylogenies using local and Genbank datasets
+All rights reserved. No warranty, explicit or implicit, provided. No distribution or modification of code allowed.
+All classes and methods will be distributed under an open license in the near future.
 
-Parts of the code are inspired by the program physcraper developed by me and Emily Jane McTavish.
+Package to automatically update alignments and phylogenies using local sequences or a local Genbank database.
 
-All classes and methods are distributed under the following license.
-
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
-
-You should have received a copy of the GNU General Public License
-along with this program.  If not, see <https://www.gnu.org/licenses/>.
+Parts are inspired by the program physcraper developed by me and Emily Jane McTavish.
 """
 
 import sys
@@ -30,7 +18,7 @@ import pandas as pd
 import numpy as np
 import os
 from dendropy import Tree, DnaCharacterMatrix
-
+# from copy import deepcopy
 import ncbiTAXONparser.ncbi_data_parser as ncbi_data_parser
 
 from . import blast
@@ -38,8 +26,9 @@ from . import phylogen_updater
 from . import write_msg_logfile
 from . import phylogenetic_helpers
 
+#import line_profiler
+
 # TODO: write tests
-# todo: write files to tmp...
 # todo: write files to tmp... - i did - but then we cannot reuse them in different_level
 #todo move some output to tmp folder and delete that
 
@@ -129,6 +118,8 @@ class PhylogeneticUpdater:
             query_seq = self.table.loc[index, 'sseq']
             # Note: should be empty in later rounds...that is why it does not matter that new_seq_tax is reassigned
             new_seq_tax = blast.get_new_seqs(query_seq, tip_name, self.config.blastdb, "unpublished", self.config)
+            print(new_seq_tax)
+            # new_seqs_unpubl = new_seqs_unpubl.append(new_seq_tax, ignore_index=True)
             new_seqs_unpubl = pd.concat([new_seqs_unpubl, new_seq_tax], ignore_index=True, sort=True)
         new_seqs_unpubl = new_seqs_unpubl.drop(['accession;gi', 'ncbi_txid', 'ncbi_txn'], axis=1)
         new_seqs_unpubl = pd.merge(new_seqs_unpubl, name_txid_unpublished, on=['accession'], sort=True)
@@ -727,10 +718,8 @@ class FilterSeqIdent(Filter):
     def filter(self, new_seqs):
         assert_new_seqs_table(new_seqs, self.table, self.status)
         print("filter FilterSeqIdent rm duplicate")
-        before = len(new_seqs)
+        #self.upd_new_seqs = deepcopy(new_seqs)
         self.upd_new_seqs = new_seqs
-
-        #self.upd_new_seqs = self.upd_new_seqs.drop_duplicates(['ncbi_txid', 'sseq'], keep='first')
 
         # drop all sequences that are identical (seq and ncbi_txid) from new_seqs
         dupl_df = self.upd_new_seqs[self.upd_new_seqs.duplicated(['ncbi_txid', 'sseq'], keep='first')]

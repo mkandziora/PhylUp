@@ -1,26 +1,14 @@
 """
-PhylUp: automatically update alignments and phylogenies.
+PhylUp: automatically update alignments.
 Copyright (C) 2019  Martha Kandziora
 martha.kandziora@yahoo.com
 
-Package to automatically update alignments and phylogenies using local and Genbank datasets
+All rights reserved. No warranty, explicit or implicit, provided. No distribution or modification of code allowed.
+All classes and methods will be distributed under an open license in the near future.
+
+Package to automatically update alignments and phylogenies using local sequences or a  local Genbank database.
 
 Parts are inspired by the program physcraper developed by me and Emily Jane McTavish.
-
-All classes and methods are distributed under the following license.
-
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
-
-You should have received a copy of the GNU General Public License
-along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 
 # sequence and id retrieval methods
@@ -37,7 +25,7 @@ from Bio.Alphabet import generic_dna
 import ncbiTAXONparser.ncbi_data_parser as ncbi_data_parser  # is the ncbi data parser class and associated functions
 from . import cd
 from . import suppress_stdout
-
+# import line_profiler
 
 """
 blastdbcmd outfmt options:
