@@ -2,7 +2,7 @@ dist: trusty
 sudo: required
 language: python
 python:
-  - "3.5"
+  - "3.6"
 compiler:
   - gcc
 addons:
@@ -15,6 +15,8 @@ addons:
       - cmake
 
 before_install:
+  - sudo apt-get update
+
   # Link gcc-6 and g++-6 to their standard commands
   - sudo ln -s /usr/bin/gcc-7 /usr/local/bin/gcc
   - sudo ln -s /usr/bin/g++-7 /usr/local/bin/g++
@@ -27,7 +29,7 @@ before_install:
 
 
 
-  - sudo apt-get update
+
 
 
 
