@@ -1,3 +1,4 @@
+import os
 import pandas as pd
 from PhylUp import phyl_up, config, phylogenetic_helpers
 

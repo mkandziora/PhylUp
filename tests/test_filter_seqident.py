@@ -1,3 +1,4 @@
+import os
 from PhylUp import phyl_up, config, phylogen_updater
 import pandas as pd
 
