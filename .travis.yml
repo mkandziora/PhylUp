@@ -132,10 +132,11 @@ before_install:
   - sudo apt-get install qt5-default
   - ./build.sh
   - cd ..
+  - cd ..
+
 
 install:
   # install requirements
-  - echo pwd
   - pip install --quiet -r requirements.txt
   - pip install --quiet .
 
