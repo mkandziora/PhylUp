@@ -119,8 +119,8 @@ class ConfigObj(object):
             self.blast_folder = os.path.abspath("./data/blast")
             if not os.path.exists(self.blast_folder):
                 os.mkdir(self.blast_folder)
-            sys.stdout.write("You are using the same blast folder across runs - be careful. Make sure it is the same locus"
-                             "and that you did not change your blast settings")
+            sys.stdout.write("You are using the same blast folder across runs - be careful. Make sure it is the same locus "
+                             "and that you did not change your blast settings.\n")
         else:
             self.fix_blast = False
             self.blast_folder = os.path.abspath(os.path.join(self.workdir, "blast"))

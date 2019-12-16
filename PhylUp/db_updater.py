@@ -49,7 +49,7 @@ def _download_localblastdb(config):
         today = datetime.datetime.now()
         time_passed = (today - download_date).days
         if time_passed >= 90:
-            print("""Your databases might not be up to date anymore. 
+            print("""Your blast databases might not be up to date anymore. 
                   You downloaded them {} days ago. Do you want to update the blast databases from ncbi? 
                   Note: This is a US government website! You agree to their terms.\n""".format(time_passed))
             x = get_user_input()
@@ -91,7 +91,7 @@ def _download_ncbi_parser(config):
         download_date = datetime.datetime.fromtimestamp(download_date)
         today = datetime.datetime.now()
         time_passed = (today - download_date).days
-        print(time_passed)
+        # print(time_passed)
         if time_passed >= 90:
             print("Do you want to update taxonomy databases from ncbi? Note: This is a US government website! "
                   "You agree to their terms. \n")
