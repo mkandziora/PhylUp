@@ -12,5 +12,3 @@ os.system("gunzip -f -cd ./data/taxdump.tar.gz | (tar xvf - names.dmp nodes.dmp)
 os.system("mv nodes.dmp ./data/")
 os.system("mv names.dmp ./data/")
 os.system("rm ./data/taxdump.tar.gz")
-
-os.

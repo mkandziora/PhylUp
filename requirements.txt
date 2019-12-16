@@ -3,5 +3,5 @@ pandas
 DendroPy
 biopython
 pytest
--e git://github.com/blubbundbla/PhylUp_remote.git
+-e git://github.com/blubbundbla/phylogenetic_concatenation.git
 -e git://github.com/blubbundbla/ncbiTAXONparser.git
