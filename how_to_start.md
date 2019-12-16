@@ -107,6 +107,8 @@ run from within the PhylUp main folder:
        * taxonomy db: run `update_blastdb taxdb`
        * rank db: repeat the steps listed under 'install the taxonomic rank database'
    
+   
+   
 ### Set up a run
 
 #### **1. edit major settings in the config file**
@@ -253,4 +255,12 @@ Here is a short introduction to what they are:
 
 Will be added as soon it becomes clear what are common error messages.
 
-    
+### If you want to run some tests
+
+run:
+
+ `python3 ./tests/tests_setup.py`
+ 
+ `pytest tests/test_*`
+
+  

@@ -3,14 +3,5 @@ pandas
 DendroPy
 biopython
 pytest
-/home/blubb/sync-TP-T470s/ncbiTAXONparser
-/home/blubb/sync-TP-T470s/phylogenetic_concatenation
-
-# pytest-xdist
-# pytest-cov
-# argcomplete
-# argparse
-# configparser
-# coverage>=4.4
-# locket
-
+-e git://github.com/blubbundbla/PhylUp_remote.git
+-e git://github.com/blubbundbla/ncbiTAXONparser.git
