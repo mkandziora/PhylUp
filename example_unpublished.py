@@ -14,8 +14,8 @@ mrca = 18794  # ncbi taxon id for the clade of interest
 # update the data:
 conf = config.ConfigObj(configfi, workdir, interactive=False)
 conf.unpublished = True
-conf.unpubl_data = '/home/blubb/sync-TP-T470s/PANDAS_phyfilter_v1/test_Afroalpine/unpublished/cns_single_output.fs.fas'
-conf.unpubl_names = '/home/blubb/sync-TP-T470s/PANDAS_phyfilter_v1/test_Afroalpine/spn.csv'
+conf.unpubl_data = './data/unpublished_seqs/'
+conf.unpubl_names = './data/unpublished_names.csv'
 
 test = phyl_up.PhylogeneticUpdater(id_to_spn, seqaln, mattype, trfn, schema_trf, conf, mrca=mrca, blacklist=blacklist)
 test.run(status_end=1)

@@ -15,6 +15,7 @@ def test_add_unpublished():
     conf.unpublished = True
     conf.unpubl_data = 'data/unpublished_seqs/'
     conf.unpubl_names = 'data/unpublished_names.csv'
+    conf.blast_folder = os.path.abspath("./data/blast_for_tests")
 
     test = phyl_up.PhylogeneticUpdater(id_to_spn, seqaln, mattype, trfn, schema_trf, conf, mrca=18794)
 

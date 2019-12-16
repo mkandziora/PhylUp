@@ -14,6 +14,7 @@ def test_run_blast_query():
     configfi = "data/localblast.config"
 
     conf = config.ConfigObj(configfi, workdir, interactive=False)
+    conf.blast_folder = os.path.abspath("./data/blast_for_tests")
     test = phyl_up.PhylogeneticUpdater(id_to_spn, seqaln, mattype, trfn, schema_trf, conf, mrca=18794)
 
     # create list of indice of subset list

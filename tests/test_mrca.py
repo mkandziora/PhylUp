@@ -13,6 +13,7 @@ def test_mrca():
     configfi = "data/localblast.config"
 
     conf = config.ConfigObj(configfi, workdir, interactive=False)
+    conf.blast_folder = os.path.abspath("./data/blast_for_tests")
     test = phyl_up.PhylogeneticUpdater(id_to_spn, seqaln, mattype, trfn, schema_trf, conf, mrca=18794)
     print(test.mrca)
 
@@ -29,6 +30,7 @@ def test_mrca_list():
     configfi = "data/localblast.config"
 
     conf = config.ConfigObj(configfi, workdir, interactive=False)
+    conf.blast_folder = os.path.abspath("./data/blast_for_tests")
     ingroup_mrca = [18794, 422320, 422327, 422329, 422331]
     # ingroup_mrca = [senecio, culcitium, hasteola, iocenes, lasiocephalus]
     test = phyl_up.PhylogeneticUpdater(id_to_spn, seqaln, mattype, trfn, schema_trf, conf, mrca=ingroup_mrca)
@@ -45,7 +47,7 @@ def test_no_mrca():
     configfi = "data/localblast.config"
 
     conf = config.ConfigObj(configfi, workdir, interactive=False)
-
+    conf.blast_folder = os.path.abspath("./data/blast_for_tests")
     test = phyl_up.PhylogeneticUpdater(id_to_spn, seqaln, mattype, trfn, schema_trf, conf, mrca=None)
     print(test.mrca)
 
@@ -61,7 +63,7 @@ def test_mrca_outgroup():
     configfi = "data/localblast.config"
 
     conf = config.ConfigObj(configfi, workdir, interactive=False)
-
+    conf.blast_folder = os.path.abspath("./data/blast_for_tests")
     ingroup_mrca = [18794, 422320, 422327, 422329, 422331, 84584]
     # ingroup_mrca = [senecio, culcitium, hasteola, iocenes, lasiocephalus, ABROTANELLA]
     test = phyl_up.PhylogeneticUpdater(id_to_spn, seqaln, mattype, trfn, schema_trf, conf, mrca=ingroup_mrca)

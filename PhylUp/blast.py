@@ -430,15 +430,15 @@ def run_blast_query(query_seq, taxon, db_path, db_name, config, mrca=None):
     db_path = os.path.abspath(db_path)
     if db_name == "unpublished":  # Run a local blast search if the data is unpublished or for filtering.
         query_output_fn = os.path.join(config.workdir, "tmp/unpublished_query_result.txt")
-        input_fn = os.path.join(config.workdir, "blast/query_seq.fas")
+        input_fn = os.path.join(config.blast_folder, "./query_seq.fas")
         db = 'unpublished_seq_db'
     elif db_name == "filterrun":  # Run a local blast search if the data is unpublished or for filtering.
         query_output_fn = os.path.join(config.workdir, "tmp/{}.txt".format(taxon))
         input_fn = os.path.join(config.workdir, "tmp/{}_tobeblasted.fas".format(taxon))
         db = 'filter_seq_db'
     elif db_name == "Genbank":
-        query_output_fn = os.path.join(config.workdir, "blast/{}.txt".format(taxon))
-        input_fn = os.path.join(config.workdir, "blast/{}_tobeblasted.fas".format(taxon))
+        query_output_fn = os.path.join(config.blast_folder, "./{}.txt".format(taxon))
+        input_fn = os.path.join(config.blast_folder, "./{}_tobeblasted.fas".format(taxon))
     else:
         print('DOES THIS EVER HAPPEN?')
         print(db_name)
@@ -466,7 +466,7 @@ def run_blast_query(query_seq, taxon, db_path, db_name, config, mrca=None):
             # with suppress_stdout():
             if not os.path.isfile(query_output_fn):
                 os.system(blastcmd)
-                print(blastcmd)
+                # print(blastcmd)
             elif not os.stat(query_output_fn).st_size > 0:
                 os.system(blastcmd)
     else:
@@ -499,7 +499,7 @@ def read_blast_query_pandas(blast_fn, config, db_name):
     elif db_name == 'unpublished':
         query_output_fn = os.path.join(config.workdir, "tmp/unpublished_query_result.txt")
     else:
-        query_output_fn = os.path.join(config.workdir, "blast/{}.txt".format(blast_fn))
+        query_output_fn = os.path.join(config.blast_folder, "./{}.txt".format(blast_fn))
     query_output_fn = os.path.abspath(query_output_fn)
     colnames = ['accession;gi', 'ncbi_txid', 'ncbi_txn', 'pident', 'evalue', 'bitscore', 'sseq', 'title', 'accession']
     data = pd.read_csv(query_output_fn, names=colnames, sep="\t", header=None)

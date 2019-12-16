@@ -67,6 +67,7 @@ class ConfigObj(object):
 
         * **interactive**: T/F; checks if databases need to be updated
         * **self.logfile**: file location where some information during the run is logged
+        * **self.fix_blast**: T/F; use same blast folder across runs
 
         :param configfi: a configuration file in a specific format. The file needs to have a heading of the format:
                         [blast] and then somewhere below that heading as string, e.g. e_value_thresh = value
@@ -111,6 +112,18 @@ class ConfigObj(object):
         if os.environ.get('SLURM_JOB_CPUS_PER_NODE'):
             self.num_threads = int(os.environ.get('SLURM_JOB_CPUS_PER_NODE'))
         print(self.num_threads)
+
+        self.fix_blast = config["blast"]["fix_blast_result_folder"]
+        if self.fix_blast == "True" or self.fix_blast == "true":
+            self.fix_blast = True
+            self.blast_folder = os.path.abspath("./data/blast")
+            if not os.path.exists(self.blast_folder):
+                os.mkdir(self.blast_folder)
+            sys.stdout.write("You are using the same blast folder across runs - be careful. Make sure it is the same locus"
+                             "and that you did not change your blast settings")
+        else:
+            self.fix_blast = False
+            self.blast_folder = os.path.abspath(os.path.join(self.workdir, "blast"))
 
         # #############
         # read in phylup settings

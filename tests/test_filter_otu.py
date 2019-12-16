@@ -13,6 +13,7 @@ def test_filter_otu_no_rank():
 
     conf = config.ConfigObj(configfi, workdir, interactive=False)
     conf.threshold = 2
+    conf.blast_folder = os.path.abspath("./data/blast_for_tests")
 
     test = phyl_up.PhylogeneticUpdater(id_to_spn, seqaln, mattype, trfn, schema_trf, conf, mrca=18794)
 

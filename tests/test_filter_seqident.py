@@ -12,6 +12,7 @@ def test_oldseq_longer():
 
     conf = config.ConfigObj(configfi, workdir, interactive=False)
     conf.threshold = 2
+    conf.blast_folder = os.path.abspath("./data/blast_for_tests")
     test = phyl_up.PhylogeneticUpdater(id_to_spn, seqaln, mattype, trfn, schema_trf, conf, mrca=18794)
 
     new_seqs = test.extend()
@@ -110,6 +111,7 @@ def test_not_add_identical():
 
     conf = config.ConfigObj(configfi, workdir, interactive=False)
     conf.threshold = 2
+    conf.blast_folder = os.path.abspath("./data/blast_for_tests")
     test = phyl_up.PhylogeneticUpdater(id_to_spn, seqaln, mattype, trfn, schema_trf, conf, mrca=18794)
 
     new_seqs = test.extend()
@@ -204,6 +206,7 @@ def test_filter_compare():
 
     conf = config.ConfigObj(configfi, workdir, interactive=False)
     conf.threshold = 2
+    conf.blast_folder = os.path.abspath("./data/blast_for_tests")
     test = phyl_up.PhylogeneticUpdater(id_to_spn, seqaln, mattype, trfn, schema_trf, conf, mrca=18794)
 
     new_seqs = test.extend()
@@ -258,6 +261,7 @@ def test_filter_compare_shorter():
 
     conf = config.ConfigObj(configfi, workdir, interactive=False)
     conf.threshold = 2
+    conf.blast_folder = os.path.abspath("./data/blast_for_tests")
     test = phyl_up.PhylogeneticUpdater(id_to_spn, seqaln, mattype, trfn, schema_trf, conf, mrca=18794)
 
     new_seqs = test.extend()
@@ -313,6 +317,7 @@ def test_filter_seqident_newexist():
 
     conf = config.ConfigObj(configfi, workdir, interactive=False)
     conf.threshold = 2
+    conf.blast_folder = os.path.abspath("./data/blast_for_tests")
     test = phyl_up.PhylogeneticUpdater(id_to_spn, seqaln, mattype, trfn, schema_trf, conf, mrca=18794)
 
     new_seqs = test.extend()
@@ -385,6 +390,7 @@ def test_oldseq():
 
     conf = config.ConfigObj(configfi, workdir, interactive=False)
     conf.threshold = 2
+    conf.blast_folder = os.path.abspath("./data/blast_for_tests")
     test = phyl_up.PhylogeneticUpdater(id_to_spn, seqaln, mattype, trfn, schema_trf, conf, mrca=18794)
 
     new_seqs = test.extend()
@@ -459,6 +465,7 @@ def test_no_similar():
 
     conf = config.ConfigObj(configfi, workdir, interactive=False)
     conf.threshold = 2
+    conf.blast_folder = os.path.abspath("./data/blast_for_tests")
     test = phyl_up.PhylogeneticUpdater(id_to_spn, seqaln, mattype, trfn, schema_trf, conf, mrca=18794)
 
     new_seqs = test.extend()

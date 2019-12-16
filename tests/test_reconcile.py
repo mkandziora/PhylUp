@@ -15,6 +15,7 @@ def test_reconcile():
 
 
     conf = config.ConfigObj(configfi, workdir, interactive=False)
+    conf.blast_folder = os.path.abspath("./data/blast_for_tests")
     print('###################### RUN 1 ######################')
     test = phyl_up.PhylogeneticUpdater(id_to_spn, seqaln, mattype, trfn, schema_trf, conf, mrca=18794)
 
