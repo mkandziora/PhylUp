@@ -1,5 +1,5 @@
 import os
-from PhylUp import phyl_up, config, phylogen_updater
+from PhylUp import phyl_up, config
 import pandas as pd
 
 def test_oldseq_longer():
