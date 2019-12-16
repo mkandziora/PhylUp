@@ -4,6 +4,8 @@ from shutil import copyfile
 
 src = "./data/data_for_tests/updt_aln.fasta"
 dst = "./tests/output/test_runs/updt_aln.fasta"
+os.mkdir("./tests/output/")
+os.mkdir("./tests/output/test_runs/")
 copyfile(src, dst)
 
 
