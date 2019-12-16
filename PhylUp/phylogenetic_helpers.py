@@ -284,7 +284,8 @@ def build_table_from_file(id_to_spn, config, downtorank=None):
     """
     print("Build table with information about sequences and taxa.")
     ncbi_parser = ncbi_data_parser.Parser(names_file=config.ncbi_parser_names_fn,
-                                          nodes_file=config.ncbi_parser_nodes_fn)
+                                          nodes_file=config.ncbi_parser_nodes_fn,
+                                          interactive=False)
     print(id_to_spn)
     table = get_txid_for_name_from_file(id_to_spn, ncbi_parser)  # builds name id link
     table['status'] = 0

@@ -20,7 +20,6 @@ import datetime
 
 from . import db_updater
 from . import debug
-#from . import ncbi_data_parser
 import ncbiTAXONparser.ncbi_data_parser as ncbi_data_parser
 
 
@@ -191,7 +190,10 @@ class ConfigObj(object):
                              "Note, that you are accessing a US government website to do so.\n")
         if interactive is True:
             db_updater._download_localblastdb(self)
-            db_updater._download_ncbi_parser(self)
+            ncbi_parser = ncbi_data_parser.Parser(names_file=self.ncbi_parser_names_fn,
+                                                  nodes_file=self.ncbi_parser_nodes_fn)
+            ncbi_parser._download_ncbi_parser()
+            #db_updater._download_ncbi_parser(self)
         debug("check db file status?: {}".format(interactive))
 
         # ###########
