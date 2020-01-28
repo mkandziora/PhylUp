@@ -8,7 +8,7 @@ mkdir PaPaRa
 cd PaPaRa
 wget https://sco.h-its.org/exelixis/resource/download/software/papara_nt-2.5-static_x86_64.tar.gz
 gunzip  -cd papara_nt-2.5-static_x86_64.tar.gz | (tar xvf - )
-echo export PATH="$PATH:$(pwd)" >> ~/.bashrc
+echo "export PATH=$PWD:\$PATH" >> ~/.bashrc
 # source .bashrc
 # papara
 cd ..
@@ -22,7 +22,7 @@ sudo apt-get install autotools-dev libtool flex bison cmake automake autoconf
 cd epa-ng-master/
 make
 cd bin
-echo export PATH="$PATH:$(pwd)" >> ~/.bashrc
+echo "export PATH=$PWD:\$PATH" >> ~/.bashrc
 cd ..
 cd ..
 cd ..
@@ -56,7 +56,7 @@ make
 cd ..
 
 cd bin
-echo export PATH="$PATH:$(pwd)" >> ~/.bashrc
+echo "export PATH=$PWD:\$PATH" >> ~/.bashrctest
 
 cd ..
 cd ..
