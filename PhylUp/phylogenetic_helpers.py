@@ -121,21 +121,28 @@ def replace_uid_with_name(file_path, table, type):
     :return:
     """
     # print(os.getcwd())
+    name_list = []
     with open(file_path, "r") as label_new:
         labelled = label_new.read()
         with open("{}_relabel".format(file_path), "wt") as fout:
             present = table[table['status'] >= 0]
             for idx in present.index:
-                split_name = present.loc[idx, 'accession'].split('.')[0]
-                if split_name in labelled:
-                    print(split_name)
-                    # print(present.loc[idx, 'ncbi_txn'])
-                    # print(present.loc[idx, 'accession'])
-                    spn = present.loc[idx, 'ncbi_txn'].replace(" ", "_").replace("-", "_").replace("'", "")
-                    if type == 'tree':
-                        labelled = replace_in_tree(idx, labelled, present, split_name, spn)
-                    else:
-                        labelled = replace_in_aln(idx, labelled, present, split_name, spn)
+                if 'concat_id' in present.columns:
+                    id = present.loc[idx, 'concat_id']
+                    split_name = 'concat_{}'.format(int(id))
+                else:
+                    split_name = present.loc[idx, 'accession'].split('.')[0]
+                if split_name not in name_list:
+                    if split_name in labelled:
+                        print(split_name)
+                        # print(present.loc[idx, 'ncbi_txn'])
+                        # print(present.loc[idx, 'accession'])
+                        spn = present.loc[idx, 'ncbi_txn'].replace(" ", "_").replace("-", "_").replace("'", "")
+                        if type == 'tree':
+                            labelled = replace_in_tree(idx, labelled, present, split_name, spn)
+                        else:
+                            labelled = replace_in_aln(idx, labelled, present, split_name, spn)
+                name_list.append(split_name)
 
             fout.write(labelled)
 
