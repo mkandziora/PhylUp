@@ -6,8 +6,14 @@ import os
 import contextlib
 from builtins import input
 import logging
+import warnings
 
 _DEBUG_MK = 0
+
+def suppress_warnings():
+    if _DEBUG_MK == 0:
+       # warnings.simplefilter(action='ignore', category=all)
+        warnings.filterwarnings(action='ignore')
 
 
 def debug(msg):
