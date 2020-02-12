@@ -18,7 +18,6 @@ import pandas as pd
 import numpy as np
 import os
 from dendropy import Tree, DnaCharacterMatrix
-# from copy import deepcopy
 import ncbiTAXONparser.ncbi_data_parser as ncbi_data_parser
 
 from . import blast
@@ -26,11 +25,11 @@ from . import phylogen_updater
 from . import write_msg_logfile
 from . import phylogenetic_helpers
 from . import suppress_warnings, debug
-#import line_profiler
+# import line_profiler
 
 # TODO: write tests
 # todo: write files to tmp... - i did - but then we cannot reuse them in different_level
-#todo move some output to tmp folder and delete that
+# todo move some output to tmp folder and delete that
 
 
 class PhylogeneticUpdater:
@@ -42,7 +41,7 @@ class PhylogeneticUpdater:
         self.aln_schema = aln_schema
         self.aln = DnaCharacterMatrix.get(path=self.aln_fn, schema=self.aln_schema)
         self.tre_fn = tre
-        self.tr_schema = tre_schema
+        self.tre_schema = tre_schema
         self.tre = None
         self.blacklist = blacklist
         self.table = phylogenetic_helpers.build_table_from_file(id_to_spn, self.config, self.config.downtorank)
@@ -153,7 +152,6 @@ class PhylogeneticUpdater:
             count += 1
             # msg = tip_name
             # write_msg_logfile(msg, self.config.workdir)
-            #print('Blast: {}.'.format(tip_name))
             print('Blast {} sequence out of {}.'.format(count, len(blast_subset.index)))
             query_seq = self.table.loc[index, 'sseq']
             self.table.at[index, 'date'] = pd.Timestamp.today()  # this is the new version of pd.set_value(), sometimes it's iat
@@ -382,7 +380,7 @@ class PhylogeneticUpdater:
         Calls InputCleaner class and updates input data.
         :return:
         """
-        cleaner = phylogen_updater.InputCleaner(self.tre_fn, self.tr_schema, self.aln_fn, self.aln_schema, self.table, self.config, self.mrca)
+        cleaner = phylogen_updater.InputCleaner(self.tre_fn, self.tre_schema, self.aln_fn, self.aln_schema, self.table, self.config, self.mrca)
         self.aln = cleaner.aln
         if self.tre_fn is not None:
             self.tre = cleaner.tre
@@ -499,7 +497,6 @@ class FilterNumberOtu(Filter):
         self.status = status
         assert len(self.upd_new_seqs) == 0, self.upd_new_seqs
 
-
     def initialize(self, config):
         self.ncbi_parser = ncbi_data_parser.Parser(names_file=config.ncbi_parser_names_fn,
                                                    nodes_file=config.ncbi_parser_nodes_fn)
@@ -600,7 +597,6 @@ class FilterNumberOtu(Filter):
             new_seqs.at[new_seqs.ncbi_txid == txid, 'downtorank'] = downtorank_id
         return new_seqs
 
-
     def select_seq_by_length(self, filter_dict, exist_dict):
         """
         This is another mode to filter the sequences, if there are more than the threshold amount available.
@@ -627,7 +623,6 @@ class FilterNumberOtu(Filter):
             select = len_seqs_new
             assert len(select) <= amnt_missing_seq
         return select
-
 
     def wrapper_filter_blast_otu(self, filter_dict, exist_dict, columnname, txid):
         """
@@ -666,7 +661,6 @@ class FilterNumberOtu(Filter):
         filtered_seqs = self.select_number_missing(subfilter_blast_seqs, exist_dict)
         filtered_acc = set(list(filtered_seqs['accession']))
         return filtered_acc
-
 
     def select_number_missing(self, subfilter_blast_seqs, table_otu_dict):
         """
@@ -708,7 +702,8 @@ def remove_mean_sd_nonfit(filter_blast_seqs):
         #     print('filter thresh too large')
     return subfilter_blast_seqs
 
-#todo table probably not needed anymore
+
+# todo table probably not needed anymore
 class FilterSeqIdent(Filter):
     """
     Filters new sequences that are identical (seq and taxon id) to something already in the data.
@@ -721,11 +716,9 @@ class FilterSeqIdent(Filter):
         assert self.table['ncbi_txid'].hasnans == False, self.table['ncbi_txid'].hasnans
         assert self.table['sseq'].hasnans == False, self.table['sseq']
 
-
     def filter(self, new_seqs):
         assert_new_seqs_table(new_seqs, self.table, self.status)
         debug("filter FilterSeqIdent rm duplicate")
-        #self.upd_new_seqs = deepcopy(new_seqs)
         self.upd_new_seqs = new_seqs
 
         # drop all sequences that are identical (seq and ncbi_txid) from new_seqs
@@ -893,7 +886,6 @@ class FilterBLASTThreshold(Filter):
     def __init__(self, config):
         super().__init__(config)
 
-
     def filter(self, new_seqs):
         debug("FilterBLASTThreshold")
         tf_eval = new_seqs['evalue'].astype(float) < float(self.config.e_value_thresh)
@@ -921,7 +913,6 @@ class FilterUniqueAcc(Filter):
     def __init__(self, config, table):
         super().__init__(config)
         self.table = table
-
 
     def filter(self, new_seqs):
         debug('FilterUniqueAcc')

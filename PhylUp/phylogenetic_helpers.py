@@ -184,22 +184,6 @@ def check_align(aln):
     return seqlen
 
 
-def resolve_polytomies(tre, workdir):
-    """
-    Randomly resolves polytomies in provided dendropy tree.
-
-    :param tre:
-    :return:
-    """
-    print('resolve_polytomies')
-    tre.resolve_polytomies()
-    tre.deroot()
-    tre.as_string(schema='newick')
-    tre_fn = os.path.join(workdir, "papara_tre.tre")
-    with open(tre_fn, "w") as tre_file:
-        tre_file.write("{}".format(tre.as_string(schema='newick', suppress_rooting=True)))
-
-
 def run_modeltest(aln_fn, workdir, model, partition=None):
     """
     Run modeltest to get the best substitution model for the alignments.

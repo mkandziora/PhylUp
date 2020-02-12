@@ -11,7 +11,7 @@ Package to automatically update alignments and phylogenies using local sequences
 Parts are inspired by the program physcraper developed by me and Emily Jane McTavish.
 """
 
-# sequence and id retrieval methods
+# sequence retrieval methods
 
 import os
 import sys
@@ -140,7 +140,7 @@ def write_local_blast_files(workdir, seq_id, seq, db=False, fn=None):
 
 def make_local_blastdb(workdir, db, taxid, path_to_db=None):
     """
-    Adds sequences into a  new blast database, which then can be used to blast aln seq against it
+    Adds sequences into a new blast database, which then can be used to blast aln seq against it
     and adds sequences that were found to be similar to input.
     If this option is used, it queries against local database first and only in "2" round
     it goes back to blasting against GenBank.
@@ -391,7 +391,7 @@ def check_directionality(blast_seq, seq):
     return full_seq
 
 
-def get_new_seqs(query_seq, taxon, db_path, db_name, config, mrca=None):
+def get_new_seqs(query_seq, taxon, db_name, config, mrca=None):
     """
     Produces the pandas df with the new sequences. Main function of this class.
 
@@ -404,7 +404,7 @@ def get_new_seqs(query_seq, taxon, db_path, db_name, config, mrca=None):
     :return: returns the new sequences found via blast
     """
     # print('get new seqs')
-    run_blast_query(query_seq, taxon, db_path, db_name, config, mrca)
+    run_blast_query(query_seq, taxon, db_name, config, mrca)
     new_blastseqs = read_blast_query_pandas(taxon, config, db_name)  # pandas implementation of read_blast_query()
     assert new_blastseqs["ncbi_txn"].isnull() is not None, (new_blastseqs["ncbi_txn"])
     return new_blastseqs
@@ -456,8 +456,8 @@ def run_blast_query(query_seq, taxon, db_name, config, mrca=None):
             # print(os.getcwd())
             # TODO MK: blast+ v. 2.8 code - then we can limit search to taxids: -taxids self.mrca_ncbi
             #  !no mrca information here avail! - needs also some form of taxonomy db - unsure which
-            blastcmd = "blastn -query " + input_fn + " -db {}/nt_v5 -out ".format(db_path) + query_output_fn + \
-                       " {} -num_threads {}".format(outfmt, config.num_threads) + \
+            blastcmd = "blastn -query " + input_fn + " -db {}/nt_v5 -out ".format(os.path.abspath(config.db_path)) + \
+                       query_output_fn + " {} -num_threads {}".format(outfmt, config.num_threads) + \
                        " -max_target_seqs {} -max_hsps {}".format(config.hitlist_size, config.hitlist_size)
                         # "-evalue {} - taxids {}".format(config.evalue, mrca)
             # needs to run from within the folder:

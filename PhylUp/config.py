@@ -42,31 +42,40 @@ class ConfigObj(object):
 
         During the initializing process the following self objects are generated:
             * self.workdir**: working directory
+            * **self.num_threads**: number of cores to be used during a run
+            * **self.mrca_input**: input of mrca
+
+            * **self.unpublished**: T/F; add unpublished local sequences
+            * **self.unpubl_data**: path to folder with unpublished sequences in fasta format
+            * **self.unpubl_names**: path to file which translates sequence names to ncbi taxon names
+            * **self.perpetual**: T/F; blast more than once against unpublished
+            * **self.blast_all**: T/F; in the subsequent Genbank blast, blast all sequences (input+unpublished) or only unpublished. = config["unpublished"]['blast_all']
+
+            * self.blastdb: this defines the path to the local blast database
             * **self.e_value_thresh**: the defined threshold for the e-value during Blast searches, check out:
                 https://blast.ncbi.nlm.nih.gov/Blast.cgi?CMD=Web&PAGE_TYPE=BlastDocs&DOC_TYPE=FAQ
             * **self.hitlist_size**: the maximum number of sequences retrieved by a single blast search
-            * **self.blast_loc**: defines which blasting method to use. Currently only local is implemented
-                * if self.blast_loc == "local":
-                    * self.blastdb: this defines the path to the local blast database
-                    * self.ncbi_parser_nodes_fn: path to 'nodes.dmp' file, that contains the hierarchical information
-                    * self.ncbi_parser_names_fn: path to 'names.dmp' file, that contains the different ID's
-            * **self.num_threads**: number of cores to be used during a run
-            * **self.minlen**: value from 0 to 1. Defines how much shorter new seq can be compared to input
-            * **self.trim_perc**: value that determines how many seq need to be present before the beginning and end
-                                    of alignment will be trimmed
-            * **self.maxlen**: max length for values to add to aln
-            * **self.different_level**: T/F, used to first filter for higher rank and then to a lower rank.
-        * **self.filtertype**: either 'blast' or 'length'; filter number per otu by blast or choose longest
-        * **self.backbone**: T/F; calculate complete tree or add to backbone
-        * **self.update_tree**: T/F; update tree (T) or just update alignment
-        * **self.threshold**: number of seq per otu
-        * **self.downtorank**: filter number otu to specific rank
-        * **self.unpublished**: T/F; add unpublished local sequences
-        * **self.modeltest_criteria** BIC, AIC or AICc
+            * **self.fix_blast**: T/F; use same blast folder across runs
 
-        * **interactive**: T/F; checks if databases need to be updated
-        * **self.logfile**: file location where some information during the run is logged
-        * **self.fix_blast**: T/F; use same blast folder across runs
+            * self.ncbi_parser_nodes_fn: path to 'nodes.dmp' file, that contains the hierarchical information
+            * self.ncbi_parser_names_fn: path to 'names.dmp' file, that contains the different ID's
+
+            * **self.minlen**: Defines how much shorter new seq can be compared to input
+            * **self.maxlen**: max length for values to add to aln
+            * **self.trim_perc**: value that determines how many seq need to be absent before the beginning and end
+                                    of alignment will be trimmed
+
+            * **self.different_level**: T/F, used to first filter for higher rank and then to a lower rank.
+            * **self.filtertype**: either 'blast' or 'length'; filter number per otu by blast or choose longest
+            * **self.threshold**: number of seq per otu
+            * **self.downtorank**: filter number otu to specific rank
+
+            * **self.backbone**: T/F; calculate complete tree or add to backbone
+            * **self.update_tree**: T/F; update tree (T) or just update alignment
+            * **self.modeltest_criteria** BIC, AIC or AICc
+
+            * **interactive**: T/F; checks if databases need to be updated
+            * **self.logfile**: file location where some information during the run is logged
 
         :param configfi: a configuration file in a specific format. The file needs to have a heading of the format:
                         [blast] and then somewhere below that heading as string, e.g. e_value_thresh = value
@@ -94,7 +103,7 @@ class ConfigObj(object):
         sys.stdout.write('Workflow runs with {} threads.\n'.format(self.num_threads))
 
         self.mrca_input = config["general"]["mrca"]
-
+        assert is_number(self.mrca_input)
         # unpublished settings
         self.unpublished = config["unpublished"]['unpublished']
         if self.unpublished == "True" or self.unpublished == "true":

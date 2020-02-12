@@ -62,7 +62,6 @@ class AlnUpdater(object):
         self.newseqs_file = "new_seqs.fasta"
         self.update_data()
 
-
     def update_data(self):
         """
         Key method of the class, cleans and updates tre and aln.
@@ -88,7 +87,7 @@ class AlnUpdater(object):
 
         :return: writes new extended alignment
         """
-        sys.stdout.write("aligning query sequences \n")
+        sys.stdout.write("Aligning query sequences. \n")
         for filename in glob.glob('{}/papara*'.format(self.config.workdir)):
             os.rename(filename, "{}/{}_tmp".format(self.config.workdir, filename.split("/")[-1]))
         phylogenetic_helpers.write_papara_alnfile(self.aln, self.config.workdir)
@@ -144,13 +143,11 @@ class AlnUpdater(object):
         aln_ids = set()
         for tax, seq in self.aln.items():
             aln_ids.add(tax.label)
-            # table = str.maketrans(dict.fromkeys('-?'))
-            # if len(seq.symbols_as_string().translate(table)) <= seq_len_cutoff:
             if len(seq.symbols_as_string().replace("-", "").replace("?", "")) <= seq_len_cutoff:
                 delete_seqs.append(tax)
         if delete_seqs:
             msg = "Taxa deleted from tree and alignment in delete short sequences" \
-                  "as sequences are shorter than %.0f:\n" % seq_len_cutoff
+                  "as sequences are shorter than {}.\n".format(seq_len_cutoff)
             write_msg_logfile(msg, self.config.workdir)
             for tax in delete_seqs:
                 self.remove_taxa_aln_tre(tax.label)
@@ -311,12 +308,17 @@ class TreeUpdater(object):
         """
         print("place query seq")
         phylogenetic_helpers.write_papara_trefile(self.tre, self.config.workdir)
-        phylogenetic_helpers.resolve_polytomies(self.tre, self.config.workdir)
+
+       # prepare tree
+        self.tre.resolve_polytomies()
+        self.tre.deroot()
+        with open(os.path.join(self.config.workdir, "epa_tree.tre"), "w") as tre_file:
+            tre_file.write("{}".format(self.tre.as_string(schema='newick', suppress_rooting=True)))
 
         with cd(self.config.workdir):
-            # get model for epa-ng
+            # todo: get model for epa-ng
             with suppress_stdout():
-                subprocess.call(["epa-ng", "--ref-msa", "old_seqs.fasta", "--tree", "papara_tre.tre",
+                subprocess.call(["epa-ng", "--ref-msa", "old_seqs.fasta", "--tree", "epa_tree.tre",
                                  "--query",  "new_seqs.fasta", "--outdir", "./", "--model", 'GTR+G', '--redo'], shell=False)
                 # make newick tre
                 subprocess.call(["gappa", "examine", "graft", "--jplace-path", "epa_result.jplace",
@@ -445,8 +447,8 @@ class TreeUpdater(object):
     def write_labelled(self, treepath):
         """ Output tree with human readable labels.
 
-        :param treepath: full file name (including path) for phylogeny
-        :return: writes out labelled phylogeny and alignment to file
+        :param treepath: file name of tree
+        :return: writes out labelled phylogeny to file
         """
         debug("write labelled files")
         if treepath is None:
