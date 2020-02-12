@@ -34,7 +34,7 @@ from . import suppress_warnings, debug
 
 
 class PhylogeneticUpdater:
-    def __init__(self, id_to_spn, aln, aln_schema, tre, tre_schema, config, mrca=None, blacklist=None):
+    def __init__(self, id_to_spn, aln, aln_schema, tre, tre_schema, config, blacklist=None):
         self.config = config
         self.workdir = self.config.workdir
         self.status = 0  # -1 = deleted, positive values = round, 0 = present at beginning
@@ -48,7 +48,7 @@ class PhylogeneticUpdater:
         self.table = phylogenetic_helpers.build_table_from_file(id_to_spn, self.config, self.config.downtorank)
         phylogenetic_helpers.add_seq_to_table(self.aln, self.table)
         self.mrca = None
-        self.set_mrca(mrca)
+        self.set_mrca(self.config.mrca)
         suppress_warnings()
 
     def set_back_data_in_table(self):
