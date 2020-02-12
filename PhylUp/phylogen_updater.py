@@ -310,11 +310,6 @@ class TreeUpdater(object):
         Just for placement, to use as starting tree.
         """
         print("place query seq")
-        if self.config.backbone is True:
-            with cd(self.config.workdir):
-                backbonetre = Tree.get(path=os.path.join(self.config.workdir, "backbone.tre"), schema="newick",
-                                       preserve_underscores=True)
-                phylogenetic_helpers.resolve_polytomies(backbonetre, self.config.workdir)
         phylogenetic_helpers.write_papara_trefile(self.tre, self.config.workdir)
         phylogenetic_helpers.resolve_polytomies(self.tre, self.config.workdir)
 
@@ -322,10 +317,10 @@ class TreeUpdater(object):
             # get model for epa-ng
             with suppress_stdout():
                 subprocess.call(["epa-ng", "--ref-msa", "old_seqs.fasta", "--tree", "papara_tre.tre",
-                                 "--query",  "new_seqs.fasta", "--outdir", "./", "--model", 'GTR+G', '--redo'])
+                                 "--query",  "new_seqs.fasta", "--outdir", "./", "--model", 'GTR+G', '--redo'], shell=False)
                 # make newick tre
                 subprocess.call(["gappa", "examine", "graft", "--jplace-path", "epa_result.jplace",
-                                 "--allow-file-overwriting"])
+                                 "--allow-file-overwriting"], shell=False)
             self.tre = Tree.get(path="epa_result.newick", schema="newick", preserve_underscores=True)
             #self.tre.write(path="place_resolve.tre", schema="newick", unquoted_underscores=True, suppress_rooting=True)
             self.tre.write(path="updt_tre.tre", schema="newick", unquoted_underscores=True, suppress_rooting=True)
@@ -482,10 +477,21 @@ class InputCleaner(object):
         assert type(self.aln) == DnaCharacterMatrix
 
         if tre_fn is not None:
-            self.tre = self.write_clean_tre(tre_fn)
+            self.tre = self.write_clean_tre(tre_fn, tre_schema)
             if self.config.different_level is False:
                 self.delete_missing()  # turned of for different level, as tre is not updated between runs, aln is.
+            if self.config.backbone is True:
+                phylogenetic_helpers.write_tre(self.tre, self.config.workdir, treepath="backbone.tre",
+                                               treeschema="newick")
+                with cd(self.config.workdir):
+                    backbonetre = Tree.get(path="backbone.tre", schema="newick", preserve_underscores=True)
+                backbonetre.resolve_polytomies()
+                phylogenetic_helpers.write_tre(backbonetre, self.config.workdir, treepath="backbone.tre",
+                                               treeschema="newick")
         self.clean_inputname()
+        phylogenetic_helpers.write_aln(self.aln, self.config.workdir)
+        if tre_fn is not None:
+            phylogenetic_helpers.write_tre(self.tre, self.config.workdir)
 
     def format_mrca_set(self, mrca):
         """

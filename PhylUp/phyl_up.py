@@ -25,7 +25,7 @@ from . import blast
 from . import phylogen_updater
 from . import write_msg_logfile
 from . import phylogenetic_helpers
-
+from . import suppress_warnings, debug
 #import line_profiler
 
 # TODO: write tests
@@ -118,7 +118,7 @@ class PhylogeneticUpdater:
             tip_name = self.table.loc[index, 'accession']
             query_seq = self.table.loc[index, 'sseq']
             # Note: should be empty in later rounds...that is why it does not matter that new_seq_tax is reassigned
-            new_seq_tax = blast.get_new_seqs(query_seq, tip_name, self.config.blastdb, "unpublished", self.config)
+            new_seq_tax = blast.get_new_seqs(query_seq, tip_name, "unpublished", self.config)
             print(new_seq_tax)
             # new_seqs_unpubl = new_seqs_unpubl.append(new_seq_tax, ignore_index=True)
             new_seqs_unpubl = pd.concat([new_seqs_unpubl, new_seq_tax], ignore_index=True, sort=True)
@@ -157,7 +157,7 @@ class PhylogeneticUpdater:
             print('Blast {} sequence out of {}.'.format(count, len(blast_subset.index)))
             query_seq = self.table.loc[index, 'sseq']
             self.table.at[index, 'date'] = pd.Timestamp.today()  # this is the new version of pd.set_value(), sometimes it's iat
-            new_seq_tax = blast.get_new_seqs(query_seq, tip_name, self.config.blastdb, "Genbank", self.config)
+            new_seq_tax = blast.get_new_seqs(query_seq, tip_name, "Genbank", self.config)
             # new_seqs_local = new_seqs_local.append(new_seq_tax, ignore_index=True)
             new_seqs_local = pd.concat([new_seqs_local, new_seq_tax], ignore_index=True, sort=True)
         assert len(new_seqs_local) > 0, new_seqs_local
@@ -285,10 +285,11 @@ class PhylogeneticUpdater:
         columns = ['ncbi_txn', 'ncbi_txid', 'status', 'status_note', "date",
                    'accession', 'pident', 'evalue', 'bitscore', 'sseq', 'title']
         all_del = pd.DataFrame(columns=columns)
-        remove_basics = [FilterUniqueAcc(self.workdir, config, self.table),
-                         # FilterBLASTThreshold(self.workdir, self.config),
-                         FilterLength(self.workdir, config, aln),
-                         FilterMRCA(self.workdir, config, mrca)
+
+        remove_basics = [FilterUniqueAcc(self.config, self.table),
+                         # FilterBLASTThreshold(self.config),
+                         FilterLength(self.config, aln),
+                         FilterMRCA(self.config, mrca)
                          ]
         for f in remove_basics:
             msg = "Time before Filter {}: {}.\n".format(f, datetime.datetime.now())
@@ -514,14 +515,12 @@ class FilterNumberOtu(Filter):
             tax_ids_newseqs = new_seqs['ncbi_txid']
             txids_added = added_before['ncbi_txid']
         else:
-            new_seqs = self.set_downtorank(new_seqs, downtorank)  # todo: this is likely doubled now, since i chnages now ncbi id to rank and original_ncbi_id for the real one...
+            new_seqs = self.set_downtorank(new_seqs, downtorank)  # todo: this is likely doubled now, since i chnages now ncbi id to rank and original_ncbi_id for the real one...# no, its not, its for the new seqs
             new_seqs_downto = self.set_downtorank(added_before, downtorank)
             tax_ids_newseqs = new_seqs['downtorank']
             txids_added = new_seqs_downto['downtorank']
-
         for txid in set(tax_ids_newseqs):
             # generate taxon_subsets
-            # print('filter per otu')
             ns_txid_df = new_seqs[tax_ids_newseqs == txid]
             os_txid_df = added_before[txids_added == txid]
             os_txid_df = os_txid_df[os_txid_df['status'] >= 0]
@@ -662,8 +661,7 @@ class FilterNumberOtu(Filter):
             # print('write local blast files')
             blast.write_local_blast_files(self.config.workdir, seq_id, seq, db=True)
         blast.make_local_blastdb(self.config.workdir, db='filterrun', taxid=txid)
-        filter_blast_seqs = blast.get_new_seqs(query_seq, txid, os.path.join(self.config.workdir, 'tmp'),
-                                               'filterrun', self.config)
+        filter_blast_seqs = blast.get_new_seqs(query_seq, txid, 'filterrun', self.config)
         subfilter_blast_seqs = remove_mean_sd_nonfit(filter_blast_seqs)
         filtered_seqs = self.select_number_missing(subfilter_blast_seqs, exist_dict)
         filtered_acc = set(list(filtered_seqs['accession']))
@@ -772,7 +770,7 @@ class FilterSeqIdent(Filter):
         assert self.table['sseq'].hasnans == False, self.table['sseq']
         msg = "Filter FilterSeqIdent reduced the new seqs from {} to {}.\n".format(len(new_seqs),
                                                                                    len(self.upd_new_seqs))
-        write_msg_logfile(msg, self.workdir)
+        write_msg_logfile(msg, self.config.workdir)
         self.aln = self.remove_existing_for_longer()
 
     def remove_existing_for_longer(self):
@@ -887,7 +885,7 @@ class FilterMRCA(Filter):
         if len(to_del) > 0:
             to_del.to_csv(os.path.join(self.config.workdir, 'wrong_mrca.csv'), mode='a')
 
-
+#todo: unused. is being filtered in blast
 class FilterBLASTThreshold(Filter):
     """
     Removes sequences that do not pass the similarity filter (blast threshold).
@@ -926,7 +924,7 @@ class FilterUniqueAcc(Filter):
 
 
     def filter(self, new_seqs):
-        print('FilterUniqueAcc')
+        debug('FilterUniqueAcc')
         # delete things in table
         new_seqs_unique = new_seqs.drop_duplicates(subset=['accession'], keep='first')
         drop = new_seqs.drop(new_seqs_unique.index.tolist())
