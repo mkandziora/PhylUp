@@ -9,7 +9,8 @@ mattype = "fasta"  # format of alignment
 configfi = "data/localblast.config"  # configuration file
 
 blacklist = ['JX895419.1']  # sequence accession numbers that shall not be added
-mrca = 18794  # ncbi taxon id for the clade of interest
+
+
 
 # update the data:
 conf = config.ConfigObj(configfi, workdir, interactive=False)
@@ -17,6 +18,6 @@ conf.unpublished = True
 conf.unpubl_data = './data/unpublished_seqs/'
 conf.unpubl_names = './data/unpublished_names.csv'
 
-test = phyl_up.PhylogeneticUpdater(id_to_spn, seqaln, mattype, trfn, schema_trf, conf, mrca=mrca, blacklist=blacklist)
+test = phyl_up.PhylogeneticUpdater(id_to_spn, seqaln, mattype, trfn, schema_trf, conf, blacklist=blacklist)
 test.run(status_end=1)
 
