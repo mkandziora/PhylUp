@@ -73,7 +73,7 @@ class ConfigObj(object):
         :param workdir: the working directory
         :param interactive: defaults to True, is used to interactively update the local blast databases
         """
-        sys.stdout.write("Building config object\n")
+        debug("Building config object\n")
         assert os.path.isfile(configfi), "file `%s` does not exists" % configfi
 
         self.workdir = workdir
@@ -86,31 +86,39 @@ class ConfigObj(object):
         config = configparser.ConfigParser()
         config.read_file(open(configfi))
 
-        # read in blast settings
-        self.e_value_thresh = config["blast"]["e_value_thresh"]
-        assert is_number(self.e_value_thresh), ("value `%s` does not exists" % self.e_value_thresh)
-
-        self.hitlist_size = int(config["blast"]["hitlist_size"])
-        assert is_number(self.hitlist_size), ("value `%s`is not a number" % self.hitlist_size)
-
-        self.blast_loc = config["blast"]["location"]
-        assert self.blast_loc in ["local"], ("your blast location `%s` is not local" % self.blast_loc)
-        if self.blast_loc == "local":
-            self.blastdb = config["blast"]["localblastdb"]
-            assert os.path.exists(self.blastdb), self.blastdb
-            self.ncbi_parser_nodes_fn = config["ncbi_parser"]["nodes_fn"]
-            self.ncbi_parser_names_fn = config["ncbi_parser"]["names_fn"]
-            # # TODO: test if this would make the whole thing faster, db building takes long, but likely blasting is faster
-            # # make smaller blast database
-            # name = self.make_db_from_taxid(self.mrca)
-            # self.blastdb = '{}/{}_db'.format(self.blastdb, name)
-
-        print("slurm threads")
-        self.num_threads = int(config["blast"].get("num_threads"))
-        #print(os.environ.get('SLURM_JOB_CPUS_PER_NODE'))
+        # general settings
+        self.num_threads = int(config["general"]["num_threads"])
+        # print(os.environ.get('SLURM_JOB_CPUS_PER_NODE'))
         if os.environ.get('SLURM_JOB_CPUS_PER_NODE'):
             self.num_threads = int(os.environ.get('SLURM_JOB_CPUS_PER_NODE'))
-        print(self.num_threads)
+        sys.stdout.write('Workflow runs with {} threads.\n'.format(self.num_threads))
+
+        self.mrca_input = config["general"]["mrca"]
+
+        # unpublished settings
+        self.unpublished = config["unpublished"]['unpublished']
+        if self.unpublished == "True" or self.unpublished == "true":
+            self.unpublished = True
+            self.unpubl_data = config["unpublished"]['unpubl_data']
+            self.unpubl_names = config["unpublished"]['unpubl_names']
+            self.perpetual = config["unpublished"]['perpetual']
+            self.blast_all = config["unpublished"]['blast_all']
+            if self.blast_all == "True" or self.blast_all == "true":
+                self.blast_all = True
+            else:
+                self.blast_all = False
+        else:
+            self.unpublished = False
+
+        # read in blast settings
+        self.blastdb = config["blast"]["localblastdb"]
+        assert os.path.exists(self.blastdb), self.blastdb
+
+        self.e_value_thresh = config["blast"]["e_value_thresh"]
+        assert is_number(self.e_value_thresh), ("e_value_thresh is not defined as a number: {}.\n".format(self.e_value_thresh))
+
+        self.hitlist_size = int(config["blast"]["hitlist_size"])
+        assert is_number(self.hitlist_size), ("Hitlist size is not defined as a number: {}.\n".format(self.hitlist_size))
 
         self.fix_blast = config["blast"]["fix_blast_result_folder"]
         if self.fix_blast == "True" or self.fix_blast == "true":
@@ -118,22 +126,37 @@ class ConfigObj(object):
             self.blast_folder = os.path.abspath("./data/blast")
             if not os.path.exists(self.blast_folder):
                 os.mkdir(self.blast_folder)
-            sys.stdout.write("You are using the same blast folder across runs - be careful. Make sure it is the same locus "
-                             "and that you did not change your blast settings.\n")
+            sys.stdout.write(
+                "You are using the same blast folder across runs ({}) - be careful. Make sure it is the same locus "
+                "and that you did not change your blast settings.\n").format(self.blast_folder)
         else:
             self.fix_blast = False
             self.blast_folder = os.path.abspath(os.path.join(self.workdir, "blast"))
 
-        # #############
-        # read in phylup settings
-        self.minlen = float(config["phylup"]["min_len"])
-        assert 0 < self.minlen <= 1, ("value `%s` is not between 0 and 1" % self.minlen)
-        self.trim_perc = float(config["phylup"]["trim_perc"])
-        assert 0 < self.trim_perc < 1, ("value `%s` is not between 0 and 1" % self.trim_perc)
-        self.maxlen = float(config["phylup"]["max_len"])
-        assert 1 < self.maxlen, ("value `%s` is not larger than 1" % self.maxlen)
+        # INTERNAL PhylUp SETTINGS
+        self.ncbi_parser_nodes_fn = config["ncbi_parser"]["nodes_fn"]
+        self.ncbi_parser_names_fn = config["ncbi_parser"]["names_fn"]
+        # # TODO: test if this would make the whole thing faster, db building takes long, but likely blasting is faster
+        # # make smaller blast database
+        # name = self.make_db_from_taxid(self.mrca)
+        # self.blastdb = '{}/{}_db'.format(self.blastdb, name)
 
-        self.different_level = config["phylup"]["different_level"]
+        # read in alignment settings
+        self.minlen = float(config["phylup"]["min_len"])
+        assert 0 < self.minlen <= 1, ("Min len is not between 0 and 1: {}.\n".format(self.minlen))
+        self.maxlen = float(config["phylup"]["max_len"])
+        assert 1 < self.maxlen, ("Max len is not larger than 1: {}.\n".format(self.maxlen))
+        self.trim_perc = float(config["phylup"]["trim_perc"])
+        assert 0 < self.trim_perc < 1, ("Percentage for trimming is not between 0 and 1: {}.\n".format(self.trim_perc))
+
+        # read in filter settings
+        self.filtertype = config["filter"]["filtertype"]
+        assert self.filtertype in ['blast', 'length'], ("self.filtertype `%s` "
+                                                        "is not 'blast' or 'length'" % self.filtertype)
+        self.threshold = int(config["filter"]["threshold"])
+        self.downtorank = config["filter"]["downtorank"]
+
+        self.different_level = config["filter"]["different_level"]
         if self.different_level == "True" or self.different_level == "true":
             self.different_level = True
         else:
@@ -141,38 +164,22 @@ class ConfigObj(object):
         assert self.different_level in [True, False], ("self.different_level `%s` "
                                                        "is not True or False" % self.different_level)
 
-        self.filtertype = config["phylup"]["filtertype"]
-        assert self.filtertype in ['blast', 'length'], ("self.filtertype `%s` "
-                                                        "is not 'blast' or 'length'" % self.filtertype)
-
-        self.backbone = config["phylup"]["backbone"]
-        if self.backbone == "True" or self.backbone == "true":
-            self.backbone = True
-        else:
-            self.backbone = False
-        self.update_tree = config["phylup"]["update_tree"]
+        # read in tree calculation settings
+        self.update_tree = config["tree"]["update_tree"]
         if self.update_tree == "True" or self.update_tree == "true":
             self.update_tree = True
         else:
             self.update_tree = False
-        self.modeltest_criteria = config['phylup']['modeltest_criteria']
+        self.backbone = config["tree"]["backbone"]
+        if self.backbone == "True" or self.backbone == "true":
+            self.backbone = True
+        else:
+            self.backbone = False
+
+        self.modeltest_criteria = config['tree']['modeltest_criteria']
         assert self.modeltest_criteria in ['AIC', 'AICc', 'BIC'], ("self.modeltest_criteria `%s` "
                                                         "is not AIC, AICc or BIC" % self.modeltest_criteria)
 
-        self.threshold = int(config["phylup"]["threshold"])
-        self.downtorank = config["phylup"]["downtorank"]
-
-        self.unpublished = config["blast"]['unpublished']
-        if self.unpublished == "True" or self.unpublished == "true":
-            self.unpublished = True
-        else:
-            self.unpublished = False
-        if self.unpublished is True:
-            self.unpubl_data = config["blast"]['unpubl_data']
-            self.unpubl_names = config["blast"]['unpubl_names']
-        else:
-            self.unpubl_data = None
-            self.unpubl_names = None
 
         ####
         # check database status
