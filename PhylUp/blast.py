@@ -25,13 +25,13 @@ from Bio.Alphabet import generic_dna
 import ncbiTAXONparser.ncbi_data_parser as ncbi_data_parser  # is the ncbi data parser class and associated functions
 from . import cd
 from . import suppress_stdout
+from . import debug
 # import line_profiler
 
 """
 blastdbcmd outfmt options:
 https://www.ncbi.nlm.nih.gov/books/NBK279684/table/appendices.T.blastdbcmd_application_opti/
 """
-
 
 def get_acc_from_blast(query_string):
     """
@@ -71,7 +71,8 @@ def get_taxid_from_acc(gb_acc, blastdb, workdir):
     fn_open.close()
     cmd1 = "blastdbcmd -db {}/nt_v5 -entry_batch {} -outfmt %T -out {}/tmp/tax_id_{}.csv".format(blastdb, fn, workdir,
                                                                                                  gb_acc)
-    os.system(cmd1)
+    with suppress_stdout():
+        os.system(cmd1)
     f = open(os.path.join(workdir, "tmp/tax_id_{}.csv".format(gb_acc)))
     tax_id_l = []
     for line in iter(f):
@@ -170,7 +171,6 @@ def make_local_blastdb(workdir, db, taxid, path_to_db=None):
             count = 0
             gb_id_l = content[::2]
             gb_id_l = list(filter(None, gb_id_l))
-
             seq_l = content[1::2]
             seq_l = list(filter(None, seq_l))
             # note: a file with multiple seqs can be read in as well
@@ -410,13 +410,12 @@ def get_new_seqs(query_seq, taxon, db_path, db_name, config, mrca=None):
     return new_blastseqs
 
 
-def run_blast_query(query_seq, taxon, db_path, db_name, config, mrca=None):
+def run_blast_query(query_seq, taxon, db_name, config, mrca=None):
     """
     Contains the cmds used to run a local blast query.
 
     :param query_seq: blast query sequence for search
     :param taxon: taxon name (=gb_acc, ncbi id); used for fn
-    :param db_path: path to blast db
     :param db_name: name of blast db
     :param config: config obj
     :param mrca: optional, new blast+ can limit results to list of taxids - not yet implemented in code
@@ -427,7 +426,6 @@ def run_blast_query(query_seq, taxon, db_path, db_name, config, mrca=None):
     taxon = str(taxon)
     if len(taxon.split('.')) > 1:
         taxon = taxon.split('.')[0]
-    db_path = os.path.abspath(db_path)
     if db_name == "unpublished":  # Run a local blast search if the data is unpublished or for filtering.
         query_output_fn = os.path.join(config.workdir, "tmp/unpublished_query_result.txt")
         input_fn = os.path.join(config.blast_folder, "./query_seq.fas")
@@ -454,7 +452,7 @@ def run_blast_query(query_seq, taxon, db_path, db_name, config, mrca=None):
     # print('run blastn')
     outfmt = " -outfmt '6 sseqid staxids sscinames pident evalue bitscore sseq salltitles sallseqid'"
     if db_name == "Genbank":
-        with cd(db_path):
+        with cd(os.path.abspath(config.db_path)):
             # print(os.getcwd())
             # TODO MK: blast+ v. 2.8 code - then we can limit search to taxids: -taxids self.mrca_ncbi
             #  !no mrca information here avail! - needs also some form of taxonomy db - unsure which
@@ -463,20 +461,24 @@ def run_blast_query(query_seq, taxon, db_path, db_name, config, mrca=None):
                        " -max_target_seqs {} -max_hsps {}".format(config.hitlist_size, config.hitlist_size)
                         # "-evalue {} - taxids {}".format(config.evalue, mrca)
             # needs to run from within the folder:
-            # with suppress_stdout():
-            if not os.path.isfile(query_output_fn):
-                os.system(blastcmd)
-                # print(blastcmd)
-            elif not os.stat(query_output_fn).st_size > 0:
-                os.system(blastcmd)
+            with suppress_stdout():
+                if not os.path.isfile(query_output_fn):
+                    #subprocess.call(blastcmd, shell=False, stderr=DEVNULL)
+                    os.system(blastcmd)
+                    # print(blastcmd)
+                elif not os.stat(query_output_fn).st_size > 0:
+                    #subprocess.call(blastcmd, shell=False, stderr=DEVNULL)
+                    os.system(blastcmd)
+
     else:
         # print("run against local data")
         with cd(os.path.join(config.workdir, "tmp")):
             blastcmd = "blastn -query {} -db {} -out ".format(input_fn, db) + query_output_fn + \
                        " {} -num_threads {}".format(outfmt, config.num_threads) + \
                        " -max_target_seqs {} -max_hsps {}".format(config.hitlist_size, config.hitlist_size)
-            # with suppress_stdout():
-            os.system(blastcmd)
+            with suppress_stdout():
+                os.system(blastcmd)
+            #subprocess.call(blastcmd, shell=False, stderr=DEVNULL)
             # todo: produces blastn taxdb warning, taxids here not needed and not part of taxdb anyways as local search.
             #  I keep it to make it coherent for reading in results.
 
@@ -490,7 +492,7 @@ def read_blast_query_pandas(blast_fn, config, db_name):
     :param db_name: name that specifies if filterrun, unpublished or normal search
     :return: updated self.new_seqs and self.data.gb_dict dictionaries
     """
-    # print('read_blast_query_pandas')
+    debug('read_blast_query_pandas')
     blast_fn = str(blast_fn)
     if len(blast_fn.split('.')) > 1:
         blast_fn = blast_fn.split('.')[0]
@@ -503,22 +505,17 @@ def read_blast_query_pandas(blast_fn, config, db_name):
     query_output_fn = os.path.abspath(query_output_fn)
     colnames = ['accession;gi', 'ncbi_txid', 'ncbi_txn', 'pident', 'evalue', 'bitscore', 'sseq', 'title', 'accession']
     data = pd.read_csv(query_output_fn, names=colnames, sep="\t", header=None)
-    assert len(data) > 0, data
+    if not db_name == 'unpublished':
+        assert len(data) > 0, data
     redundant = data[data['accession'].str.contains(';')]
+    non_redundant_redundant = get_non_redundant_data(config, redundant)  # new data frame with split value columns
     non_redundant = data[data['accession'].str.contains(';') == False]
     non_redundant['accession'] = non_redundant['accession'].apply(get_acc_from_blast)  # todo: throws pandas warning about sort, but if added, its breaking
-    # new data frame with split value columns
     assert len(redundant) + len(non_redundant) == len(data)
-
-    non_redundant_redundant = get_non_redundant_data(config, redundant)
-
     new_seqs = pd.concat([non_redundant_redundant, non_redundant], sort=True, ignore_index=True)
+    assert new_seqs['ncbi_txid'].isnull().values.any() == False
     new_seqs['sseq'] = new_seqs['sseq'].str.replace("-", "")
     new_seqs['date'] = datetime.datetime.strptime('01/01/00', '%d/%m/%y')
-    assert new_seqs['ncbi_txid'].isnull().values.any() == False
-    # ncbi_parser = ncbi_data_parser.Parser(names_file=config.ncbi_parser_names_fn,
-    #                                       nodes_file=config.ncbi_parser_nodes_fn)
-    # new_seqs['ncbi_txid'] = new_seqs['ncbi_txid'].apply(ncbi_parser.get_name_from_id())
     # todo this could be made faster by running it on the redundant/non_redundant data first
     new_seqs = wrapper_get_fullseq(config, new_seqs, db_name)
     return new_seqs
@@ -613,11 +610,13 @@ def wrapper_get_fullseq(config, new_blast_seq_dict, db):
     """
     if db == 'Genbank':
         blastdb = config.blastdb
+    elif db == 'unpublished':
+        blastdb = os.path.join(config.workdir, 'tmp/unpublished_seq_db')
     else:
         blastdb = os.path.join(config.workdir, 'tmp/filter_seq_db')
     for idx in new_blast_seq_dict.index:
         gb_acc = new_blast_seq_dict.loc[idx, "accession"]
-        if len(gb_acc.split(".")) >= 2:  # Do not add sequences that are not in Genbank accession format, e.g. PDB
+        if len(gb_acc.split(".")) >= 2 or db == 'unpublished':  # Do not add sequences that are not in Genbank accession format, e.g. PDB
             # replace sequence
             full_seq = get_full_seq(gb_acc, new_blast_seq_dict.loc[idx, "sseq"], config.workdir, blastdb, db)
             # new_blast_seq_dict.loc[idx, "sseq"] = full_seq

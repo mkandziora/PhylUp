@@ -24,7 +24,7 @@ import numpy as np
 import ncbiTAXONparser.ncbi_data_parser as ncbi_data_parser
 
 from . import cd
-
+from . import debug
 
 def truncate_papara_aln(aln):
     """
@@ -37,7 +37,7 @@ def truncate_papara_aln(aln):
     # # split papara.extended into new and olds seqs (1 arg = old, 2 = all)
     # # split does not work, as original aln_papara often shorter than extended:
     # subprocess.call(["epa-ng", "--split", "aln_papara.phy", "papara_alignment.extended"])
-    print('truncate papara aln')
+    debug('truncate papara aln')
     len_aln = len(aln.taxon_namespace)
     # read the data file in as a list
     ref_msa_fn = open(os.path.abspath('papara_alignment.phylip_trim'), "r")
@@ -92,7 +92,6 @@ def write_aln(aln, workdir, alnpath="updt_aln.fasta", alnschema="fasta"):
     :param alnschema: format for alignment in file
     :return:
     """
-    print("write_files")
     aln.write(path=os.path.join(workdir, alnpath),
               schema=alnschema)
 
@@ -107,7 +106,6 @@ def write_tre(tre, workdir, treepath="updt_tre.tre", treeschema="newick"):
     :param treeschema: format for tree in file
     :return:
     """
-    print("write_files")
     tre.write(path=os.path.join(workdir, treepath), schema=treeschema, unquoted_underscores=True, suppress_rooting=True)
 
 
@@ -134,9 +132,7 @@ def replace_uid_with_name(file_path, table, type):
                     split_name = present.loc[idx, 'accession'].split('.')[0]
                 if split_name not in name_list:
                     if split_name in labelled:
-                        print(split_name)
-                        # print(present.loc[idx, 'ncbi_txn'])
-                        # print(present.loc[idx, 'accession'])
+                        debug(split_name)
                         spn = present.loc[idx, 'ncbi_txn'].replace(" ", "_").replace("-", "_").replace("'", "")
                         if type == 'tree':
                             labelled = replace_in_tree(idx, labelled, present, split_name, spn)
@@ -217,13 +213,14 @@ def run_modeltest(aln_fn, workdir, model, partition=None):
     :return:
     """
     aln_fn = os.path.abspath(os.path.join(workdir, aln_fn))
-    if os.path.exists('{}.ckp'.format(aln_fn)):
-        os.remove('{}.ckp'.format(aln_fn))
-    if partition is None:
-        subprocess.run(['modeltest-ng', '-i', aln_fn,  '--force'])
-    else:
-        subprocess.run(['modeltest-ng', '-i', aln_fn, '--partition', partition, '--force'
-                        ])
+
+    if not os.path.exists('{}.out'.format(aln_fn)):
+        if os.path.exists('{}.ckp'.format(aln_fn)):
+            os.remove('{}.ckp'.format(aln_fn))
+        if partition is None:
+            subprocess.run(['modeltest-ng', '-i', aln_fn,  '--force'], shell=False)
+        else:
+            subprocess.run(['modeltest-ng', '-i', aln_fn, '--partition', partition, '--force'], shell=False)
 
     best_model = find_best_model(aln_fn, model, partition)
     return best_model
@@ -289,11 +286,11 @@ def build_table_from_file(id_to_spn, config, downtorank=None):
     :param downtorank: name of rank if sequences shall be filtered to a higher rank
     :return: table with all sequence information available
     """
-    print("Build table with information about sequences and taxa.")
+    debug("Build table with information about sequences and taxa.")
     ncbi_parser = ncbi_data_parser.Parser(names_file=config.ncbi_parser_names_fn,
                                           nodes_file=config.ncbi_parser_nodes_fn,
                                           interactive=False)
-    print(id_to_spn)
+    debug(id_to_spn)
     table = get_txid_for_name_from_file(id_to_spn, ncbi_parser)  # builds name id link
     table['status'] = 0
     try:
@@ -303,11 +300,12 @@ def build_table_from_file(id_to_spn, config, downtorank=None):
     table['sseq'] = None
     table['status'] = table['status'].astype(int)
     table['ncbi_txid'] = table['ncbi_txid'].astype(int)
-    if downtorank is not None:
-        table['original_ncbi_txid'] = table['ncbi_txid'].astype(int)
-        table['ncbi_txid'] = np.vectorize(ncbi_parser.get_downtorank_id)(table['original_ncbi_txid'], downtorank)
-    else:
-        table['ncbi_txid'] = table['ncbi_txid'].astype(int)
+    #if downtorank is not None:
+        #table['original_ncbi_txid'] = table['ncbi_txid'].astype(int)
+        #table['ncbi_txid'] = np.vectorize(ncbi_parser.get_downtorank_id)(table['original_ncbi_txid'])
+        #table['ncbi_txid'] = np.vectorize(ncbi_parser.get_downtorank_id)(table['original_ncbi_txid'], downtorank)
+    #else:
+    #    table['ncbi_txid'] = table['ncbi_txid'].astype(int)
     return table
 
 
@@ -357,6 +355,7 @@ def get_txid_for_name_from_file(tipname_id_fn, ncbi_parser):
     columns = ['accession', 'ncbi_txn']
     name_id = pd.read_csv(tipname_id_fn, names=columns,  sep=",", header=None)
     name_id['ncbi_txid'] = name_id['ncbi_txn'].apply(ncbi_parser.get_id_from_name)
+    name_id['ncbi_txid'].isnull().values.any() == False
     return name_id
 
 

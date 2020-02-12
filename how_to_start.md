@@ -35,7 +35,6 @@ make sure the programs are accessible from everywhere, thus add them to your PAT
 * Windows: `set PATH=%PATH%;C:\path\to\my\program`
 * MAC: `export PATH=$PATH:~/path/to/program`
 
-(! set PATH=%PATH%:  it takes the current path and sets PATH to it.)
 
 #### 2.a) download PhylUp using the command line:
 * as a normal package: `wget  https://github.com/blubbundbla/PhylUp/archive/master.zip`
@@ -200,7 +199,7 @@ Beside the standard definition, there are more input options. Currently supporte
 	`python3 ./data/spn_to_taxid.py NAME_OF_MRCA`
 
 	Please note that in the case that the mrca is a species name, the space between the two names needs to be replaced with an '_'
-* **status_end**: This is an option to tell the program how often to run the blast searches. If it is set to 1, it will only blast the input sequences and adds those found to the alignment. If it is set to 2, it will blast the newly retrieved sequences from the initial blast search and adds those results to the alignment as well. As such the input plus the first round of newly found sequences is blasted. If it is set to 3, it will add one more 'round', etc... 
+* **status_end**: This is an option to tell the program how often to run the blast searches. If it is set to 1, it will only blast the input sequences once and adds those found to the alignment. If it is set to 2, it will blast the newly retrieved sequences from the initial blast search and adds those results to the alignment as well. As such the input plus the first round of newly found sequences is blasted. If it is set to 3, it will add one more 'round', etc... 
 
 
 ##### B. hierachical updating - Asteroideae example:

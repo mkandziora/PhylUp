@@ -27,6 +27,7 @@ from . import cd
 from . import write_msg_logfile
 from . import suppress_stdout
 from . import phylogenetic_helpers
+from . import debug
 
 
 class AlnUpdater(object):
@@ -49,11 +50,10 @@ class AlnUpdater(object):
 
         if self.tre is None:  # generate random tree, e.g. from modeltest
             self.tre_fn = "updt_aln.fasta.tree"
-            best_subst_model = phylogenetic_helpers.run_modeltest('updt_aln.fasta',
-                                                                  self.config.workdir, self.config.modeltest_criteria)
+            best_subst_model = phylogenetic_helpers.run_modeltest('updt_aln.fasta', self.config.workdir,
+                                                                  self.config.modeltest_criteria)
             self.tre = Tree.get(path=os.path.join(self.config.workdir, self.tre_fn),
-                                schema="newick",
-                                preserve_underscores=True)
+                                schema="newick", preserve_underscores=True)
             phylogenetic_helpers.write_papara_trefile(self.tre, self.config.workdir)
         else:
             phylogenetic_helpers.write_aln(self.aln, self.config.workdir)
@@ -116,7 +116,7 @@ class AlnUpdater(object):
         with suppress_stdout():
             subprocess.check_call(["papara_static_x86_64", "-t", "papara_tre.tre", "-s", "aln_papara.phy",
                                    #  "-j", "{}".format(self.config.num_threads),  # FIXME: only works when papara is compiled.
-                                   "-q", self.newseqs_file, "-n", 'phylip'])
+                                   "-q", self.newseqs_file, "-n", 'phylip'], shell=False)
 
     def write_papara_queryseqs(self):
         """Writes out the query sequence file which is needed by papara.
@@ -346,25 +346,26 @@ class TreeUpdater(object):
             seed = str(random.randint(1, 21))
 
             subprocess.call(["raxml-ng-mpi", '--check', '--msa', "{}".format(aln_fn),
-                             '--model', best_subst_model, '--prefix', 'check'])
+                             '--model', best_subst_model, '--prefix', 'check'], shell=False)
             if self.config.update_tree is True:
                 if self.config.backbone is not True:
                     # print('tree')
-                    subprocess.call(["raxml-ng-mpi", "--threads", "{}".format(num_threads),
+                    subprocess.call(["raxml-ng-mpi", "--threads", "{}".format(num_threads), '--model', best_subst_model,
                                      "--msa", "{}".format(aln_fn), "--tree", "epa_result.newick",
-                                     "--seed", "{}".format(seed), "--prefix", "fulltree"])
+                                     "--seed", "{}".format(seed), "--prefix", "fulltree"], shell=False)
                 else:
-                    subprocess.call(["raxml-ng-mpi", "--threads", "{}".format(num_threads), "--msa {}".format(aln_fn),
-                                     "--constraint-tree", "backbone.tre", "--seed", "{}".format(seed),
-                                     "--prefix", "fulltree"])
+                    print('backbone')
+                    subprocess.call(["raxml-ng-mpi", "--threads", "{}".format(num_threads), '--model', best_subst_model,
+                                     "--msa", aln_fn, "--tree-constraint", "backbone.tre",
+                                     "--seed", "{}".format(seed), "--prefix", "fulltree"], shell=False)
             else:
                 todo = 'To update the data run the following command in your working directory.'
                 if self.config.backbone is not True:
-                    cmd1 = "raxml-ng-mpi --threads {} --msa {} --tree epa_result.newick --seed {}" \
-                           " --prefix fulltree".format(num_threads, aln_fn, seed)
+                    cmd1 = "raxml-ng-mpi --threads {} --model {} --msa {} --tree epa_result.newick --seed {}" \
+                           " --prefix fulltree".format(num_threads, best_subst_model, aln_fn, seed)
                 else:
-                    cmd1 = "raxml-ng-mpi --threads {} --msa {} --constraint-tree backbone.tre --seed {}" \
-                           " --prefix fulltree".format(num_threads, aln_fn, seed)
+                    cmd1 = "raxml-ng-mpi --threads {} --model {} --msa {} --tree-constraint updt_tre.tre --seed {}" \
+                           " --prefix fulltree".format(num_threads, best_subst_model, aln_fn, seed)
                 print(todo)
                 print(cmd1)
 
@@ -393,19 +394,21 @@ class TreeUpdater(object):
                     subprocess.call(["raxml-ng-mpi", '--all', "--msa", "{}".format(aln_fn), '--model', best_subst_model,
                                      '--bs-trees',  # 'tbe',  #
                                      'autoMRE', '--seed', seed, "--threads", "{}".format(num_threads),
-                                     "--prefix", "fulltree"])
+                                     "--prefix", "fulltree"], shell=False)
                 else:
                     print('else')
                     subprocess.call(["raxml-ng-mpi", '--all', "--msa", "{}".format(aln_fn), '--model', best_subst_model,
                                      '--bs-trees',  # 'fbp,tbe',
                                      'autoMRE', '--seed', seed, "--threads", "{}".format(num_threads),
-                                     "--prefix", "fulltree"])
+                                     "--prefix", "fulltree"], shell=False)
+                #subprocess.call(["raxml-ng-mpi", '--support', '--tree', 'fulltree.raxml.bestTree', '--bs-trees',
+                 #                'fulltree.raxml.bootstraps', "--prefix", 'support'])
                 subprocess.call(["raxml-ng-mpi", '--consense', 'MRE', '--tree', 'fulltree.raxml.bootstraps',
-                                 "--prefix", 'consMRE'])
+                                 "--prefix", 'consMRE'], shell=False)
                 subprocess.call(["raxml-ng-mpi", '--consense', 'STRICT', '--tree', 'fulltree.raxml.bootstraps',
-                                 "--prefix", 'consSTRICT'])
+                                 "--prefix", 'consSTRICT'], shell=False)
                 subprocess.call(["raxml-ng-mpi", '--consense', 'MR', '--tree', 'fulltree.raxml.bootstraps',
-                                 "--prefix", 'consMR'])
+                                 "--prefix", 'consMR'], shell=False)
             else:
                 todo = 'To update the data run the following command in your working directory.'
                 cmd1 = "raxml-ng-mpi  --all --threads {} --msa {} --model {} --bs-trees autoMRE --seed {}" \
@@ -419,6 +422,14 @@ class TreeUpdater(object):
                 print(cmd2)
                 print(cmd3)
                 print(cmd4)
+
+                lfd = os.path.join(self.workdir, "logfile")
+                with open(lfd, "a") as log:
+                    log.write("{}\n".format(todo))
+                    log.write("{}\n".format(cmd1))
+                    log.write("{}\n".format(cmd2))
+                    log.write("{}\n".format(cmd3))
+                    log.write("{}\n".format(cmd4))
 
     def calculate_final_tree(self):
         """Calculates the final tree using a trimmed alignment.
@@ -442,7 +453,7 @@ class TreeUpdater(object):
         :param treepath: full file name (including path) for phylogeny
         :return: writes out labelled phylogeny and alignment to file
         """
-        #print("write labelled files")
+        debug("write labelled files")
         if treepath is None:
             treepath = os.path.join(self.config.workdir, "fulltree.raxml.bestTree")
         else:
@@ -454,7 +465,7 @@ class InputCleaner(object):
     """
     This is the input class, that cleans the data before updating the phylogeny.
     """
-    def __init__(self, tre_fn, aln_fn, table, config_obj, mrca=None):
+    def __init__(self, tre_fn, tre_schema, aln_fn, aln_schema, table, config_obj, mrca=None):
         print('Clean the input data: {}, {}.'.format(tre_fn, aln_fn))
         self.config = config_obj
         if not os.path.exists(self.config.workdir):
@@ -467,7 +478,7 @@ class InputCleaner(object):
         self.mrca = self.format_mrca_set(mrca)
 
         self.table = table
-        self.aln = self.write_clean_aln(aln_fn)
+        self.aln = self.write_clean_aln(aln_fn, aln_schema)
         assert type(self.aln) == DnaCharacterMatrix
 
         if tre_fn is not None:
@@ -511,7 +522,7 @@ class InputCleaner(object):
     def delete_missing(self):
         """ Remove taxa if only present in tree or aln.
         """
-        print("Delete missing")
+        debug("Delete missing taxa")
         treed_taxa = set(leaf.taxon for leaf in self.tre.leaf_nodes())
         aln_tax = set(taxon for taxon in self.aln)
         delete_tax = treed_taxa ^ aln_tax
@@ -567,14 +578,14 @@ class InputCleaner(object):
                     newname = newname[:-1]
                 for idx in self.table.index:
                     original = self.table.loc[idx, "accession"].split('.')[0]
-                    # print(original, tax.label, newname)
+                    #print(original, tax.label, newname)
                     if original == tax.label or original == newname:
                         #tax.label = self.table.loc[idx, "accession"].split('.')[0]
                         found_label = 1
-                if found_label == 0:
-                    sys.stderr.write("could not match tip label {} any ncbi taxon name\n".format(tax.label))
+                #if found_label == 0: # and self.table.loc[idx, "ncbi_txid"]:
+                #    sys.stderr.write("could not match tip label {} any ncbi taxon name\n".format(tax.label))
 
-    def write_clean_aln(self, aln_fn):
+    def write_clean_aln(self, aln_fn, aln_schema):
         """
         Write out original and cleaned alignemnt (? converted to -, no whitespaces).
 
@@ -593,10 +604,10 @@ class InputCleaner(object):
         with open(upd_aln_fn, "w") as aln_file:
             aln_file.write(filedata)
         # use replaced aln as input
-        aln = DnaCharacterMatrix.get(path=upd_aln_fn, schema='fasta')
+        aln = DnaCharacterMatrix.get(path=upd_aln_fn, schema=aln_schema)
         return aln
 
-    def write_clean_tre(self, tre_fn):
+    def write_clean_tre(self, tre_fn, tre_schema):
         """
         Write out original and cleaned tre (no whitespaces).
 
@@ -615,6 +626,6 @@ class InputCleaner(object):
             with open(upd_tre_fn, "w") as tre_file:
                 tre_file.write(filedata)
             # use replaced tre as input
-            tre = Tree.get(path=upd_tre_fn, schema='newick', taxon_namespace=self.aln.taxon_namespace,
+            tre = Tree.get(path=upd_tre_fn, schema=tre_schema, taxon_namespace=self.aln.taxon_namespace,
                            preserve_underscores=True)
             return tre

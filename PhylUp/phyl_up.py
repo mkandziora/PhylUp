@@ -49,22 +49,23 @@ class PhylogeneticUpdater:
         phylogenetic_helpers.add_seq_to_table(self.aln, self.table)
         self.mrca = None
         self.set_mrca(mrca)
+        suppress_warnings()
 
     def set_back_data_in_table(self):
         """
-        Overwrites information in table for all blast date and status of newly added sequences.
+        Overwrites information in table for all  entries of for the status of newly added sequences.
 
         Needed for different_level == True
 
         :return:
         """
         if self.config.different_level == True and self.status == 0:
-            try:
-                self.table['date'] = pd.to_datetime('01/01/00', format='%d/%m/%y')
-            except NotImplementedError:
-                self.table['date'] = pd.Timestamp.strptime('01/01/00', '%d/%m/%y')
+            # try:
+            #     self.table['date'] = pd.to_datetime('01/01/00', format='%d/%m/%y')
+            # except NotImplementedError:
+            #     self.table['date'] = pd.Timestamp.strptime('01/01/00', '%d/%m/%y')
             self.table.at[self.table['status'] > 0, 'status'] = 0.5
-            self.config.update_tree = False
+            # self.config.update_tree = False
 
     def set_mrca(self, mrca):
         """
@@ -83,7 +84,7 @@ class PhylogeneticUpdater:
                 # print('get mrca of all input!')
                 self.mrca = mrca
             else:
-                print('get mrca of no input!')
+                print('Get mrca as input was not provided.')
                 aln_taxids = set(self.table['ncbi_txid'].tolist())
                 ncbi_parser = ncbi_data_parser.Parser(names_file=self.config.ncbi_parser_names_fn,
                                                       nodes_file=self.config.ncbi_parser_nodes_fn)
@@ -124,7 +125,8 @@ class PhylogeneticUpdater:
         new_seqs_unpubl = new_seqs_unpubl.drop(['accession;gi', 'ncbi_txid', 'ncbi_txn'], axis=1)
         new_seqs_unpubl = pd.merge(new_seqs_unpubl, name_txid_unpublished, on=['accession'], sort=True)
         new_seqs_unpubl['title'] = 'unpublished'
-        new_seqs_unpubl['status'] = 0.5
+        new_seqs_unpubl['status'] = 0.75
+        assert new_seqs_unpubl['ncbi_txid'].isnull().values.any() == False
         return new_seqs_unpubl
 
     def extend(self):
@@ -135,23 +137,24 @@ class PhylogeneticUpdater:
         """
         # create list of indice of subset list
         sys.stdout.write("Find new sequences using the BLAST database.\n")
-        # sets back date for rerun with different tribe or so
+        # sets back data for rerun with different tribe or so
         self.set_back_data_in_table()
         self.status += 1
-        #today = pd.Timestamp.today()
-        #min_date_blast = today - pd.Timedelta(days=90)
         present_subset = self.table[self.table['status'] > -1]
-        #present_subset = present_subset[(present_subset.date <= min_date_blast)]
+        blast_subset = present_subset[present_subset['status'] >= self.status-1]
         new_seqs_local = pd.DataFrame(columns=['ncbi_txn', 'ncbi_txid', 'status', 'status_note', "date", 'accession',
                                                'pident', 'evalue', 'bitscore', 'sseq', 'title'])
         # get new seqs from seqs in blast table seq
-        msg = present_subset[['accession', 'ncbi_txn',  'status']].to_string()
+        msg = blast_subset[['accession', 'ncbi_txn',  'status']].to_string()
         write_msg_logfile(msg, self.config.workdir)
-        for index in present_subset.index:
+        count = 0
+        for index in blast_subset.index:
             tip_name = self.table.loc[index, 'accession']
+            count += 1
             # msg = tip_name
             # write_msg_logfile(msg, self.config.workdir)
-            print('Blast: {}.'.format(tip_name))
+            #print('Blast: {}.'.format(tip_name))
+            print('Blast {} sequence out of {}.'.format(count, len(blast_subset.index)))
             query_seq = self.table.loc[index, 'sseq']
             self.table.at[index, 'date'] = pd.Timestamp.today()  # this is the new version of pd.set_value(), sometimes it's iat
             new_seq_tax = blast.get_new_seqs(query_seq, tip_name, self.config.blastdb, "Genbank", self.config)
@@ -193,11 +196,11 @@ class PhylogeneticUpdater:
 
         subcols = new_seqs[['ncbi_txn', 'ncbi_txid', 'status', 'status_note', "date", 'sseq', 'accession']]
         subcols.at[:, 'status'] = self.status
-        #self.table = self.table.append(subcols, ignore_index=True)
         self.table = pd.concat([self.table, subcols], ignore_index=True, sort=True)
         #assert self.table['status'].hasnans == False, self.table['status'].hasnans
-        assert len(subcols) == len(self.table[self.table['status'] == self.status]), \
-            (len(subcols), len(self.table[self.table['status'] == self.status]), subcols['accession'])
+        if not self.config.blastall:
+            assert len(subcols) == len(self.table[self.table['status'] == self.status]), \
+                (len(subcols), len(self.table[self.table['status'] == self.status]), subcols['accession'])
         new_seqs_upd_index = self.table[self.table['status'] == self.status]
         return new_seqs_upd_index
 
@@ -215,15 +218,17 @@ class PhylogeneticUpdater:
         new_seqs = new_seqs[~new_seqs['accession'].isin(self.table['accession'])]  # ~ is the pd not in/!
         print('Length of new seqs before filtering: {}'.format(len(new_seqs)))
         if len(new_seqs) > 0:
-            print(new_seqs.columns)
+            debug(new_seqs.columns)
             new_seqs = self.basic_filters(aln, self.mrca, new_seqs)
             # next filter need infos in table
-            new_seqs = self.add_new_seqs(new_seqs)
+            if len(new_seqs) > 0:
+                new_seqs = self.add_new_seqs(new_seqs)
 
         for idx in new_seqs.index:
             assert idx in self.table.index, (idx, self.table.index)
         # filter for seq identity process
-        new_seqs = self.compare_filter(new_seqs)
+        if len(new_seqs) > 0:
+            new_seqs = self.compare_filter(new_seqs)
         return new_seqs
 
     def compare_filter(self, new_seqs):
@@ -280,10 +285,10 @@ class PhylogeneticUpdater:
         columns = ['ncbi_txn', 'ncbi_txid', 'status', 'status_note', "date",
                    'accession', 'pident', 'evalue', 'bitscore', 'sseq', 'title']
         all_del = pd.DataFrame(columns=columns)
-        remove_basics = [FilterUniqueAcc(self.config, self.table),
-                         FilterBLASTThreshold(self.config),
-                         FilterLength(self.config, aln),
-                         FilterMRCA(self.config, mrca)
+        remove_basics = [FilterUniqueAcc(self.workdir, config, self.table),
+                         # FilterBLASTThreshold(self.workdir, self.config),
+                         FilterLength(self.workdir, config, aln),
+                         FilterMRCA(self.workdir, config, mrca)
                          ]
         for f in remove_basics:
             msg = "Time before Filter {}: {}.\n".format(f, datetime.datetime.now())
@@ -295,6 +300,8 @@ class PhylogeneticUpdater:
             # all_del = all_del.append(del_seq, ignore_index=True)
             all_del = pd.concat([all_del, del_seq], ignore_index=True, sort=True)
             check_filter_numbers(del_seq, new_seqs, internal_new_seq)
+            if len(new_seqs) == 0:
+                return new_seqs  # stop filtering if new seqs is 0
         check_filter_numbers(all_del, new_seqs, orig_len)
         return new_seqs
 
@@ -374,7 +381,7 @@ class PhylogeneticUpdater:
         Calls InputCleaner class and updates input data.
         :return:
         """
-        cleaner = phylogen_updater.InputCleaner(self.tre_fn, self.aln_fn, self.table, self.config, self.mrca)
+        cleaner = phylogen_updater.InputCleaner(self.tre_fn, self.tr_schema, self.aln_fn, self.aln_schema, self.table, self.config, self.mrca)
         self.aln = cleaner.aln
         if self.tre_fn is not None:
             self.tre = cleaner.tre
@@ -583,12 +590,14 @@ class FilterNumberOtu(Filter):
         :param downtorank:
         :return:
         """
-        # print("set_downtorank")
+        # debug("set_downtorank")
         new_seqs.at[:, 'downtorank'] = 0
         if self.ncbi_parser is None:
             self.initialize(self.config)
         for txid in set(new_seqs['ncbi_txid']):
             downtorank_id = self.ncbi_parser.get_downtorank_id(txid, downtorank)
+            if downtorank_id == 0:  # added for sequences that have no corresponding rank defined - which results in id 0
+                downtorank_id = txid
             new_seqs.at[new_seqs.ncbi_txid == txid, 'downtorank'] = downtorank_id
         return new_seqs
 
@@ -717,7 +726,7 @@ class FilterSeqIdent(Filter):
 
     def filter(self, new_seqs):
         assert_new_seqs_table(new_seqs, self.table, self.status)
-        print("filter FilterSeqIdent rm duplicate")
+        debug("filter FilterSeqIdent rm duplicate")
         #self.upd_new_seqs = deepcopy(new_seqs)
         self.upd_new_seqs = new_seqs
 
@@ -736,9 +745,9 @@ class FilterSeqIdent(Filter):
             # go through new_seqs to check if there is more than one identical (1 is the one we compare here)
             same_seqs = self.upd_new_seqs[(self.upd_new_seqs.sseq.str.contains(seq_compare)) & (self.upd_new_seqs['ncbi_txid'] == txid_compare)]
             if len(same_seqs.index) > 1:
-                print("identical seq new")
+                # debug("identical seq new")
                 to_del = new_seqs.loc[idx]
-                print(new_seqs.loc[idx, "accession"])
+                # debug(new_seqs.loc[idx, "accession"])
 
                 self.del_table = self.del_table.append(to_del)
                 self.upd_new_seqs = self.upd_new_seqs.drop([idx])
@@ -748,8 +757,8 @@ class FilterSeqIdent(Filter):
 
                 # go through avail seq in table to check if there is one identical
                 if len(same_old.index) > 0:
-                    print("identical old")
-                    print(new_seqs.loc[idx, "accession"])
+                    # debug("identical old")
+                    # debug(new_seqs.loc[idx, "accession"])
 
                     to_del = new_seqs.loc[idx]
                     self.del_table = self.del_table.append(to_del)
@@ -763,11 +772,11 @@ class FilterSeqIdent(Filter):
         assert self.table['sseq'].hasnans == False, self.table['sseq']
         msg = "Filter FilterSeqIdent reduced the new seqs from {} to {}.\n".format(len(new_seqs),
                                                                                    len(self.upd_new_seqs))
-        write_msg_logfile(msg, self.config.workdir)
+        write_msg_logfile(msg, self.workdir)
         self.aln = self.remove_existing_for_longer()
 
     def remove_existing_for_longer(self):
-        print("remove_existing_for_longer")
+        debug("remove_existing_for_longer")
         # check if one of the new seqs is identical but longer than old
         existing_old = self.table[self.table['status'].between(-1, self.status, inclusive=False)]
         aln = DnaCharacterMatrix.get(path=os.path.abspath(os.path.join(self.config.workdir, "updt_aln.fasta")), schema='fasta')
@@ -781,13 +790,13 @@ class FilterSeqIdent(Filter):
                             self.upd_new_seqs['ncbi_txid'] == int(txid_compare))]
             # go through avail seq in table to check if there is one identical
             if len(same_new.index) > 0:
-                print("old seq found in new")
+                debug("old seq found in new")
                 self.table.at[idx, 'status'] = -1
                 self.table.at[idx, 'status_note'] = 'new seq found - identical but longer'
                 tip_name = self.table.loc[idx, "accession"]
                 for tax, seq in aln.items():
                     if tip_name == tax.label:
-                        print("remove from aln")
+                        debug("remove from aln")
                         aln.remove_sequences([tax])
                 aln.write(path="updt_aln.fasta", schema="fasta")
                 counter += 1
@@ -834,9 +843,8 @@ class FilterMRCA(Filter):
         self.ncbi_parser = ncbi_data_parser.Parser(names_file=config.ncbi_parser_names_fn,
                                                    nodes_file=config.ncbi_parser_nodes_fn)
 
-
     def filter(self, new_seqs):
-        print("FilterMRCA")
+        debug("FilterMRCA")
         if self.ncbi_parser is None:
             self.initialize(self.config)
         to_del = pd.DataFrame()
@@ -889,7 +897,7 @@ class FilterBLASTThreshold(Filter):
 
 
     def filter(self, new_seqs):
-        print("FilterBLASTThreshold")
+        debug("FilterBLASTThreshold")
         tf_eval = new_seqs['evalue'].astype(float) < float(self.config.e_value_thresh)
         upd_new_seqs = new_seqs[tf_eval == True]
         deltab = new_seqs[tf_eval != True]
@@ -969,7 +977,7 @@ class FilterLength(Filter):
         :param new_seqs: sequences to be filtered
         :return: filtered sequences
         """
-        print('filter FilterLength')
+        debug('filter FilterLength')
         avg_len = self.avg_length_seqs_in_aln()
         del_seq = pd.DataFrame()
         filter_new_seqs = pd.DataFrame()
