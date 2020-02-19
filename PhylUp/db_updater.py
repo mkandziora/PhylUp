@@ -25,15 +25,16 @@ def _download_localblastdb(config):
     """Check if files are present and if they are uptodate.
     If not files will be downloaded.
     """
-    if not os.path.isfile("{}/nt_v5.69.nhr".format(config.blastdb)):
+    print(config.blastdb_path)
+    if not os.path.isfile("{}/nt_v5.69.nhr".format(config.blastdb_path)):
         print("Do you want to download the blast nt databases from ncbi? Note: "
               "This is a US government website! You agree to their terms. \n")
         x = get_user_input()
         if x == "yes":
             os.system("wget -c 'ftp://ftp.ncbi.nlm.nih.gov/blast/db/v5/nt_v5.*' "
-                      "-P {}/".format(config.blastdb))
+                      "-P {}/".format(config.blastdb_path))
             os.system("wget -c 'ftp://ftp.ncbi.nlm.nih.gov/blast/db/v5/taxdb.tar.gz' "
-                      "-P {}/".format(config.blastdb))
+                      "-P {}/".format(config.blastdb_path))
             with cd(config.blastdb):
                 print("update blast db")
                 os.system("update_blastdb nt_v5")
@@ -44,7 +45,7 @@ def _download_localblastdb(config):
             sys.stderr.write("You have no nt database, which is needed to run PhylUp. Restart and type 'yes'. \n")
             sys.exit(-10)
     else:
-        download_date = os.path.getmtime("{}/nt_v5.60.nhr".format(config.blastdb))
+        download_date = os.path.getmtime("{}/nt_v5.60.nhr".format(config.blastdb_path))
         download_date = datetime.datetime.fromtimestamp(download_date)
         today = datetime.datetime.now()
         time_passed = (today - download_date).days

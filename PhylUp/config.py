@@ -21,18 +21,10 @@ import datetime
 from . import db_updater
 from . import debug
 import ncbiTAXONparser.ncbi_data_parser as ncbi_data_parser
+from . import blast, phylogenetic_helpers
 
 
 # TODO: make global blast folders that can be shared across runs
-
-
-def is_number(s):
-    """test if string can be coerced to float"""
-    try:
-        float(s)
-        return True
-    except ValueError:
-        return False
 
 
 class ConfigObj(object):
@@ -49,7 +41,8 @@ class ConfigObj(object):
             * **self.unpubl_data**: path to folder with unpublished sequences in fasta format
             * **self.unpubl_names**: path to file which translates sequence names to ncbi taxon names
             * **self.perpetual**: T/F; blast more than once against unpublished
-            * **self.blast_all**: T/F; in the subsequent Genbank blast, blast all sequences (input+unpublished) or only unpublished. = config["unpublished"]['blast_all']
+            * **self.blast_all**: T/F; in the subsequent Genbank blast, blast all sequences (input+unpublished)
+                                    or only unpublished. = config["unpublished"]['blast_all']
 
             * self.blastdb: this defines the path to the local blast database
             * **self.e_value_thresh**: the defined threshold for the e-value during Blast searches, check out:
@@ -95,6 +88,17 @@ class ConfigObj(object):
         config = configparser.ConfigParser()
         config.read_file(open(configfi))
 
+        # ncbi parser
+        self.ncbi_parser_nodes_fn = config["ncbi_parser"]["nodes_fn"]
+        self.ncbi_parser_names_fn = config["ncbi_parser"]["names_fn"]
+        # # TODO: test if this would make the whole thing faster, db building takes long, but likely blasting is faster
+        # # make smaller blast database
+        # name = self.make_db_from_taxid(self.mrca)
+        # self.blastdb = '{}/{}_db'.format(self.blastdb, name)
+        ncbi_parser = ncbi_data_parser.Parser(names_file=self.ncbi_parser_names_fn,
+                                              nodes_file=self.ncbi_parser_nodes_fn)
+
+
         # general settings
         self.num_threads = int(config["general"]["num_threads"])
         # print(os.environ.get('SLURM_JOB_CPUS_PER_NODE'))
@@ -103,7 +107,6 @@ class ConfigObj(object):
         sys.stdout.write('Workflow runs with {} threads.\n'.format(self.num_threads))
 
         self.mrca_input = config["general"]["mrca"]
-        assert is_number(self.mrca_input)
         # unpublished settings
         self.unpublished = config["unpublished"]['unpublished']
         if self.unpublished == "True" or self.unpublished == "true":
@@ -111,23 +114,46 @@ class ConfigObj(object):
             self.unpubl_data = config["unpublished"]['unpubl_data']
             self.unpubl_names = config["unpublished"]['unpubl_names']
             self.perpetual = config["unpublished"]['perpetual']
-            self.blast_all = config["unpublished"]['blast_all']
-            if self.blast_all == "True" or self.blast_all == "true":
-                self.blast_all = True
-            else:
-                self.blast_all = False
         else:
             self.unpublished = False
+        self.blast_all = config["unpublished"]['blast_all']
+        if self.blast_all == "True" or self.blast_all == "true":
+            self.blast_all = True
+        else:
+            self.blast_all = False
+        # if self.unpublished == False:
+        #     if self.blast_all == True:
+        #         sys.stdout.write('Program set config blast_all to False. You do not use unpublished data.')
+        #     self.blast_all = False
 
         # read in blast settings
-        self.blastdb = config["blast"]["localblastdb"]
-        assert os.path.exists(self.blastdb), self.blastdb
+        self.blast_type = config['blast']['blast_type']
+        assert self.blast_type in ['Genbank', 'own']
+        self.blastdb_path = config["blast"]["localblastdb"]
+        assert os.path.exists(self.blastdb_path), self.blastdb_path
+
+        if self.blast_type == 'Genbank':
+            self.blastdb = '{}/nt_v5'.format(self.blastdb_path)
+        elif self.blast_type == 'own':
+            tax_id_map = config['blast']['taxid_map']
+            name_txid = phylogenetic_helpers.get_txid_for_name_from_file(self.tax_id_map, ncbi_parser)
+            if not os.path.exists(os.path.join(self.blastdb_path, 'db')):
+                os.mkdir(os.path.join(self.blastdb_path, 'db'))
+            name_txid[['accession', 'ncbi_txid']].to_csv(
+                os.path.join(self.blastdb_path, 'db/own_txid.txt'),
+                sep=' ', header=False, index=False)
+            blast.make_local_blastdb(self.blastdb_path, 'own', tax_id_map, path_to_db=self.blastdb)
+            self.blastdb = '{}/db/own_seq_db'.format(self.blastdb_path)
 
         self.e_value_thresh = config["blast"]["e_value_thresh"]
-        assert is_number(self.e_value_thresh), ("e_value_thresh is not defined as a number: {}.\n".format(self.e_value_thresh))
+        assert self.e_value_thresh.split('.')[0].isdigit(), ("e_value_thresh is not defined as "
+                                                             "a number: {}.\n".format(self.e_value_thresh))
+        self.e_value_thresh = float(self.e_value_thresh)
 
-        self.hitlist_size = int(config["blast"]["hitlist_size"])
-        assert is_number(self.hitlist_size), ("Hitlist size is not defined as a number: {}.\n".format(self.hitlist_size))
+        self.hitlist_size = config["blast"]["hitlist_size"]
+        assert self.hitlist_size.split('.')[0].isdigit(), ("Hitlist size is not defined as "
+                                                           "a number: {}.\n".format(self.hitlist_size))
+        self.hitlist_size = int(self.hitlist_size)
 
         self.fix_blast = config["blast"]["fix_blast_result_folder"]
         if self.fix_blast == "True" or self.fix_blast == "true":
@@ -137,18 +163,12 @@ class ConfigObj(object):
                 os.mkdir(self.blast_folder)
             sys.stdout.write(
                 "You are using the same blast folder across runs ({}) - be careful. Make sure it is the same locus "
-                "and that you did not change your blast settings.\n").format(self.blast_folder)
+                "and that you did not change your blast settings.\n".format(self.blast_folder))
         else:
             self.fix_blast = False
             self.blast_folder = os.path.abspath(os.path.join(self.workdir, "blast"))
 
-        # INTERNAL PhylUp SETTINGS
-        self.ncbi_parser_nodes_fn = config["ncbi_parser"]["nodes_fn"]
-        self.ncbi_parser_names_fn = config["ncbi_parser"]["names_fn"]
-        # # TODO: test if this would make the whole thing faster, db building takes long, but likely blasting is faster
-        # # make smaller blast database
-        # name = self.make_db_from_taxid(self.mrca)
-        # self.blastdb = '{}/{}_db'.format(self.blastdb, name)
+
 
         # read in alignment settings
         self.minlen = float(config["phylup"]["min_len"])
@@ -186,9 +206,8 @@ class ConfigObj(object):
             self.backbone = False
 
         self.modeltest_criteria = config['tree']['modeltest_criteria']
-        assert self.modeltest_criteria in ['AIC', 'AICc', 'BIC'], ("self.modeltest_criteria `%s` "
-                                                        "is not AIC, AICc or BIC" % self.modeltest_criteria)
-
+        assert self.modeltest_criteria in ['AIC', 'AICc', 'BIC'], ("self.modeltest_criteria `%s` is "
+                                                                   "not AIC, AICc or BIC" % self.modeltest_criteria)
 
         ####
         # check database status
@@ -196,22 +215,20 @@ class ConfigObj(object):
         if interactive is None:
             interactive = sys.stdin.isatty()
         if interactive is False:
-            sys.stdout.write("REMEMBER TO UPDATE THE NCBI DATABASES REGULARLY! ")
-            download_date = os.path.getmtime("{}/nt_v5.60.nhr".format(self.blastdb))
-            download_date = datetime.datetime.fromtimestamp(download_date)
-            today = datetime.datetime.now()
-            time_passed = (today - download_date).days
-            sys.stdout.write("Looks like you last updated it {} days ago.\n".format(time_passed))
-            sys.stdout.write("Run the file 'update_databases.py' from the data folder to automatically update. "
-                             "Note, that you are accessing a US government website to do so.\n")
+            if  self.blast_type == 'Genbank':
+                sys.stdout.write("REMEMBER TO UPDATE THE NCBI DATABASES REGULARLY! ")
+                download_date = os.path.getmtime("{}/nt_v5.60.nhr".format(self.blastdb_path))
+                download_date = datetime.datetime.fromtimestamp(download_date)
+                today = datetime.datetime.now()
+                time_passed = (today - download_date).days
+                sys.stdout.write("Looks like you last updated it {} days ago.\n".format(time_passed))
+                sys.stdout.write("Run the file 'update_databases.py' from the data folder to automatically update. "
+                                 "Note, that you are accessing a US government website to do so.\n")
+
         if interactive is True:
             db_updater._download_localblastdb(self)
-            ncbi_parser = ncbi_data_parser.Parser(names_file=self.ncbi_parser_names_fn,
-                                                  nodes_file=self.ncbi_parser_nodes_fn)
             ncbi_parser._download_ncbi_parser()
-            #db_updater._download_ncbi_parser(self)
         debug("check db file status?: {}".format(interactive))
-
         # ###########
         # internal settings
         self.logfile = os.path.join(self.workdir, "logfile")

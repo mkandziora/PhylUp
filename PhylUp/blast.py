@@ -69,7 +69,9 @@ def get_taxid_from_acc(gb_acc, blastdb, workdir):
     fn_open = open(fn, "w+")
     fn_open.write("{}\n".format(gb_acc))
     fn_open.close()
-    cmd1 = "blastdbcmd -db {}/nt_v5 -entry_batch {} -outfmt %T -out {}/tmp/tax_id_{}.csv".format(blastdb, fn, workdir,
+    # cmd1 = "blastdbcmd -db {}/nt_v5 -entry_batch {} -outfmt %T -out {}/tmp/tax_id_{}.csv".format(blastdb, fn, workdir,
+    #                                                                                             gb_acc)
+    cmd1 = "blastdbcmd -db {} -entry_batch {} -outfmt %T -out {}/tmp/tax_id_{}.csv".format(blastdb, fn, workdir,
                                                                                                  gb_acc)
     with suppress_stdout():
         os.system(cmd1)
@@ -102,7 +104,8 @@ def get_taxid_from_acc_stdout(gb_acc, blastdb, workdir):
     fn_open = open(fn, "w+")
     fn_open.write("{}\n".format(gb_acc))
     fn_open.close()
-    cmd1 = "blastdbcmd -db {}/nt_v5 -entry_batch {} -outfmt %T -out -".format(blastdb, fn)
+    #cmd1 = "blastdbcmd -db {}/nt_v5 -entry_batch {} -outfmt %T -out -".format(blastdb, fn)
+    cmd1 = "blastdbcmd -db {} -entry_batch {} -outfmt %T -out -".format(blastdb, fn)
     result = subprocess.check_output(cmd1, shell=True).decode(sys.stdout.encoding)  # todo maybe replace with .run
     taxid_l = result.split('\n')
     taxid_l = list(filter(None, taxid_l))
@@ -152,16 +155,25 @@ def make_local_blastdb(workdir, db, taxid, path_to_db=None):
     :return: writes local blast databases for the local sequences
     """
     # print("make_local_blastdb")
-    if db == "unpublished":
+    if db == "unpublished" or db == 'own':
         taxid_map = os.path.abspath(taxid)
         print('Make local blast database from: {}'.format(path_to_db))
         localfiles = os.listdir(path_to_db)
-        if os.path.exists(os.path.join(workdir, 'tmp/unpublished_seq_db')):
-            os.remove(os.path.join(workdir, 'tmp/unpublished_seq_db'))
+
+        if db == 'unpublished':
+            path_db = os.path.join(workdir, 'tmp/unpublished_seq_db')
+        else:
+            path_db = os.path.join(path_to_db, 'db/own_seq_db')
+        if os.path.exists(path_db):
+            os.remove(path_db)
+        db_abspath = os.path.abspath(path_db)
+        fn = '{}_seq'.format(db)
+
         for index, item in enumerate(localfiles):
             item = str(item)
             if item.startswith(".~"):  # remove those files from list
                 localfiles[index] = None
+
         localfiles = list(filter(None, localfiles))
         for filename in localfiles:
             filepath = os.path.join(path_to_db, filename)
@@ -176,16 +188,14 @@ def make_local_blastdb(workdir, db, taxid, path_to_db=None):
             # note: a file with multiple seqs can be read in as well
             assert len(gb_id_l) == len(seq_l), (gb_id_l, seq_l)
 
-            len_gb = len(gb_id_l)
-            for i in range(0, len_gb):
+            for i in range(0, len(gb_id_l)):
                 key = gb_id_l[i].replace(">", "")
                 count = count + 1
                 seq = seq_l[i]
-                write_local_blast_files(workdir, key, seq, db=True, fn="unpublished_seq")
-        path_db = os.path.join(workdir, './tmp/unpublished_seq_db')
-        db = os.path.abspath(path_db)
+                write_local_blast_files(workdir, key, seq, db=True, fn=fn)
+
         with cd(path_to_db):
-            cmd1 = "makeblastdb -in {} -dbtype nucl -taxid_map {} -parse_seqids".format(db, taxid_map)
+            cmd1 = "makeblastdb -in {} -dbtype nucl -taxid_map {} -parse_seqids".format(db_abspath, taxid_map)
             with suppress_stdout():
                 os.system(cmd1)
     elif db == "filterrun":
@@ -223,8 +233,8 @@ def get_full_seq_stdout(gb_acc, blast_seq, workdir, blastdb, db):
         fn_open.write("{}\n".format(gb_acc.split(".")[0]))
         fn_open.close()
         db_path = "{}".format(blastdb)
-        cmd1 = "blastdbcmd -db {}/nt_v5  -entry_batch {} " \
-               "-outfmt %f -out -".format(db_path, fn)
+        #cmd1 = "blastdbcmd -db {}/nt_v5  -entry_batch {} -outfmt %f -out -".format(db_path, fn)
+        cmd1 = "blastdbcmd -db {}  -entry_batch {} -outfmt %f -out -".format(db_path, fn)
         result = subprocess.check_output(cmd1, shell=True).decode(sys.stdout.encoding)
         seqn = result.split('\n')[1:]
         seperator = ''
@@ -269,7 +279,7 @@ def get_full_seq_tmp(gb_acc, blast_seq, workdir, blastdb, db):
         db_path = "{}".format(blastdb)
         with NamedTemporaryFile() as f:
             subprocess.check_call(
-                ["blastdbcmd", "-db", "{}/nt_v5".format(db_path), "-entry_batch", "{}".format(fn), "-outfmt", "%f",
+                ["blastdbcmd", "-db", "{}".format(db_path), "-entry_batch", "{}".format(fn), "-outfmt", "%f",
                  "-out", "-"], stdout=f)
             f.seek(0)
             result = f.read().decode(sys.stdout.encoding)
@@ -317,11 +327,13 @@ def get_full_seq(gb_acc, blast_seq, workdir, blastdb, db):
             fn_open.write("{}\n".format(gb_acc.split(".")[0]))
             fn_open.close()
             db_path = "{}".format(blastdb)
-            cmd1 = "blastdbcmd -db {}/nt_v5  -entry_batch {} " \
-                   "-outfmt %f -out {}/tmp/full_seq_{}.fasta".format(db_path, fn, workdir, gb_acc)
+            #cmd1 = "blastdbcmd -db {}/nt_v5  -entry_batch {} -outfmt %f -out {}/tmp/full_seq_{}.fasta".format(db_path, fn, workdir, gb_acc)
+            cmd1 = "blastdbcmd -db {} -entry_batch {} -outfmt %f -out {}/tmp/full_seq_{}.fasta".format(db_path, fn, workdir, gb_acc)
             # print(cmd1)
             with suppress_stdout():
                 os.system(cmd1)
+            #DEVNULL = open(os.devnull, 'wb')
+            #subprocess.call(cmd1, shell=False, stderr=DEVNULL)
             assert os.stat(full_seq_fn).st_size > 0, ('file {} has no content'.format(full_seq_fn))
         # read in file to get full seqseq
         fn_seq = os.path.join(workdir, "tmp/full_seq_{}.fasta".format(gb_acc))
@@ -351,12 +363,13 @@ def get_seq_from_file(gb_acc, fn, seq_set):
     seq = None
     with open(fn) as f:
         for i, line in enumerate(f):
+            first_item = line.split('\t')[0].rstrip().lstrip()[1:]
             if found:
                 seq = line.rstrip().lstrip()
                 seq = seq.upper()
                 seq_set = True
                 break
-            elif gb_acc in line:
+            elif gb_acc == first_item:
                 found = True
     return seq, seq_set
 
@@ -422,6 +435,8 @@ def run_blast_query(query_seq, taxon, db_name, config, mrca=None):
     :return: runs local blast query and writes it to file
     """
     # print("run_blast_query")
+    #errf = open("./{}/blast_stderr".format(config.workdir), 'a')
+
     assert taxon not in [None, 'nan', 'NA', 'na']
     taxon = str(taxon)
     if len(taxon.split('.')) > 1:
@@ -451,14 +466,19 @@ def run_blast_query(query_seq, taxon, db_name, config, mrca=None):
 
     # print('run blastn')
     outfmt = " -outfmt '6 sseqid staxids sscinames pident evalue bitscore sseq salltitles sallseqid'"
+
+    DEVNULL = open(os.devnull, 'wb')
     if db_name == "Genbank":
-        with cd(os.path.abspath(config.db_path)):
-            # print(os.getcwd())
+        with cd(os.path.abspath(config.blastdb_path)):
             # TODO MK: blast+ v. 2.8 code - then we can limit search to taxids: -taxids self.mrca_ncbi
             #  !no mrca information here avail! - needs also some form of taxonomy db - unsure which
-            blastcmd = "blastn -query " + input_fn + " -db {}/nt_v5 -out ".format(os.path.abspath(config.db_path)) + \
+            #blastcmd = "blastn -query " + input_fn + " -db {}/nt_v5 -out ".format(os.path.abspath(config.blastdb)) + \
+            #           query_output_fn + " {} -num_threads {}".format(outfmt, config.num_threads) + \
+            #           " -max_target_seqs {} -max_hsps {}".format(config.hitlist_size, config.hitlist_size)
+            blastcmd = "blastn -query " + input_fn + " -db {} -out ".format(os.path.abspath(config.blastdb)) + \
                        query_output_fn + " {} -num_threads {}".format(outfmt, config.num_threads) + \
                        " -max_target_seqs {} -max_hsps {}".format(config.hitlist_size, config.hitlist_size)
+            systemcmd = "{} | tee ./{}/blast_stderr, shell = False".format(blastcmd, config.workdir)
                         # "-evalue {} - taxids {}".format(config.evalue, mrca)
             # needs to run from within the folder:
             with suppress_stdout():
@@ -476,6 +496,7 @@ def run_blast_query(query_seq, taxon, db_name, config, mrca=None):
             blastcmd = "blastn -query {} -db {} -out ".format(input_fn, db) + query_output_fn + \
                        " {} -num_threads {}".format(outfmt, config.num_threads) + \
                        " -max_target_seqs {} -max_hsps {}".format(config.hitlist_size, config.hitlist_size)
+            print(blastcmd)
             with suppress_stdout():
                 os.system(blastcmd)
             #subprocess.call(blastcmd, shell=False, stderr=DEVNULL)

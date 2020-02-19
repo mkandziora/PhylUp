@@ -47,7 +47,7 @@ class PhylogeneticUpdater:
         self.table = phylogenetic_helpers.build_table_from_file(id_to_spn, self.config, self.config.downtorank)
         phylogenetic_helpers.add_seq_to_table(self.aln, self.table)
         self.mrca = None
-        self.set_mrca(self.config.mrca)
+        self.set_mrca(self.config.mrca_input)
         suppress_warnings()
 
     def set_back_data_in_table(self):
@@ -196,7 +196,7 @@ class PhylogeneticUpdater:
         subcols.at[:, 'status'] = self.status
         self.table = pd.concat([self.table, subcols], ignore_index=True, sort=True)
         #assert self.table['status'].hasnans == False, self.table['status'].hasnans
-        if not self.config.blastall:
+        if not self.config.blast_all:
             assert len(subcols) == len(self.table[self.table['status'] == self.status]), \
                 (len(subcols), len(self.table[self.table['status'] == self.status]), subcols['accession'])
         new_seqs_upd_index = self.table[self.table['status'] == self.status]
@@ -335,20 +335,25 @@ class PhylogeneticUpdater:
             next
         else:
             while retrieved_seqs > 0 and (status_end is None or self.status <= status_end):
-                print(status_end is None or self.status <= status_end)
                 msg = "Time before blast: {}.\n".format(datetime.datetime.now())
                 write_msg_logfile(msg, self.config.workdir)
                 if self.config.unpublished is True:
+                    msg = "Blast against unpublished sequences.\n"
+                    write_msg_logfile(msg, self.config.workdir)
                     new_seqs = self.extend_with_unpublished()
-                    self.config.unpublished = False
-                    # print(new_seqs[['accession', 'ncbi_txid', 'ncbi_txn']])
+                    if self.config.perpetual is False:
+                        self.config.unpublished = False
+                        if self.config.blast_all is True:
+                            self.table.at[self.table.status == self.status, 'status'] = 0
+                            self.status = 0
                 else:
                     new_seqs = self.extend()  # todo rename to find new seqs
                     msg = "Time after BLAST: {}.\n".format(datetime.datetime.now())
                     write_msg_logfile(msg, self.config.workdir)
                 new_seqs = self.call_filter(new_seqs, self.aln)
-                new_seqs = new_seqs[~new_seqs['accession'].isin(all_new_seqs['accession'])]  # ~ is the pd not in/!
-                all_new_seqs = pd.concat([all_new_seqs, new_seqs], ignore_index=True, sort=True)
+                if len(new_seqs.index) > 0:
+                    new_seqs = new_seqs[~new_seqs['accession'].isin(all_new_seqs['accession'])]  # ~ is the pd not in/!
+                    all_new_seqs = pd.concat([all_new_seqs, new_seqs], ignore_index=True, sort=True)
                 print('Length of new seqs after filtering: {}'.format(len(new_seqs)))
                 retrieved_seqs = len(new_seqs)
                 msg = "Newly found seqs: {}.\n".format(len(new_seqs))
@@ -365,6 +370,8 @@ class PhylogeneticUpdater:
                               os.path.join(self.workdir, "table_updated_tmp"))
             self.table.to_csv(os.path.join(self.workdir, 'table.updated'), index=False)
         self.update_aln()
+        self.table['sequence_length'] = self.table['sseq'].apply(len)
+        self.table.to_csv(os.path.join(self.workdir, 'table.updated'), index=False)
         if self.tre is None:
             self.tre_fn = os.path.abspath(os.path.join(self.config.workdir, "updt_aln.fasta.tree"))
             self.tre = Tree.get(path=os.path.join(self.config.workdir, 'updt_tre.tre'),
