@@ -69,7 +69,6 @@ class AlnUpdater(object):
         :return: output files
         """
         print('update data')
-        print(len(self.new_seq_table))
         if len(self.new_seq_table) > 0:
             self.delete_short_seqs()
             self.write_papara_queryseqs()
@@ -276,8 +275,9 @@ class TreeUpdater(object):
         print("update phylogeny")
         self.place_query_seqs_epa()
         self.check_tre_in_aln()
-        self.calculate_final_tree()  # comment out for development speed up
+
         if self.config.update_tree is True:
+            self.calculate_final_tree()  # comment out for development speed up
             # self.tre = Tree.get(path=os.path.join(self.config.workdir, "fulltree.raxml.bestTree"),
             #                     schema="newick", preserve_underscores=True, taxon_namespace=self.aln.taxon_namespace)
             # fn = os.path.join(self.config.workdir, 'papara_alignment.phylip_trim', taxon_namespace=self.tre.taxon_namespace)

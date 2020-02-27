@@ -118,7 +118,6 @@ class PhylogeneticUpdater:
             query_seq = self.table.loc[index, 'sseq']
             # Note: should be empty in later rounds...that is why it does not matter that new_seq_tax is reassigned
             new_seq_tax = blast.get_new_seqs(query_seq, tip_name, "unpublished", self.config)
-            print(new_seq_tax)
             # new_seqs_unpubl = new_seqs_unpubl.append(new_seq_tax, ignore_index=True)
             new_seqs_unpubl = pd.concat([new_seqs_unpubl, new_seq_tax], ignore_index=True, sort=True)
         new_seqs_unpubl = new_seqs_unpubl.drop(['accession;gi', 'ncbi_txid', 'ncbi_txn'], axis=1)
@@ -143,6 +142,7 @@ class PhylogeneticUpdater:
         blast_subset = present_subset[present_subset['status'] >= self.status-1]
         new_seqs_local = pd.DataFrame(columns=['ncbi_txn', 'ncbi_txid', 'status', 'status_note', "date", 'accession',
                                                'pident', 'evalue', 'bitscore', 'sseq', 'title'])
+
         # get new seqs from seqs in blast table seq
         msg = blast_subset[['accession', 'ncbi_txn',  'status']].to_string()
         write_msg_logfile(msg, self.config.workdir)
@@ -318,8 +318,6 @@ class PhylogeneticUpdater:
                    'accession', 'pident', 'evalue', 'bitscore', 'sseq', 'title']
         all_new_seqs = pd.DataFrame(columns=columns)
 
-        self.call_input_cleaner()
-
         retrieved_seqs = 1
         if os.path.exists(os.path.join(self.workdir, 'all_new_seqs.updated')):
             all_new_seqs = pd.read_csv(os.path.join(self.workdir, 'all_new_seqs.updated'))
@@ -331,6 +329,9 @@ class PhylogeneticUpdater:
                                 taxon_namespace=self.aln.taxon_namespace, preserve_underscores=True)
             msg = "New round of updating begins with mrca: {}.\n".format(self.mrca)
             write_msg_logfile(msg, self.config.workdir)
+
+        self.call_input_cleaner()
+
         if self.config.different_level == False and os.path.exists(os.path.join(self.workdir, 'all_new_seqs.updated')):
             next
         else:
@@ -341,6 +342,7 @@ class PhylogeneticUpdater:
                     msg = "Blast against unpublished sequences.\n"
                     write_msg_logfile(msg, self.config.workdir)
                     new_seqs = self.extend_with_unpublished()
+                    #self.update_aln()
                     if self.config.perpetual is False:
                         self.config.unpublished = False
                         if self.config.blast_all is True:
@@ -350,6 +352,7 @@ class PhylogeneticUpdater:
                     new_seqs = self.extend()  # todo rename to find new seqs
                     msg = "Time after BLAST: {}.\n".format(datetime.datetime.now())
                     write_msg_logfile(msg, self.config.workdir)
+                    #self.update_aln()
                 new_seqs = self.call_filter(new_seqs, self.aln)
                 if len(new_seqs.index) > 0:
                     new_seqs = new_seqs[~new_seqs['accession'].isin(all_new_seqs['accession'])]  # ~ is the pd not in/!
@@ -510,7 +513,7 @@ class FilterNumberOtu(Filter):
 
     def filter(self, new_seqs, downtorank=None):
         assert_new_seqs_table(new_seqs, self.table, self.status)
-        print("filter FilterNumberOtu")
+        debug("filter FilterNumberOtu")
         # get all seqs and ids from aln and before for next filter
         present = self.table[self.table['status'] > -1]
         added_before = present[present['status'].astype(int) < self.status]
@@ -544,7 +547,7 @@ class FilterNumberOtu(Filter):
                             assert len(filtered_acc) == len(filtered), (len(filtered_acc), len(filtered),
                                                                         [i for i in filtered_acc if i in filtered['accession'].to_list()])
                         elif self.config.filtertype == 'length':
-                            print('filter otu by length')
+                            debug('filter otu by length')
                             filtered = self.select_seq_by_length(ns_txid_df, os_txid_df)
                         else:
                             # print('should not happen')
@@ -556,7 +559,7 @@ class FilterNumberOtu(Filter):
                             filtered = new_seqs[new_seqs['accession'].isin(filtered_acc)]
                             assert len(filtered_acc) == len(filtered), (len(filtered_acc), len(filtered))
                         elif self.config.filtertype == 'length':
-                            print('filter otu by length')
+                            debug('filter otu by length')
                             filtered = self.select_seq_by_length(ns_txid_df, os_txid_df)
                         else:
                             # print('should not happen')
@@ -804,7 +807,6 @@ class FilterSeqIdent(Filter):
                 for tax, seq in aln.items():
                     seq = seq.symbols_as_string().replace('-', '')
                     if seq == seq_compare:
-                        print('found seq')
                         count = 1
                 assert count == 0
         msg = "Filter FilterSeqIdent removed {} sequence(s) from existing alignment due to longer" \
