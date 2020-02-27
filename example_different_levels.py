@@ -1,8 +1,8 @@
-from pandas_filter import phyl_up, config
+from PhylUp import phyl_up, config
 
 
 # round 1 Senecio
-workdir = "tests/output/different_level"
+workdir = "tests/output/test_different_level"
 trfn = "data/tiny_test_example/test.tre"
 schema_trf = "newick"
 id_to_spn = "data/tiny_test_example/test_nicespl.csv"
@@ -11,8 +11,8 @@ mattype = "fasta"
 configfi = "data/localblast_Senecio.config"
 blacklist = ['JX895419.1']
 
-conf = config.ConfigObj(configfi, workdir, interactive=True)
-test = phyl_up.PhylogeneticUpdater(id_to_spn, seqaln, mattype, trfn, schema_trf, conf, mrca=18794, blacklist=blacklist)
+conf = config.ConfigObj(configfi, workdir, interactive=False)
+test = phyl_up.PhylogeneticUpdater(id_to_spn, seqaln, mattype, trfn, schema_trf, conf, blacklist=blacklist)
 test.run()
 
 
@@ -24,7 +24,7 @@ configfi = "data/localblast_Senecioneae.config"
 blacklist = ['JX895419.1']
 
 conf = config.ConfigObj(configfi, workdir, interactive=False)
-test = phyl_up.PhylogeneticUpdater(id_to_spn, seqaln, mattype, trfn, schema_trf, conf, mrca=102812, blacklist=blacklist)
+test = phyl_up.PhylogeneticUpdater(id_to_spn, seqaln, mattype, trfn, schema_trf, conf, blacklist=blacklist)
 test.run()
 
 
@@ -36,7 +36,7 @@ configfi = "data/localblast_Asteroideae.config"
 blacklist = ['JX895419.1']
 
 conf = config.ConfigObj(configfi, workdir, interactive=False)
-test = phyl_up.PhylogeneticUpdater(id_to_spn, seqaln, mattype, trfn, schema_trf, conf, mrca=102804, blacklist=blacklist)
+test = phyl_up.PhylogeneticUpdater(id_to_spn, seqaln, mattype, trfn, schema_trf, conf, blacklist=blacklist)
 test.run()
 
 
