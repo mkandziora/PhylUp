@@ -78,16 +78,22 @@ class PhylogeneticUpdater:
         """
         if type(mrca) is int:
             self.mrca = mrca
+        if mrca.isdigit():
+            self.mrca = int(mrca)
+
+        elif len(mrca.split(',')) > 1:
+            mrca_list = []
+            for item in mrca.split(','):
+                mrca = int(item.lstrip().rstrip())
+                mrca_list.append(mrca)
+            self.mrca = mrca_list
         else:
-            if type(mrca) is list:
-                # print('get mrca of all input!')
-                self.mrca = mrca
-            else:
-                print('Get mrca as input was not provided.')
-                aln_taxids = set(self.table['ncbi_txid'].tolist())
-                ncbi_parser = ncbi_data_parser.Parser(names_file=self.config.ncbi_parser_names_fn,
-                                                      nodes_file=self.config.ncbi_parser_nodes_fn)
-                self.mrca = ncbi_parser.get_mrca(taxid_set=aln_taxids)
+            sys.stdout.write('Get mrca as input was not provided.\n')
+            aln_taxids = set(self.table['ncbi_txid'].tolist())
+            ncbi_parser = ncbi_data_parser.Parser(names_file=self.config.ncbi_parser_names_fn,
+                                                  nodes_file=self.config.ncbi_parser_nodes_fn)
+            self.mrca = ncbi_parser.get_mrca(taxid_set=aln_taxids)
+
 
     def extend_with_unpublished(self):
         """
@@ -104,7 +110,7 @@ class PhylogeneticUpdater:
         # convert name to file
         ncbi_parser = ncbi_data_parser.Parser(names_file=self.config.ncbi_parser_names_fn,
                                               nodes_file=self.config.ncbi_parser_nodes_fn)
-        name_txid_unpublished = phylogenetic_helpers.get_txid_for_name_from_file(self.config.unpubl_names, ncbi_parser)
+        name_txid_unpublished = phylogenetic_helpers.get_txid_for_name_from_file(os.path.abspath(self.config.unpubl_names), ncbi_parser)
         if not os.path.exists(os.path.join(self.workdir, 'tmp')):
             os.mkdir(os.path.join(self.workdir, 'tmp'))
         name_txid_unpublished[['accession', 'ncbi_txid']].to_csv(os.path.join(self.workdir, 'tmp/unpublished_txid.txt'),
@@ -239,26 +245,27 @@ class PhylogeneticUpdater:
         if len(new_seqs) > 0:
             for idx in new_seqs.index:
                 assert idx in self.table.index, (idx, self.table.index)
-            f = FilterSeqIdent(self.config, self.table, self.status)
-            msg = "Time before Filter {}: {}.\n".format(f, datetime.datetime.now())
-            write_msg_logfile(msg, self.config.workdir)
-            before_filter = new_seqs
-            f.filter(new_seqs)
-            self.aln = f.aln
-            new_seqs = f.upd_new_seqs  # assign new_seqs to last upd from filter before
-            self.table = f.table
-            del_seq = f.del_table
+            if self.config.identical_seqs is False:
+                f = FilterSeqIdent(self.config, self.table, self.status)
+                msg = "Time before Filter {}: {}.\n".format(f, datetime.datetime.now())
+                write_msg_logfile(msg, self.config.workdir)
+                before_filter = new_seqs
+                f.filter(new_seqs)
+                self.aln = f.aln
+                new_seqs = f.upd_new_seqs  # assign new_seqs to last upd from filter before
+                self.table = f.table
+                del_seq = f.del_table
 
-            # check that all del_tab entries are deleted in table
-            assert any(
-                x in del_seq['accession'].to_list() for x in self.table.loc[self.table['status'] >= 0, 'accession'].to_list()) == False, \
-                ([i for i in del_seq['accession'].to_list() if i in self.table.loc[self.table['status'] >= 0, 'accession'].to_list()])
-            check_df_index_unique(new_seqs)
-            check_df_index_unique(self.table)
-            check_filter_numbers(del_seq, new_seqs, before_filter)
-            assert len(new_seqs) == len(self.table[self.table['status'] == self.status]), \
-                (len(new_seqs), len(self.table[self.table['status'] == self.status]),
-                 new_seqs['accession'], self.table[self.table['status'] == self.status]['accession'])
+                # check that all del_tab entries are deleted in table
+                assert any(x in del_seq['accession'].to_list() for x in self.table.loc[self.table['status'] >= 0,
+                                                                                       'accession'].to_list()) == False, \
+                    ([i for i in del_seq['accession'].to_list() if i in self.table.loc[self.table['status'] >= 0, 'accession'].to_list()])
+                check_df_index_unique(new_seqs)
+                check_df_index_unique(self.table)
+                check_filter_numbers(del_seq, new_seqs, before_filter)
+                assert len(new_seqs) == len(self.table[self.table['status'] == self.status]), \
+                    (len(new_seqs), len(self.table[self.table['status'] == self.status]),
+                     new_seqs['accession'], self.table[self.table['status'] == self.status]['accession'])
 
             # filter for number otu
             f = FilterNumberOtu(self.config, self.table, self.status)
@@ -343,11 +350,13 @@ class PhylogeneticUpdater:
                     write_msg_logfile(msg, self.config.workdir)
                     new_seqs = self.extend_with_unpublished()
                     #self.update_aln()
+                    if len(new_seqs) == 0:
+                        self.config.unpublished = False
                     if self.config.perpetual is False:
                         self.config.unpublished = False
-                        if self.config.blast_all is True:
-                            self.table.at[self.table.status == self.status, 'status'] = 0
-                            self.status = 0
+                    if self.config.blast_all is True:
+                        self.table.at[self.table.status == self.status, 'status'] = 0
+                        self.status = 0
                 else:
                     new_seqs = self.extend()  # todo rename to find new seqs
                     msg = "Time after BLAST: {}.\n".format(datetime.datetime.now())
@@ -361,6 +370,7 @@ class PhylogeneticUpdater:
                 retrieved_seqs = len(new_seqs)
                 msg = "Newly found seqs: {}.\n".format(len(new_seqs))
                 write_msg_logfile(msg, self.config.workdir)
+                self.table.to_csv(os.path.join(self.workdir, 'table.updated'), index=False)
             msg = "Time before update tre/aln: {}.\n".format(datetime.datetime.now())
             write_msg_logfile(msg, self.config.workdir)
             msg = "Newly found seqs will be added to aln and tre: {}.\n".format(len(all_new_seqs))
@@ -371,10 +381,10 @@ class PhylogeneticUpdater:
                 if os.path.exists(os.path.join(self.workdir, 'table.updated')):
                     os.rename(os.path.join(self.workdir, 'table.updated'),
                               os.path.join(self.workdir, "table_updated_tmp"))
-            self.table.to_csv(os.path.join(self.workdir, 'table.updated'), index=False)
-        self.update_aln()
         self.table['sequence_length'] = self.table['sseq'].apply(len)
         self.table.to_csv(os.path.join(self.workdir, 'table.updated'), index=False)
+
+        self.update_aln()
         if self.tre is None:
             self.tre_fn = os.path.abspath(os.path.join(self.config.workdir, "updt_aln.fasta.tree"))
             self.tre = Tree.get(path=os.path.join(self.config.workdir, 'updt_tre.tre'),
@@ -516,7 +526,10 @@ class FilterNumberOtu(Filter):
         debug("filter FilterNumberOtu")
         # get all seqs and ids from aln and before for next filter
         present = self.table[self.table['status'] > -1]
-        added_before = present[present['status'].astype(int) < self.status]
+        if self.status == 0:
+            added_before = present[present['status'].astype(int) <= self.status]  # added to be able to filter unpublished
+        else:
+            added_before = present[present['status'].astype(int) < self.status]
 
         if downtorank is None:
             tax_ids_newseqs = new_seqs['ncbi_txid']

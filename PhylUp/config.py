@@ -114,6 +114,10 @@ class ConfigObj(object):
             self.unpubl_data = config["unpublished"]['unpubl_data']
             self.unpubl_names = config["unpublished"]['unpubl_names']
             self.perpetual = config["unpublished"]['perpetual']
+            if self.perpetual == "True" or self.perpetual == "true":
+                self.perpetual = True
+            else:
+                self.perpetual = False
         else:
             self.unpublished = False
         self.blast_all = config["unpublished"]['blast_all']
@@ -184,6 +188,11 @@ class ConfigObj(object):
                                                         "is not 'blast' or 'length'" % self.filtertype)
         self.threshold = int(config["filter"]["threshold"])
         self.downtorank = config["filter"]["downtorank"]
+        self.identical_seqs = config["filter"]["identical_seqs"]
+        if self.identical_seqs == "True" or self.identical_seqs == "true":
+            self.identical_seqs = True
+        else:
+            self.identical_seqs = False
 
         self.different_level = config["filter"]["different_level"]
         if self.different_level == "True" or self.different_level == "true":
