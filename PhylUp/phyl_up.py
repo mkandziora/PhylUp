@@ -388,16 +388,17 @@ class PhylogeneticUpdater:
         self.table['sequence_length'] = self.table['sseq'].apply(len)
         self.table.to_csv(os.path.join(self.workdir, 'table.updated'), index=False)
 
-        self.update_aln()
-        if self.tre is None:
-            self.tre_fn = os.path.abspath(os.path.join(self.config.workdir, "updt_aln.fasta.tree"))
-            self.tre = Tree.get(path=os.path.join(self.config.workdir, 'updt_tre.tre'),
-                                schema="newick",
-                                preserve_underscores=True,
-                                taxon_namespace=self.aln.taxon_namespace)
-        self.update_tre()
-        msg = "Time finished: {}.\n".format(datetime.datetime.now())
-        write_msg_logfile(msg, self.config.workdir)
+        if len(all_new_seqs) > 0:
+            self.update_aln()
+            if self.tre is None:
+                self.tre_fn = os.path.abspath(os.path.join(self.config.workdir, "updt_aln.fasta.tree"))
+                self.tre = Tree.get(path=os.path.join(self.config.workdir, 'updt_tre.tre'),
+                                    schema="newick",
+                                    preserve_underscores=True,
+                                    taxon_namespace=self.aln.taxon_namespace)
+            self.update_tre()
+            msg = "Time finished: {}.\n".format(datetime.datetime.now())
+            write_msg_logfile(msg, self.config.workdir)
 
     def call_input_cleaner(self):
         """
