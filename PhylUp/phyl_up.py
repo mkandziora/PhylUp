@@ -76,23 +76,28 @@ class PhylogeneticUpdater:
         :param mrca: input mrca
         :return: sets self.mrca
         """
-        if type(mrca) is int:
-            self.mrca = mrca
-        if mrca.isdigit():
-            self.mrca = int(mrca)
-
-        elif len(mrca.split(',')) > 1:
-            mrca_list = []
-            for item in mrca.split(','):
-                mrca = int(item.lstrip().rstrip())
-                mrca_list.append(mrca)
-            self.mrca = mrca_list
-        else:
+        # if type(mrca) is int:
+        #     self.mrca = mrca
+        # if mrca.isdigit():
+        #     self.mrca = int(mrca)
+        #
+        if mrca == None:
             sys.stdout.write('Get mrca as input was not provided.\n')
             aln_taxids = set(self.table['ncbi_txid'].tolist())
             ncbi_parser = ncbi_data_parser.Parser(names_file=self.config.ncbi_parser_names_fn,
                                                   nodes_file=self.config.ncbi_parser_nodes_fn)
             self.mrca = ncbi_parser.get_mrca(taxid_set=aln_taxids)
+        elif len(mrca.split(',')) > 1:
+            mrca_list = set()
+            for item in mrca.split(','):
+                mrca = int(item.lstrip().rstrip())
+                mrca_list.add(mrca)
+            self.mrca = mrca_list
+        elif mrca is not None:
+            self.mrca = int(mrca)
+        else:
+            sys.stderr.write('Something goes wrong with the mrca input.\n')
+            exit(-55)
 
 
     def extend_with_unpublished(self):
