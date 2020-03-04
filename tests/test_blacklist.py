@@ -14,12 +14,12 @@ def test_blacklist():
 
     conf = config.ConfigObj(configfi, workdir, interactive=False)
     conf.blast_folder = os.path.abspath("./data/blast_for_tests")
-    test = phyl_up.PhylogeneticUpdater(id_to_spn, seqaln, mattype, trfn, schema_trf, conf, mrca=18794)
+    test = phyl_up.PhylogeneticUpdater(id_to_spn, seqaln, mattype, trfn, schema_trf, conf)
 
     new_seqs = test.extend()
     len_no_bl = len(new_seqs)
 
-    test = phyl_up.PhylogeneticUpdater(id_to_spn, seqaln, mattype, trfn, schema_trf, conf, mrca=18794, blacklist=blacklist)
+    test = phyl_up.PhylogeneticUpdater(id_to_spn, seqaln, mattype, trfn, schema_trf, conf, blacklist=blacklist)
     new_seqs = test.extend()
     len_bl = len(new_seqs)
 

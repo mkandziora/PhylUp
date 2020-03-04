@@ -1,8 +1,8 @@
 import datetime
-import pandas as pd
+# import pandas as pd
 import os
 from PhylUp import phyl_up, config, blast
-from PhylUp import cd
+# from PhylUp import cd
 
 def test_run_blast_query():
     workdir = "tests/output/test_runs"
@@ -15,7 +15,7 @@ def test_run_blast_query():
 
     conf = config.ConfigObj(configfi, workdir, interactive=False)
     conf.blast_folder = os.path.abspath("./data/blast_for_tests")
-    test = phyl_up.PhylogeneticUpdater(id_to_spn, seqaln, mattype, trfn, schema_trf, conf, mrca=18794)
+    test = phyl_up.PhylogeneticUpdater(id_to_spn, seqaln, mattype, trfn, schema_trf, conf)
 
     # create list of indice of subset list
     today = datetime.date.today()
@@ -32,11 +32,10 @@ def test_run_blast_query():
         tip_name = test.table.loc[index, 'accession']
 
         query_seq = test.table.loc[index, 'sseq']
-        print()
         test.table.loc[index, 'date'] = today  # TODO: is here the blast date the issue???
         print(query_seq, tip_name, test.config.blastdb, "Genbank", test.config)
         # new_seq_tax = blast.get_new_seqs(query_seq, tip_name, test.config.blastdb, "Genbank", test.config)
-        blast.run_blast_query(query_seq, tip_name, test.config.blastdb, "Genbank", test.config)
+        blast.run_blast_query(query_seq, tip_name, "Genbank", test.config)
         new_blastseqs = blast.read_blast_query_pandas(tip_name, test.config, 'Genbank')
         assert len(new_blastseqs) > 0
 

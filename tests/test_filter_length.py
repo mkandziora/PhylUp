@@ -14,7 +14,7 @@ def test_filterlen():
 
     conf = config.ConfigObj(configfi, workdir, interactive=False)
     conf.blast_folder = os.path.abspath("./data/blast_for_tests")
-    test = phyl_up.PhylogeneticUpdater(id_to_spn, seqaln, mattype, trfn, schema_trf, conf, mrca=18794)
+    test = phyl_up.PhylogeneticUpdater(id_to_spn, seqaln, mattype, trfn, schema_trf, conf)
 
     aln = phylogenetic_helpers.read_in_aln(test.aln_fn, test.aln_schema)
 
