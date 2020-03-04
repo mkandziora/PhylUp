@@ -20,11 +20,12 @@ import pandas as pd
 from copy import deepcopy
 from dendropy import DnaCharacterMatrix, Tree
 
-import numpy as np
 import ncbiTAXONparser.ncbi_data_parser as ncbi_data_parser
 
 from . import cd
 from . import debug
+from . import suppress_stdout
+
 
 def truncate_papara_aln(aln):
     """
@@ -270,10 +271,11 @@ def build_table_from_file(id_to_spn, config, downtorank=None):
     :param downtorank: name of rank if sequences shall be filtered to a higher rank
     :return: table with all sequence information available
     """
-    debug("Build table with information about sequences and taxa.")
     ncbi_parser = ncbi_data_parser.Parser(names_file=config.ncbi_parser_names_fn,
                                           nodes_file=config.ncbi_parser_nodes_fn,
                                           interactive=False)
+    sys.stdout.write("Build table with information about sequences and taxa.\n")
+
     debug(id_to_spn)
     table = get_txid_for_name_from_file(id_to_spn, ncbi_parser)  # builds name id link
     table['status'] = 0
@@ -335,7 +337,6 @@ def get_txid_for_name_from_file(tipname_id_fn, ncbi_parser):
     :param ncbi_parser: ncbiTAXONparser instance
     :return:
     """
-    print(tipname_id_fn)
     columns = ['accession', 'ncbi_txn']
     name_id = pd.read_csv(tipname_id_fn, names=columns,  sep=",", header=None)
     name_id['ncbi_txid'] = name_id['ncbi_txn'].apply(ncbi_parser.get_id_from_name)

@@ -533,7 +533,9 @@ def read_blast_query_pandas(blast_fn, config, db_name):
     non_redundant['accession'] = non_redundant['accession'].apply(get_acc_from_blast)  # todo: throws pandas warning about sort, but if added, its breaking
     assert len(redundant) + len(non_redundant) == len(data)
     new_seqs = pd.concat([non_redundant_redundant, non_redundant], sort=True, ignore_index=True)
-    assert new_seqs['ncbi_txid'].isnull().values.any() == False
+
+
+    assert new_seqs['ncbi_txid'].isnull().values.any() == False, ('not all new seqs have a taxon id. Often related to error in input of unpiblished ')
     new_seqs['sseq'] = new_seqs['sseq'].str.replace("-", "")
     new_seqs['date'] = datetime.datetime.strptime('01/01/00', '%d/%m/%y')
     # todo this could be made faster by running it on the redundant/non_redundant data first

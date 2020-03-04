@@ -201,7 +201,6 @@ class PhylogeneticUpdater:
         subcols = new_seqs[['ncbi_txn', 'ncbi_txid', 'status', 'status_note', "date", 'sseq', 'accession']]
         subcols.at[:, 'status'] = self.status
         self.table = pd.concat([self.table, subcols], ignore_index=True, sort=True)
-        #assert self.table['status'].hasnans == False, self.table['status'].hasnans
         if not self.config.blast_all:
             assert len(subcols) == len(self.table[self.table['status'] == self.status]), \
                 (len(subcols), len(self.table[self.table['status'] == self.status]), subcols['accession'])
@@ -221,6 +220,8 @@ class PhylogeneticUpdater:
         # everyone's filter
         new_seqs = new_seqs[~new_seqs['accession'].isin(self.table['accession'])]  # ~ is the pd not in/!
         print('Length of new seqs before filtering: {}'.format(len(new_seqs)))
+        msg = "Time before filtering: {}.\n".format(datetime.datetime.now())
+        write_msg_logfile(msg, self.config.workdir)
         if len(new_seqs) > 0:
             debug(new_seqs.columns)
             new_seqs = self.basic_filters(aln, self.mrca, new_seqs)
@@ -233,6 +234,8 @@ class PhylogeneticUpdater:
         # filter for seq identity process
         if len(new_seqs) > 0:
             new_seqs = self.compare_filter(new_seqs)
+        msg = "Time after filtering: {}.\n".format(datetime.datetime.now())
+        write_msg_logfile(msg, self.config.workdir)
         return new_seqs
 
     def compare_filter(self, new_seqs):
@@ -247,8 +250,6 @@ class PhylogeneticUpdater:
                 assert idx in self.table.index, (idx, self.table.index)
             if self.config.identical_seqs is False:
                 f = FilterSeqIdent(self.config, self.table, self.status)
-                msg = "Time before Filter {}: {}.\n".format(f, datetime.datetime.now())
-                write_msg_logfile(msg, self.config.workdir)
                 before_filter = new_seqs
                 f.filter(new_seqs)
                 self.aln = f.aln
@@ -269,8 +270,6 @@ class PhylogeneticUpdater:
 
             # filter for number otu
             f = FilterNumberOtu(self.config, self.table, self.status)
-            msg = "Time before Filter {}: {}.\n".format(f, datetime.datetime.now())
-            write_msg_logfile(msg, self.config.workdir)
             f.filter(new_seqs, self.config.downtorank)
             self.table = f.table
             new_seqs = f.upd_new_seqs
@@ -297,8 +296,6 @@ class PhylogeneticUpdater:
                          FilterMRCA(self.config, mrca)
                          ]
         for f in remove_basics:
-            msg = "Time before Filter {}: {}.\n".format(f, datetime.datetime.now())
-            write_msg_logfile(msg, self.config.workdir)
             internal_new_seq = new_seqs
             f.filter(new_seqs)
             new_seqs = f.upd_new_seqs
@@ -320,6 +317,7 @@ class PhylogeneticUpdater:
 
         msg = "Begin update: {}.\n".format(datetime.datetime.now())
         write_msg_logfile(msg, self.config.workdir)
+        print(msg)
 
         columns = ['ncbi_txn', 'ncbi_txid', 'status', 'status_note', "date",
                    'accession', 'pident', 'evalue', 'bitscore', 'sseq', 'title']
@@ -354,6 +352,7 @@ class PhylogeneticUpdater:
                         self.config.unpublished = False
                     if self.config.perpetual is False:
                         self.config.unpublished = False
+
                     if self.config.blast_all is True:
                         self.table.at[self.table.status == self.status, 'status'] = 0
                         self.status = 0
@@ -557,8 +556,9 @@ class FilterNumberOtu(Filter):
                         if self.config.filtertype == 'blast':
                             filtered_acc = self.wrapper_filter_blast_otu(ns_txid_df, os_txid_df, 'accession', txid)  # returns only add column
                             filtered = new_seqs[new_seqs['accession'].isin(filtered_acc)]
-                            assert len(filtered_acc) == len(filtered), (len(filtered_acc), len(filtered),
-                                                                        [i for i in filtered_acc if i in filtered['accession'].to_list()])
+                            assert len(filtered_acc) == len(filtered), \
+                                (len(filtered_acc), len(filtered),
+                                 [i for i in filtered_acc if i in filtered['accession'].to_list()])
                         elif self.config.filtertype == 'length':
                             debug('filter otu by length')
                             filtered = self.select_seq_by_length(ns_txid_df, os_txid_df)
