@@ -184,6 +184,16 @@ def check_align(aln):
             return
     return seqlen
 
+def run_papara():
+    """
+    Runs papara and adds new sequences to the alignment.
+
+    :return:
+    """
+    with suppress_stdout():
+        subprocess.check_call(["papara_static_x86_64", "-t", "papara_tre.tre", "-s", "aln_papara.phy",
+                               #  "-j", "{}".format(self.config.num_threads),  # FIXME: only works when papara is compiled.
+                               "-q", "new_seqs.fasta", "-n", 'phylip'], shell=False)
 
 def run_modeltest(aln_fn, workdir, model, partition=None):
     """

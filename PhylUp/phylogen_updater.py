@@ -93,7 +93,7 @@ class AlnUpdater(object):
         if self.tre is not None:
             phylogenetic_helpers.write_papara_trefile(self.tre, self.config.workdir)
         with cd(self.config.workdir):
-            self.run_papara()
+            phylogenetic_helpers.run_papara()
             path = os.path.join(os.getcwd(), "papara_alignment.phylip".format())
             assert os.path.exists(path), "{} does not exists".format(path)
         aln_old = self.aln
@@ -104,17 +104,6 @@ class AlnUpdater(object):
             phylogenetic_helpers.truncate_papara_aln(aln_old)
         msg = "Following papara alignment, aln has {} seqs \n".format(len(self.aln))
         write_msg_logfile(msg, self.config.workdir)
-
-    def run_papara(self):
-        """
-        Runs papara and adds new sequences to the alignment.
-
-        :return:
-        """
-        with suppress_stdout():
-            subprocess.check_call(["papara_static_x86_64", "-t", "papara_tre.tre", "-s", "aln_papara.phy",
-                                   #  "-j", "{}".format(self.config.num_threads),  # FIXME: only works when papara is compiled.
-                                   "-q", self.newseqs_file, "-n", 'phylip'], shell=False)
 
     def write_papara_queryseqs(self):
         """Writes out the query sequence file which is needed by papara.
