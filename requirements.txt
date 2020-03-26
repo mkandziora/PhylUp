@@ -3,5 +3,5 @@ pandas
 DendroPy
 biopython
 pytest
--e git://github.com/blubbundbla/phylogenetic_concatenation.git
--e git://github.com/blubbundbla/ncbiTAXONparser.git
+-e git://github.com/blubbundbla/phylogenetic_concatenation.git#egg=phylogenetic_concatenation
+-e git://github.com/blubbundbla/ncbiTAXONparser.git#egg=ncbiTAXONparser
