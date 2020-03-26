@@ -62,6 +62,22 @@ def truncate_papara_aln(aln):
     tmpaln.write(path="new_seqs.fasta", schema='fasta')
 
 
+def make_mafft_aln(aln, workdir):
+    """ Write fasta for mafft alignment"""
+    write_papara_alnfile(aln, workdir)
+
+    aln = DnaCharacterMatrix.get(path=os.path.join(workdir, "aln_papara.phy"), schema='phylip')
+    aln.write(path=os.path.join(workdir, "aln_papara.fasta"), schema='fasta')
+
+    with open(os.path.join(workdir, "aln_papara.fasta")) as aln_fasta:
+        existing = aln_fasta.read()
+        with open(os.path.join(workdir, "new_seqs.fasta")) as new:
+            new_seqs = new.read()
+            with open(os.path.join(workdir, "mafft.fasta"), "wt") as fout:
+                fout.write(existing)
+                fout.write(new_seqs)
+
+
 def write_papara_alnfile(aln, workdir):
     """This writes out aln files for papara (except query sequences).
     Papara needs phylip format for the alignment.
