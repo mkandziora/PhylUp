@@ -1,15 +1,16 @@
-# PhylUp - automatic updating of phylogenetic alignments    
-![](/home/blubb/sync-TP-T470s/PANDAS_phyfilter_v1/manuscript/images/PhylUp_aln_schema.png)   
+# PhylUp - updating of phylogenetic alignments with custom sampling
+![](./manuscript/new_images2_vertikal.png)   
     
 ## Short introduction to the tool:
 
-PhylUp is a command-line tool written in python3 to automatically update alignments and phylogenies.
-As input it needs a alignment (and if available a phylogeny) and 
-a file with the information about the tip names and the corresponding species names. 
+PhylUp is a command-line tool written in python3 to automatically update alignments and phylogenies with a focus on different sampling strategies.
+As input it needs a alignment or a single sequence (and if available a phylogeny) and 
+a file with the information about the sequence names and the corresponding species names. 
 PhylUp will take every input sequence and blasts it against the ncbi GenBank database. 
 Sequences that are similar to the input sequence will be added to the alignment, 
-if they are a different taxon and/or they are longer than existing sequences or differ in at least one point mutation.
-Newly found sequence will be blasted again and this continues until no new sequences were found.
+if they are a different taxon and/or they are longer than existing sequences.
+They are then filtered to user settings provided in the configuration file.
+Newly found and filtered sequences will be blasted again until no new sequences were found.
 Finally, it will place the newly found sequences into the alignment and if enabled to update phylogenies.
 
 After the single-gene datasets are updated, the data can be concatenated. 
@@ -27,6 +28,7 @@ The tool decides randomly which sequences to combine if there are more than a si
 * [BLAST+](https://blast.ncbi.nlm.nih.gov/Blast.cgi?CMD=Web&PAGE_TYPE=BlastDocs&DOC_TYPE=Download) - It needs blast+ v.2.9 or higher. It is needed for filter runs and when using local BLAST databases. Setup and installation information can be found [here](https://www.ncbi.nlm.nih.gov/books/NBK1762/).
 * [EPA-NG](https://github.com/Pbdas/epa-ng/archive/master.zip) - places new sequences into the phylogeny
 * [gappa](https://github.com/lczech/gappa/archive/master.zip) - transforms the output from EPA-NG into a readable output
+* [MAFFT](https://mafft.cbrc.jp/alignment/software/linux.html) - alignment tool if a single sequence was provided as input.
 
 On a Linux machine check [here](./install_req.bash) for an example bash code on how to install the required dependencies.
 
@@ -40,7 +42,7 @@ make sure the programs are accessible from everywhere, thus add them to your PAT
 * as a normal package: `wget  https://github.com/blubbundbla/PhylUp/archive/master.zip`
 * as a git repository: `git clone 'git@github.com:blubbundbla/PhylUp.git'`
 
-#### 2.b) install a virtual environment
+#### 2.b) optional: install a virtual environment
   This is very useful if you want to run it on a cluster and/or do not want to change already installed python packages on your computer.
   A virtual environment will locally install the packages needed.
 
@@ -113,29 +115,41 @@ run from within the PhylUp main folder:
 #### **1. edit major settings in the config file**
 
 There is an example config file in `./data/localblast.config`
+  * **General settings**:
+    * **num_threads**: defines how many cores shall be used for the blasting and other parallelized parts
+    * **mrca**: ncbi taxonomy ID; this is optional and the user can also provide several ID's (e.g. mrca = 1, 2, 3).
+                Often phylogenies include outgroups, and someone might not be interested in updating that part of the tree. 
+                This can be avoided by defining the most recent common ancestor. 
+                It requires the ncbi taxon identifier for the group of interest, which can be obtained from [here](https://www.ncbi.nlm.nih.gov/taxonomy) or by using a provided script:
+
+	    `python3 ./data/spn_to_taxid.py NAME_OF_MRCA`
+
+	    Please note that in the case that the mrca is a species name, the space between the two words needs to be replaced with an '_'
+
+  * **unpublished sequence settings**:
+    * **unpublished**: True or False; if additional database shall be used
+    * **unpubl\_data**: Path to folder with files - no files other than unpublished sequences are allowed
+    * **unpubl\_names**: path to file with unique name and taxon name; needs to be in a different folder than the unpublished sequences
+    * **perpetual**: True or False; False, if the input sequences shall only be blasted against the unpublished database a single time
+    * **blast\_all**: True or False; BLAST original input plus the newly added during the following Genbank search or only the newly added once
+   
   * **BLAST settings**:
+    * **blast\_type**: must be either 'Genbank' or 'own' (own is a folder with FASTA formatted sequences)
+    * **taxid\_map**: only needed if option blast\_type is set to own; provide path to file that contains a   translation table (sequence name, species name)
+    * **localblastdb**: path to local blast database; path must end with a '/' 
     * **e_value_thresh**: 
       This is the e-value that can be retrieved from BLAST searches and is used to limit the BLAST results to sequences that are similar to the search input sequence.
       It is a parameter that describes how many hits can be expected by chance from a similar-sized database during BLAST searches. Small e-value indicate a significant match. In general, shorter sequences have lower e-values, because shorter sequences have a higher probability to occur in the database by chance. For more information please refer to the ncbi BLAST resources (e.g. \url{https://blast.ncbi.nlm.nih.gov/Blast.cgi?CMD=Web&PAGE_TYPE=BlastDocs}).
       We used an e-value of 0.001 for all example datasets.
     * **hitlist_size**: 
       This specifies the amount of sequences being returned from a BLAST search. If your phylogeny does not contain a lot of nodes, it can be a low value, which will speed-up the analysis. If the sampled lineage contains many sequences with low sequence divergence it is better to increase it to be able to retrieve all similar sequences. It is not advised to have a really low hitlist size, as this will influence the number of sequences that will be added to your alignment. Low hitlist sizes might not return all best-matches but only the first 10 even though there might be more best-matches in the database \citep{shah_misunderstood-2018}. Furthermore, for example, if the hitlist size is 10, but the phylogeny which shall be updated is sparsely sampled, this might result in an updated phylogeny, that has only the parts of the phylogeny updated, that were present in the input phylogeny. Lineages that were not present might never be added, as the 10 best hits all belong to the lineages already present. 
-    * **location**: 
-      This defines which kind of BLAST service is used. At the moment leave it as is, `local`.
-       * **local**: will look for a local database under the path specified under `localblastdb`
-       * **remote**: either ncbi (default) or amazon cloud service (website needs to be defined using `url_base`) - not yet implemented
-    * **localblastdb**: needed when `location = local` path to the locally stored BLAST database, needs to have a `/` at the end of the path
-    * **url_base**: needed when `location = remote` and you use a Amazon cloud service
-    * **num_threads**: defines how many cores shall be used for the blasting and other parallelized parts
-    * **unpublished**: True/False - set to True if you want to add unpublished sequences
-    * **unpubl_data**: path to folder with sequence files - no files other than unpublished seqs are allowed - unpubl names needs to go somewhere else
-    * **unpubl_names**: path to file with sequence names corresponding to ncbi taxon names
-
+    * **fix\_blast\_result\_folder**:  True or False; True will use same blast folder across runs - be careful - if input sequences across runs have different loci this will not update the results as it uses files which exists. Furthermore, if the blast settings above are changed all files need to be deleted.
+       
   * **Alignment settings**:
     * **min_len:** minimum length a new sequence can have
     * **max_len**: maximum length of sequences that are added to alignment, must be greater than 1.
-    * **trim_perc**: How many sequences need to have information at the beginning and end of an alignment, to not be trimed.
-
+    * **trim_perc**: value that determines how many seq need to be present before the beginning and end of alignment will be trimmed
+  
   * **Filter Settings**:
     * **filtertype:**   This defines how to filter the number of sequences per taxon.
         * **blast**:  All sequences belonging to a taxon will be used for a filtering blast search.
@@ -154,18 +168,20 @@ There is an example config file in `./data/localblast.config`
                      It can be set to None and then for all taxa, there will be the maximum number of threshold sequences retrieved.
                     If it is set to species, there will no more than the maximum number of sequences randomly choosen from all sequences available for all the subspecies.
                         It can be set to any ranks defined in the ncbi taxonomy browser.
-    * **different_level:** True or False. Makes hierachical adding of sequences possible - see Asteroideae example.
-
+    * **different_level:** True or False. Makes hierarchical adding of sequences possible - see Asteroideae example.
+    * **identical\_seqs:** True or False; set to True if identical sequences shall be kept
+        
   * **Tree Calculation**:
-    *	**update_tree:** True or False. Set to true if you want to calculate an updated phylogeny from within the program. Often not advisable as HighPerformanceClusters are often set up in different ways and the tool might not make the use of the power of the cluster.
+    * **update_tree:** True or False. Set to true if you want to calculate an updated phylogeny from within the program. Often not advisable as HighPerformanceClusters are often set up in different ways and the tool might not make the use of the power of the cluster.
 
     * **backbone:** True or False. Set to true if you only want to add new sequences to existing tree, without recalculating the full tree. 
-  
-  
+    * **modeltest\_criteria:** must be BIC, AIC or AICc; defined which information criterion is used to select substitution model for the alignment
+       
   * **Internal settings:**
+    * **nodes\_fn:** path to nodes file from ncbi, is usually downloaded automatically and placed in the provided path
+    * **names\_fn:** path to names file from ncbi, is usually downloaded automatically and placed in the provided path
+       
   
-    Will follow, if you are looking for it and it's not here, send us an email.
-    
 
 #### **2. write your analysis file**
 ##### A. standard run 
@@ -191,18 +207,10 @@ Note: Specified paths have to start either from your root directory (e.g. `/home
 
 Beside the standard definition, there are more input options. Currently supported are:
 * **blacklist**: A list of sequences, that shall not be added or were identified to be removed later. This needs to be formatted as a python list containing the GenBank identifiers (e.g. `[accession number, accession number]`).
-* **mrca**: Define the clade of interest by providing the ncbi taxonomic identifier.
-    Often phylogenies include outgroups, and someone might not be interested in updating that part of the tree. 
-    This can be avoided by defining the most recent common ancestor. 
-    It requires the ncbi taxon identifier for the group of interest, which can be obtained from [here](https://www.ncbi.nlm.nih.gov/taxonomy) or by using a provided script:
-
-	`python3 ./data/spn_to_taxid.py NAME_OF_MRCA`
-
-	Please note that in the case that the mrca is a species name, the space between the two names needs to be replaced with an '_'
 * **status_end**: This is an option to tell the program how often to run the blast searches. If it is set to 1, it will only blast the input sequences once and adds those found to the alignment. If it is set to 2, it will blast the newly retrieved sequences from the initial blast search and adds those results to the alignment as well. As such the input plus the first round of newly found sequences is blasted. If it is set to 3, it will add one more 'round', etc... 
 
 
-##### B. hierachical updating - Asteroideae example:
+##### B. hierarchical updating - Asteroideae example:
 
 Update an alignment with different settings of mrca, threshold and downtorank settings.
 
@@ -212,15 +220,12 @@ There is an example file in `example_different_levels.py`.
 
  Instead of using GenBank as the source of new sequences, we can specify a folder which contains sequences in fasta format and this folder will be used as a sequence database. 
  Before using the BLAST database to find new sequences, sequences from that folder can be added to the alignment/phylogeny if the folder contains sequences that are similar to the sequences already present in the alignment. This is intended to be used for newly sequenced material, which is not yet published on GenBank.
-     To use this you need to specify:
-     
-   * add_unpubl_seq = path to folder with the sequences
-   * id_to_spn_addseq_json = path to file which translates the sequences names to species names
+     To use this you need to adapt the unpublished sequence settings.
      
    There is an example file in `example_unpublished.py`, with an example of the input files in `./data/unpublished_seqs` and `./data/unpublished_names.csv` shows how to write the comma-delimited file.
 
 
-#### **3. start to update your phylogeny:**
+#### **3. start to update your alignment:**
 
 This should be straight forward - type in your PhylUp main folder:
 
@@ -230,7 +235,7 @@ And now you just need to wait...
 
 #### **4. Concatenate different single-gene PhylUp runs:**
     
-After the single-gene PhylUp runs were updated, the data can be combined, see for example `example_concat.py`.
+After the single-gene PhylUp runs were updated, the data can be combined using [phylogenetic concatenation](https://github.com/blubbundbla/phylogenetic_concatenation.git), see for example `example_concat.py`.
 
 
 #### **5. Navigating the output:**
