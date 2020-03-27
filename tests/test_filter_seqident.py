@@ -1,4 +1,6 @@
 import os
+from distutils.dir_util import copy_tree
+
 from PhylUp import phyl_up, config
 import pandas as pd
 
@@ -9,7 +11,13 @@ def test_oldseq_longer():
     id_to_spn = "data/tiny_test_example/test_nicespl.csv"
     seqaln = "data/tiny_test_example/test.fas"
     mattype = "fasta"
-    configfi = "data/localblast.config"
+    configfi = "data/localblast_test.config"
+
+    tmp_folder = os.path.join(workdir, 'tmp')
+    if not os.path.exists(tmp_folder):
+        os.mkdir(tmp_folder)
+    #call(['cp', '-a', 'data/tmp_for_test/', tmp_folder])
+    copy_tree('data/tmp_for_test/', tmp_folder)
 
     conf = config.ConfigObj(configfi, workdir, interactive=False)
     conf.threshold = 2
@@ -107,7 +115,7 @@ def test_not_add_identical():
     id_to_spn = "data/tiny_test_example/test_nicespl.csv"
     seqaln = "data/tiny_test_example/test.fas"
     mattype = "fasta"
-    configfi = "data/localblast.config"
+    configfi = "data/localblast_test.config"
 
 
     conf = config.ConfigObj(configfi, workdir, interactive=False)
@@ -203,7 +211,7 @@ def test_filter_compare():
     id_to_spn = "data/tiny_test_example/test_nicespl.csv"
     seqaln = "data/tiny_test_example/test.fas"
     mattype = "fasta"
-    configfi = "data/localblast.config"
+    configfi = "data/localblast_test.config"
 
     conf = config.ConfigObj(configfi, workdir, interactive=False)
     conf.threshold = 2
@@ -258,7 +266,7 @@ def test_filter_compare_shorter():
     id_to_spn = "data/tiny_test_example/test_nicespl.csv"
     seqaln = "data/tiny_test_example/test.fas"
     mattype = "fasta"
-    configfi = "data/localblast.config"
+    configfi = "data/localblast_test.config"
 
     conf = config.ConfigObj(configfi, workdir, interactive=False)
     conf.threshold = 2
@@ -314,7 +322,7 @@ def test_filter_seqident_newexist():
     id_to_spn = "data/tiny_test_example/test_nicespl.csv"
     seqaln = "data/tiny_test_example/test.fas"
     mattype = "fasta"
-    configfi = "data/localblast.config"
+    configfi = "data/localblast_test.config"
 
     conf = config.ConfigObj(configfi, workdir, interactive=False)
     conf.threshold = 2
@@ -387,7 +395,7 @@ def test_oldseq():
     id_to_spn = "data/tiny_test_example/test_nicespl.csv"
     seqaln = "data/tiny_test_example/test.fas"
     mattype = "fasta"
-    configfi = "data/localblast.config"
+    configfi = "data/localblast_test.config"
 
     conf = config.ConfigObj(configfi, workdir, interactive=False)
     conf.threshold = 2
@@ -462,7 +470,7 @@ def test_no_similar():
     id_to_spn = "data/tiny_test_example/test_nicespl.csv"
     seqaln = "data/tiny_test_example/test.fas"
     mattype = "fasta"
-    configfi = "data/localblast.config"
+    configfi = "data/localblast_test.config"
 
     conf = config.ConfigObj(configfi, workdir, interactive=False)
     conf.threshold = 2

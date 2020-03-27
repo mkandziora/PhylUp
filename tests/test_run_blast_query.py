@@ -1,6 +1,7 @@
 import datetime
 # import pandas as pd
 import os
+from distutils.dir_util import copy_tree
 from PhylUp import phyl_up, config, blast
 # from PhylUp import cd
 
@@ -11,7 +12,13 @@ def test_run_blast_query():
     id_to_spn = "data/tiny_test_example/test_nicespl.csv"
     seqaln = "data/tiny_test_example/test.fas"
     mattype = "fasta"
-    configfi = "data/localblast.config"
+    configfi = "data/localblast_test.config"
+
+    tmp_folder = os.path.join(workdir, 'tmp')
+    if not os.path.exists(tmp_folder):
+        os.mkdir(tmp_folder)
+    #call(['cp', '-a', 'data/tmp_for_test/', tmp_folder])
+    copy_tree('data/tmp_for_test/', tmp_folder)
 
     conf = config.ConfigObj(configfi, workdir, interactive=False)
     conf.blast_folder = os.path.abspath("./data/blast_for_tests")
