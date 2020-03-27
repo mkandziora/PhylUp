@@ -73,9 +73,11 @@ def get_taxid_from_acc(gb_acc, blastdb, workdir):
     #                                                                                             gb_acc)
     cmd1 = "blastdbcmd -db {} -entry_batch {} -outfmt %T -out {}/tmp/tax_id_{}.csv".format(blastdb, fn, workdir,
                                                                                                  gb_acc)
-    with suppress_stdout():
-        os.system(cmd1)
-    f = open(os.path.join(workdir, "tmp/tax_id_{}.csv".format(gb_acc)))
+    fn_out = "{}/tmp/tax_id_{}.csv".format(workdir, gb_acc)
+    if not os.path.exists(fn_out):
+        with suppress_stdout():
+            os.system(cmd1)
+    f = open(fn_out)
     tax_id_l = []
     for line in iter(f):
         line = line.rstrip().lstrip()
