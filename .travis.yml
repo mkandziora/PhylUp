@@ -147,8 +147,8 @@ install:
 script:
   - wget 'https://ftp.ncbi.nlm.nih.gov/pub/taxonomy/taxdump.tar.gz'
   - gunzip  -cd taxdump.tar.gz | (tar xvf - names.dmp nodes.dmp)
-  - mkdir taxonomy
-  - mv *.dmp taxonomy/
+  #- mkdir taxonomy
+  - mv *.dmp src/ncbitaxonparser/ncbiTAXONparser/data
   - mkdir tests/output
   - mkdir tests/output/test_runs
   - cp data/data_for_tests/* tests/output/test_runs/
