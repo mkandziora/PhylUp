@@ -1,5 +1,5 @@
 # PhylUp - updating of phylogenetic alignments with custom sampling
-![](./manuscript/new_images2_vertikal.png)   
+![](./PhylUp_workflow.png)   
     
 ## Short introduction to the tool:
 
