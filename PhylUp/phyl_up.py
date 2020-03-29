@@ -94,7 +94,7 @@ class PhylogeneticUpdater:
                 mrca_list.add(mrca)
             self.mrca = mrca_list
         elif mrca is not None:
-            self.mrca = set([mrca])
+            self.mrca = set([int(mrca)])
         else:
             sys.stderr.write('Something goes wrong with the mrca input.\n')
             exit(-55)
