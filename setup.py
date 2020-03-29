@@ -2,17 +2,14 @@
 
 from setuptools import setup
 
-setup(name='pandas_filter',
+setup(name='PhylUp',
       version='0.1',
-      description='pandas_filter',
+      description='Updating of phylogenetic data',
       author='Martha Kandziora',
       author_email='martha.kandziora@yahoo.com',
-      packages=['pandas_filter'],
+      packages=['PhylUp'],
       install_requires=[
           'dendropy',
-#          'configparser',
-          'biopython',
-#          'urllib3',
-          'peyotl',
+          'biopython'
       ]
      )

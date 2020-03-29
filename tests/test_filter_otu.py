@@ -1,45 +1,64 @@
-from pandas_filter import pandas_numpy_try1, config, aln_updater
+import os
+from distutils.dir_util import copy_tree
+
+from PhylUp import phyl_up, config, phylogenetic_helpers
+from copy import deepcopy
+
 
 def test_filter_otu_no_rank():
-    workdir = "test_runs"
+    workdir = "tests/output/test_runs"
     trfn = "data/tiny_test_example/test.tre"
     schema_trf = "newick"
     id_to_spn = "data/tiny_test_example/test_nicespl.csv"
     seqaln = "data/tiny_test_example/test.fas"
     mattype = "fasta"
-    configfi = "data/localblast.config"
+    configfi = "data/localblast_test.config"
+
+
+    tmp_folder = os.path.join(workdir, 'tmp')
+    if not os.path.exists(tmp_folder):
+        os.mkdir(tmp_folder)
+    #call(['cp', '-a', 'data/tmp_for_test/', tmp_folder])
+    copy_tree('data/tmp_for_test/', tmp_folder)
+
+
 
     conf = config.ConfigObj(configfi, workdir, interactive=False)
     conf.threshold = 2
-    test = pandas_numpy_try1.Update_data(id_to_spn, seqaln, mattype, trfn, schema_trf, conf, mrca=18794)
+    conf.blast_folder = os.path.abspath("./data/blast_for_tests")
 
-    new_seqs = None
-    new_seqs = test.extend(new_seqs)
+    test = phyl_up.PhylogeneticUpdater(id_to_spn, seqaln, mattype, trfn, schema_trf, conf)
 
-    aln = test.read_in_aln()
-    f = pandas_numpy_try1.FilterUniqueAcc(test.config)
-    f.filter(new_seqs)
-    new_seqs = f.upd_new_seqs
+    new_seqs = test.extend()
+    aln = phylogenetic_helpers.read_in_aln(test.aln_fn, test.aln_schema)
+
+    new_seqs = new_seqs[~new_seqs['accession'].isin(test.table['accession'])]  # ~ is the pd not in/!
+    new_seqs = test.basic_filters(aln, test.mrca, new_seqs)
+    # next filter need infos in table
+    new_seqs = test.add_new_seqs(new_seqs)
 
     before = len(new_seqs)
     new_seqs_org = new_seqs
-    f = pandas_numpy_try1.FilterNumberOtu(test.config, test.table, aln)
+    before_table = deepcopy(test.table)
+
+    f = phyl_up.FilterNumberOtu(test.config, test.table, test.status)
+    #assert len(test.table[test.table['status'] == test.status]) == 0, test.table[test.table['status'] == test.status]
     f.filter(new_seqs)
     new_seqs = f.upd_new_seqs
 
     del_tab = len(f.del_table)
     after = len(new_seqs)
-    print(before, after, del_tab)
+
+
     assert before > after
     assert del_tab > 0
 
     # with downtorank
     new_seqs = new_seqs_org
     before_dtr = len(new_seqs)
-    aln = test.read_in_aln()
 
-    f = pandas_numpy_try1.FilterNumberOtu(test.config, test.table, aln)
-    f.filter(new_seqs, 'genus')
+    f = phyl_up.FilterNumberOtu(test.config, before_table, test.status)
+    f.filter(new_seqs_org, 'genus')
     new_seqs = f.upd_new_seqs
 
     del_tab_dtr = len(f.del_table)
@@ -54,3 +73,4 @@ def test_filter_otu_no_rank():
 
     assert after > after_dtr
     assert del_tab < del_tab_dtr
+
