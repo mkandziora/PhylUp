@@ -86,7 +86,7 @@ class PhylogeneticUpdater:
             aln_taxids = set(self.table['ncbi_txid'].tolist())
             ncbi_parser = ncbi_data_parser.Parser(names_file=self.config.ncbi_parser_names_fn,
                                                   nodes_file=self.config.ncbi_parser_nodes_fn)
-            self.mrca = ncbi_parser.get_mrca(taxid_set=aln_taxids)
+            self.mrca = set(ncbi_parser.get_mrca(taxid_set=aln_taxids))
         elif len(mrca.split(',')) > 1:
             mrca_list = set()
             for item in mrca.split(','):
@@ -94,7 +94,7 @@ class PhylogeneticUpdater:
                 mrca_list.add(mrca)
             self.mrca = mrca_list
         elif mrca is not None:
-            self.mrca = int(mrca)
+            self.mrca = set(mrca)
         else:
             sys.stderr.write('Something goes wrong with the mrca input.\n')
             exit(-55)
