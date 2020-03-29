@@ -27,7 +27,7 @@ def test_mrca():
     test = phyl_up.PhylogeneticUpdater(id_to_spn, seqaln, mattype, trfn, schema_trf, conf)
     print(test.mrca)
 
-    assert test.mrca == 18794
+    assert test.mrca == {18794}
 
 # #################################
 def test_mrca_list():
@@ -62,7 +62,7 @@ def test_no_mrca():
     test = phyl_up.PhylogeneticUpdater(id_to_spn, seqaln, mattype, trfn, schema_trf, conf)
     print(test.mrca)
 
-    assert test.mrca == 18794
+    assert test.mrca == {18794}
 
 
 
