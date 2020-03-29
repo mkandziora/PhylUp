@@ -483,7 +483,8 @@ class InputCleaner(object):
         self.ncbi_parser = ncbi_data_parser.Parser(names_file=config_obj.ncbi_parser_names_fn,
                                                    nodes_file=config_obj.ncbi_parser_nodes_fn)
         # set mrca id
-        assert type(mrca) in [int, list] or mrca is None, ("mrca is not an integer, list or None: {}".format(mrca))
+        assert type(mrca) in [int, list, set] or mrca is None, ("mrca is not an integer, list, set"
+                                                                " or None: {}".format(mrca))
         self.mrca = self.format_mrca_set(mrca)
 
         self.table = table
