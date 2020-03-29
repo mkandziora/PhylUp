@@ -6,7 +6,8 @@ martha.kandziora@yahoo.com
 All rights reserved. No warranty, explicit or implicit, provided. No distribution or modification of code allowed.
 All classes and methods will be distributed under an open license in the near future.
 
-Package to automatically update alignments and phylogenies using local sequences or a local Genbank database.
+Package to automatically update alignments and phylogenies using local sequences or a local Genbank database
+while controlling for the number of sequences per OTU.
 
 Parts are inspired by the program physcraper developed by me and Emily Jane McTavish.
 """
