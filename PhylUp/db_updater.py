@@ -27,7 +27,7 @@ def _download_localblastdb(config):
     If not files will be downloaded.
     """
     print(config.blastdb_path)
-    if not os.path.isfile("{}/nt.23.nhr".format(config.blastdb_path)):
+    if not os.path.isfile("{}/nt.22.nhr".format(config.blastdb_path)):
         print("Do you want to download the blast nt databases from ncbi? Note: "
               "This is a US government website! You agree to their terms. \n")
         x = get_user_input()
@@ -46,7 +46,7 @@ def _download_localblastdb(config):
             sys.stderr.write("You have no nt database, which is needed to run PhylUp. Restart and type 'yes'. \n")
             sys.exit(-10)
     else:
-        download_date = os.path.getmtime("{}/nt.60.nhr".format(config.blastdb_path))
+        download_date = os.path.getmtime("{}/nt.22.nhr".format(config.blastdb_path))
         download_date = datetime.datetime.fromtimestamp(download_date)
         today = datetime.datetime.now()
         time_passed = (today - download_date).days
