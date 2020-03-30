@@ -91,6 +91,10 @@ before_install:
   #- wget ftp://ftp.ncbi.nlm.nih.gov/blast/executables/LATEST/ncbi-blast-2.*-x64-linux.tar.gz
 
   - tar -xvf ncbi-blast-2.9.0+-x64-linux.tar.gz
+  - cd ncbi-blast-2.9.0+/bin/
+  - echo export PATH="$PATH:$(pwd)" >> ~/.bashrc
+  - cd ..
+  - cd ..
 
     #install papara
   - mkdir PaPaRa
