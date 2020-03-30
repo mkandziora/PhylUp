@@ -229,7 +229,7 @@ class ConfigObj(object):
         if interactive is False:
             if  self.blast_type == 'Genbank':
                 sys.stdout.write("REMEMBER TO UPDATE THE NCBI DATABASES REGULARLY! ")
-                download_date = os.path.getmtime("{}/nt.60.nhr".format(self.blastdb_path))
+                download_date = os.path.getmtime("{}/nt.23.nhr".format(self.blastdb_path))
                 download_date = datetime.datetime.fromtimestamp(download_date)
                 today = datetime.datetime.now()
                 time_passed = (today - download_date).days
