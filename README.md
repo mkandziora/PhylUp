@@ -73,7 +73,7 @@ run from within the PhylUp main folder:
     
       * `open a terminal`
       * `cd /to/the/folder/of/your/future/blastdb`  
-      * `wget 'https://ftp.ncbi.nlm.nih.gov/blast/db/v5/nt_v5.*'`  # this downloads all nt-compressed files
+      * `wget 'https://ftp.ncbi.nlm.nih.gov/blast/db/nt.*'`  # this downloads all nt-compressed files
       * `cat *.tar.gz | tar -xvzf - -i`  # macOS `tar` does not support the `-i` flag,  you need to use homebrew to `brew install gnu-tar` and replace the `tar` command by `gtar`
       * `blastdbcmd -db nt -info`  # checks if it works
       * `rm *.tar.gz*`

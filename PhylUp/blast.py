@@ -569,6 +569,7 @@ def get_non_redundant_data(config, redundant):
     :param redundant:
     :return:
     """
+    debug('get_non_redundant_data')
     colnames = ['accession;gi', 'ncbi_txid', 'ncbi_txn', 'pident', 'evalue', 'bitscore', 'sseq', 'title', 'accession']
     non_redundant_redundant = pd.DataFrame(columns=colnames)
     queried_acc = set()  # used to test if gb_acc was added before  aka query_dict in physcraper

@@ -140,7 +140,7 @@ class ConfigObj(object):
         assert os.path.exists(self.blastdb_path), self.blastdb_path
 
         if self.blast_type == 'Genbank':
-            self.blastdb = '{}/nt_v5'.format(self.blastdb_path)
+            self.blastdb = '{}/nt'.format(self.blastdb_path)
         elif self.blast_type == 'own':
             tax_id_map = config['blast']['taxid_map']
             name_txid = phylogenetic_helpers.get_txid_for_name_from_file(self.tax_id_map, ncbi_parser)
@@ -229,7 +229,7 @@ class ConfigObj(object):
         if interactive is False:
             if  self.blast_type == 'Genbank':
                 sys.stdout.write("REMEMBER TO UPDATE THE NCBI DATABASES REGULARLY! ")
-                download_date = os.path.getmtime("{}/nt_v5.60.nhr".format(self.blastdb_path))
+                download_date = os.path.getmtime("{}/nt.60.nhr".format(self.blastdb_path))
                 download_date = datetime.datetime.fromtimestamp(download_date)
                 today = datetime.datetime.now()
                 time_passed = (today - download_date).days
