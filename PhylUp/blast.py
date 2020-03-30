@@ -387,7 +387,7 @@ def check_directionality(blast_seq, seq):
     """
     assert blast_seq is not "", blast_seq
     assert seq is not "", seq
-    orig = Seq(seq, generic_dna)
+    orig = Seq(seq, generic_dna)  # generic_dna and Alphabet will be deprecated soon. I've not yet found a solution.
     dna_comp = orig.complement()
     dna_rcomp = orig.reverse_complement()
     dna_r = orig[::-1]
@@ -528,6 +528,20 @@ def read_blast_query_pandas(blast_fn, config, db_name):
     query_output_fn = os.path.abspath(query_output_fn)
     colnames = ['accession;gi', 'ncbi_txid', 'ncbi_txn', 'pident', 'evalue', 'bitscore', 'sseq', 'title', 'accession']
     data = pd.read_csv(query_output_fn, names=colnames, sep="\t", header=None)
+
+    if data['ncbi_txid'].isnull().values.any() == True:
+        colnames = ['accession;gi', 'ncbi_txid']
+        tax_id_map = pd.read_csv(os.path.join(config.workdir, 'tmp/unpublished_txid.txt'), names=colnames, sep=" ",
+                                 header=None)
+        before = len(data)
+        for idx in data.index:
+            if data.loc[idx, 'ncbi_txid'] == None:
+                acc = data.loc[idx, 'accession;gi']
+                map_id = tax_id_map[tax_id_map['accession;gi'] == acc, 'ncbi_txid']
+                data.loc[idx, 'ncbi_txid'] = map_id
+        after=len(data)
+        assert after == before, (before, after)
+
     if not db_name == 'unpublished':
         assert len(data) > 0, data
     redundant = data[data['accession'].str.contains(';')]

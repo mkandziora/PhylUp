@@ -279,7 +279,7 @@ def estimate_number_threads_raxml(workdir, aln_fn, model):
     """
     print('estimate_number_threads_raxml')
     with cd(workdir):
-        subprocess.run(['raxml-ng-mpi', '--parse', '--msa', aln_fn,
+        subprocess.run(['raxml-ng', '--parse', '--msa', aln_fn,
                         '--prefix', 'numthreads', '--model', model, '--redo'])
         with open('numthreads.raxml.log') as f:
             datafile = f.readlines()
