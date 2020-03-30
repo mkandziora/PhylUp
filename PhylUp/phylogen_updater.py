@@ -178,15 +178,16 @@ class AlnUpdater(object):
         :return:
         """
         tax = self.aln.taxon_namespace.get_taxon(taxon_label)
-        tax2 = self.tre.taxon_namespace.get_taxon(taxon_label)
 
         self.aln.remove_sequences([tax])
         self.aln.discard_sequences([tax])
         self.aln.taxon_namespace.remove_taxon_label(taxon_label)  # raises an error if label not found
 
-        self.tre.prune_taxa([tax2])
-        self.tre.prune_taxa_with_labels([taxon_label])
-        self.tre.prune_taxa_with_labels([tax2])
+        if self.tre != None:
+            tax2 = self.tre.taxon_namespace.get_taxon(taxon_label)
+            self.tre.prune_taxa([tax2])
+            self.tre.prune_taxa_with_labels([taxon_label])
+            self.tre.prune_taxa_with_labels([tax2])
 
     def trim(self, aln_fn=False, format_aln=None):
         """
