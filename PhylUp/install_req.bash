@@ -2,27 +2,29 @@
 # make folder where you want to install the needed phylogenetic methods
 
 apt-get update
+apt-get install libjson-perl
 
 #install papara
 mkdir PaPaRa
 cd PaPaRa
 wget https://sco.h-its.org/exelixis/resource/download/software/papara_nt-2.5-static_x86_64.tar.gz
 gunzip  -cd papara_nt-2.5-static_x86_64.tar.gz | (tar xvf - )
-echo "export PATH=$PWD:\$PATH" >> ~/.bashrc
+echo export PATH="$PATH:$(pwd)" >> ~/.bashrc
 # source .bashrc
 # papara
 cd ..
 
 # install EPA-NG
+sudo apt-get install autotools-dev libtool flex bison cmake automake autoconf
+
 mkdir EPA-ng
 cd EPA-ng
 wget https://github.com/Pbdas/epa-ng/archive/master.zip
 unzip master.zip
-sudo apt-get install autotools-dev libtool flex bison cmake automake autoconf
 cd epa-ng-master/
 make
 cd bin
-echo "export PATH=$PWD:\$PATH" >> ~/.bashrc
+echo export PATH="$PATH:$(pwd)" >> ~/.bashrc
 cd ..
 cd ..
 cd ..
@@ -56,9 +58,20 @@ make
 cd ..
 
 cd bin
-echo "export PATH=$PWD:\$PATH" >> ~/.bashrctest
+echo export PATH="$PATH:$(pwd)" >> ~/.bashrc
 
 cd ..
 cd ..
 
 source ~/.bashrc
+
+wget ftp://ftp.ncbi.nlm.nih.gov/blast/executables/blast+/2.9.0/ncbi-blast-2.9.0+-x64-linux.tar.gz
+tar -xvf ncbi-blast-2.9.0+-x64-linux.tar.gz
+
+wget 'https://ftp.ncbi.nlm.nih.gov/pub/taxonomy/taxdump.tar.gz'
+gunzip  -cd taxdump.tar.gz | (tar xvf - names.dmp nodes.dmp)
+  #- mkdir taxonomy
+  #- mv *.dmp src/ncbitaxonparser/ncbiTAXONparser/data
+mv *.dmp ./data/
+
+

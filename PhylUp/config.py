@@ -108,7 +108,8 @@ class ConfigObj(object):
         sys.stdout.write('Workflow runs with {} threads.\n'.format(self.num_threads))
 
         self.mrca_input = config["general"]["mrca"]
-
+        if self.mrca_input == "None" or self.mrca_input == "":
+            self.mrca_input = None
 
         # unpublished settings
         self.unpublished = config["unpublished"]['unpublished']
