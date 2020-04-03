@@ -17,7 +17,7 @@ import os
 import subprocess
 import sys
 import pandas as pd
-
+import numpy as np
 from copy import deepcopy
 from dendropy import DnaCharacterMatrix, Tree
 
@@ -174,11 +174,11 @@ def replace_in_tree(idx, labelled, present, split_name, spn):
 def replace_in_aln(idx, labelled, present, split_name, spn):
 
     try:
-        labelled = labelled.replace(">{}".format(split_name),
-                                    ">{}_{}".format(spn, split_name))
+        labelled = labelled.replace(">{}\n".format(split_name),
+                                    ">{}_{}\n".format(spn, split_name))
     except AttributeError:
-        labelled = labelled.replace(">{}".format(split_name),
-                                    ">{}_{}".format(present.loc[idx, 'ncbi_txid'],
+        labelled = labelled.replace(">{}\n".format(split_name),
+                                    ">{}_{}\n".format(present.loc[idx, 'ncbi_txid'],
                                                     split_name))
     return labelled
 
