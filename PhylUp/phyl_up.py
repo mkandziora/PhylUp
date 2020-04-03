@@ -386,7 +386,11 @@ class PhylogeneticUpdater:
                 if os.path.exists(os.path.join(self.workdir, 'table.updated')):
                     os.rename(os.path.join(self.workdir, 'table.updated'),
                               os.path.join(self.workdir, "table_updated_tmp"))
-        self.table['sequence_length'] = self.table['sseq'].apply(len)
+        print(self.table['sseq'])
+        try:
+            self.table['sequence_length'] = self.table['sseq'].apply(len)
+        except:
+            pass
         self.table.to_csv(os.path.join(self.workdir, 'table.updated'), index=False)
 
         if len(all_new_seqs) > 0:
@@ -807,28 +811,31 @@ class FilterSeqIdent(Filter):
             txid_compare = existing_old.loc[idx, 'ncbi_txid']
             seq_compare = existing_old.loc[idx, 'sseq']
             # use those to compare to new seqs:
-            same_new = self.upd_new_seqs[(self.upd_new_seqs.sseq.str.contains(seq_compare)) & (
-                            self.upd_new_seqs['ncbi_txid'] == int(txid_compare))]
-            # go through avail seq in table to check if there is one identical
-            if len(same_new.index) > 0:
-                debug("old seq found in new")
-                self.table.at[idx, 'status'] = -1
-                self.table.at[idx, 'status_note'] = 'new seq found - identical but longer'
-                tip_name = self.table.loc[idx, "accession"]
-                for tax, seq in aln.items():
-                    if tip_name == tax.label:
-                        debug("remove from aln")
-                        aln.remove_sequences([tax])
-                aln.write(path="updt_aln.fasta", schema="fasta")
-                counter += 1
+            if len(self.upd_new_seqs.sseq) > len(seq_compare):
+                same_new = self.upd_new_seqs[(self.upd_new_seqs.sseq.str.contains(seq_compare)) & (
+                                self.upd_new_seqs['ncbi_txid'] == int(txid_compare))]
+                # go through avail seq in table to check if there is one identical
+                if len(same_new.index) > 0:
+                    debug("old seq found in new")
+                    self.table.loc[idx, 'status'] = -1
+                    self.table.loc[idx, 'status_note'] = 'new seq found - identical but longer'
+                    tip_name = self.table.loc[idx, "accession"]
+                    for tax, seq in aln.items():
+                        if tip_name == tax.label:
+                            debug("remove from aln")
+                            aln.remove_sequences([tax])
+                    aln.write(path="updt_aln.fasta", schema="fasta")
+                    counter += 1
 
-                # assert that seq is removed:
-                count = 0
-                for tax, seq in aln.items():
-                    seq = seq.symbols_as_string().replace('-', '')
-                    if seq == seq_compare:
-                        count = 1
-                assert count == 0
+                    # assert that seq is removed:
+                    count = 0
+                    for tax, seq in aln.items():
+
+                        seq = seq.symbols_as_string().replace('-', '')
+                        if str(seq) == str(seq_compare):
+                            if tip_name == tax.label:  # is needed as sometimes seq with different label have same seq
+                                count = 1
+                    assert count == 0
         msg = "Filter FilterSeqIdent removed {} sequence(s) from existing alignment due to longer" \
               " but identical sequence in new seqs.\n".format(counter)
         write_msg_logfile(msg, self.config.workdir)

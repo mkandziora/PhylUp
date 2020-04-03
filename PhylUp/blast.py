@@ -552,7 +552,7 @@ def read_blast_query_pandas(blast_fn, config, db_name):
     new_seqs = pd.concat([non_redundant_redundant, non_redundant], sort=True, ignore_index=True)
 
 
-    assert new_seqs['ncbi_txid'].isnull().values.any() == False, ('not all new seqs have a taxon id. Often related to error in input of unpiblished ')
+    assert new_seqs['ncbi_txid'].isnull().values.any() == False, ('Not all new seqs have a taxon id. Often related to error in input of unpublished.')
     new_seqs['sseq'] = new_seqs['sseq'].str.replace("-", "")
     new_seqs['date'] = datetime.datetime.strptime('01/01/00', '%d/%m/%y')
     # todo this could be made faster by running it on the redundant/non_redundant data first
