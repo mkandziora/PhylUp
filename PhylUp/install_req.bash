@@ -3,6 +3,7 @@
 
 apt-get update
 apt-get install libjson-perl
+apt-get install mafft
 
 #install papara
 mkdir PaPaRa
@@ -60,6 +61,22 @@ cd ..
 cd bin
 echo export PATH="$PATH:$(pwd)" >> ~/.bashrc
 
+cd ..
+cd ..
+
+
+
+# install modeltest-ng
+mkdir modeltest-ng
+cd modeltest-ng
+git clone --recursive https://github.com/ddarriba/modeltest
+mkdir build
+cd build
+cmake ..
+make
+echo export PATH="$PATH:$(pwd)" >> ~/.bashrc
+
+cd ..
 cd ..
 cd ..
 

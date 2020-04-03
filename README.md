@@ -199,7 +199,7 @@ There is an example file in `example_analysis.py`, it comes with a tiny sample d
 * **mattype**: file format of your alignment - currently supported: “fasta”, “newick”, “nexus”, “nexml”, “phylip”
 * **trfn**: give the path to the file containing the corresponding phylogeny, all tips must be represented in the alignment file as well.
 * **schema_trf**: file format of your phylogeny file - currently supported: “fasta”, “newick”, “nexus”, “nexml”, “phylip”
-* **id_to_spn**: path to a comma-delimited file where tip labels correspond to species names: example file can be found in `tests/data/tiny_test_example/test_nicespl.csv`
+* **id_to_spn**: path to a comma-delimited file where tip labels correspond to species names: example file can be found in `tests/data/tiny_test_example/test_nicespl.csv`. Species names must be provided with '_' rather than a 'whitespace', also for species epithets with a '-' in its name.
 * **workdir**: path to your working directory, the folder where intermediate and result files shall be stored.
 * **configfi**: path to your config-file, which was edited in step 1.
 

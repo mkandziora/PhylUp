@@ -386,5 +386,8 @@ def add_seq_to_table(aln, table):
             if taxon.label in tip_name:
                 table.at[index, 'sseq'] = seq
                 queried_taxa.append(tip_name)
-    assert tip_name in queried_taxa, (tip_name, queried_taxa)
+        assert taxon.label in queried_taxa, (taxon.label, queried_taxa, 'often missing in spn translation table')
+
+    table['sseq'].replace('', np.nan, inplace=True)
+    table.dropna(subset=['sseq'], inplace=True)
     return table

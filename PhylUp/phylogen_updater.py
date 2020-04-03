@@ -523,7 +523,8 @@ class InputCleaner(object):
         :param mrca:
         :return:
         """
-        print('Format mrca: {}'.format(mrca))
+        mrca_name = self.ncbi_parser.get_name_from_id(mrca)
+        print('Format mrca: {} - {}'.format(mrca, mrca_name))
         if type(mrca) is int:
             valid = self.ncbi_parser.taxid_is_valid(mrca)
             mrca = {mrca}
