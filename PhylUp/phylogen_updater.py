@@ -177,17 +177,23 @@ class AlnUpdater(object):
         :param taxon_label: taxon_label from dendropy object - aln or phy
         :return:
         """
-        tax = self.aln.taxon_namespace.get_taxon(taxon_label)
 
+        if self.tre != None:
+            # not sure why this function exist. None of them actually remove a tip.
+            # tax2 = self.tre.taxon_namespace.get_taxon(taxon_label)
+            # self.tre.prune_taxa([tax2])
+            # self.tre.prune_taxa_with_labels([taxon_label])
+            # self.tre.prune_taxa_with_labels([tax2])
+
+            leaf_set = set(leaf.taxon for leaf in self.tre.leaf_nodes())
+            for leaf in leaf_set:
+                if leaf.label == taxon_label:
+                    self.tre.prune_taxa([leaf])
+
+        tax = self.aln.taxon_namespace.get_taxon(taxon_label)
         self.aln.remove_sequences([tax])
         self.aln.discard_sequences([tax])
         self.aln.taxon_namespace.remove_taxon_label(taxon_label)  # raises an error if label not found
-
-        if self.tre != None:
-            tax2 = self.tre.taxon_namespace.get_taxon(taxon_label)
-            self.tre.prune_taxa([tax2])
-            self.tre.prune_taxa_with_labels([taxon_label])
-            self.tre.prune_taxa_with_labels([tax2])
 
     def trim(self, aln_fn=False, format_aln=None):
         """
