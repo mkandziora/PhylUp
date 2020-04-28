@@ -49,6 +49,8 @@ class ConfigObj(object):
             * **self.e_value_thresh**: the defined threshold for the e-value during Blast searches, check out:
                 https://blast.ncbi.nlm.nih.gov/Blast.cgi?CMD=Web&PAGE_TYPE=BlastDocs&DOC_TYPE=FAQ
             * **self.hitlist_size**: the maximum number of sequences retrieved by a single blast search
+            * **self.hitlist_size_unpublished**: the maximum number of sequences retrieved by a single blast search
+                                                in the unpublished database
             * **self.fix_blast**: T/F; use same blast folder across runs
 
             * self.ncbi_parser_nodes_fn: path to 'nodes.dmp' file, that contains the hierarchical information
@@ -162,6 +164,10 @@ class ConfigObj(object):
         assert self.hitlist_size.split('.')[0].isdigit(), ("Hitlist size is not defined as "
                                                            "a number: {}.\n".format(self.hitlist_size))
         self.hitlist_size = int(self.hitlist_size)
+        self.hitlist_size_unpublished = config["blast"]["hitlist_size_unpublished"]
+        assert self.hitlist_size_unpublished.split('.')[0].isdigit(), ("Hitlist size  unpublished is not defined as "
+                                                           "a number: {}.\n".format(self.hitlist_size))
+        self.hitlist_size_unpublished = int(self.hitlist_size_unpublished)
 
         self.fix_blast = config["blast"]["fix_blast_result_folder"]
         if self.fix_blast == "True" or self.fix_blast == "true":
@@ -175,8 +181,6 @@ class ConfigObj(object):
         else:
             self.fix_blast = False
             self.blast_folder = os.path.abspath(os.path.join(self.workdir, "blast"))
-
-
 
         # read in alignment settings
         self.minlen = float(config["phylup"]["min_len"])

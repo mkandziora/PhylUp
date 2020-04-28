@@ -498,7 +498,7 @@ def run_blast_query(query_seq, taxon, db_name, config, mrca=None):
         with cd(os.path.join(config.workdir, "tmp")):
             blastcmd = "blastn -query {} -db {} -out ".format(input_fn, db) + query_output_fn + \
                        " {} -num_threads {}".format(outfmt, config.num_threads) + \
-                       " -max_target_seqs {} -max_hsps {}".format(config.hitlist_size, config.hitlist_size)
+                       " -max_target_seqs {} -max_hsps {}".format(config.hitlist_size_unpublished, config.hitlist_size_unpublished)
             with suppress_stdout():
                 os.system(blastcmd)
             #subprocess.call(blastcmd, shell=False, stderr=DEVNULL)

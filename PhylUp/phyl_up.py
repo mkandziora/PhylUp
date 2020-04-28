@@ -361,13 +361,15 @@ class PhylogeneticUpdater:
                     #self.update_aln()
                     if len(new_seqs) == 0:
                         self.config.unpublished = False
-                    if self.config.perpetual is False:
-                        self.config.unpublished = False
+                    # if self.config.perpetual is False:
+                    #     self.config.unpublished = False
 
                     if self.config.blast_all is True:
                         self.table.at[self.table.status == self.status, 'status'] = 0
                         self.status = 0
+
                 else:
+                    print('extend with Genbank')
                     new_seqs = self.extend()  # todo rename to find new seqs
                     msg = "Time after BLAST: {}.\n".format(datetime.datetime.now())
                     write_msg_logfile(msg, self.config.workdir)
@@ -381,8 +383,16 @@ class PhylogeneticUpdater:
                 msg = "Newly found seqs: {}.\n".format(len(new_seqs))
                 write_msg_logfile(msg, self.config.workdir)
                 self.table.to_csv(os.path.join(self.workdir, 'table.updated'), index=False)
+
+                # todo extract this to new method - place in unpublished part only.
+                self.replace_complete_withusedseq(new_seqs)
+                if self.config.perpetual is False:
+                    self.config.unpublished = False
+
             msg = "Time before update tre/aln: {}.\n".format(datetime.datetime.now())
             write_msg_logfile(msg, self.config.workdir)
+            # if len(new_seqs.index) > 0:
+            #     all_new_seqs = pd.concat([all_new_seqs, new_seqs], ignore_index=True, sort=True)
             msg = "Newly found seqs will be added to aln and tre: {}.\n".format(len(all_new_seqs))
             write_msg_logfile(msg, self.config.workdir)
 
@@ -411,11 +421,60 @@ class PhylogeneticUpdater:
             msg = "Time finished: {}.\n".format(datetime.datetime.now())
             write_msg_logfile(msg, self.config.workdir)
 
+    def replace_complete_withusedseq(self, new_seqs):
+        """
+        Replaces the complete sequence (e.g. plastome) with the part that is actually used in the alignment and also replaces it in the table.
+        Note, that therefore the new seqs have to be placed into the alignment first.
+
+        :param new_seqs:
+        :return:
+        """
+        print('replace_complete_withusedseq')
+        if self.config.unpublished == True:
+            print('get short used seqs')
+            self.update_aln()
+            # get shorter seqs from aln - also replace in table
+            for idx in new_seqs.index:
+                tip_name = str(new_seqs.loc[idx, 'accession'].split('.')[0])
+                print(tip_name)
+                filepath = os.path.join(self.config.workdir, "updt_aln.fasta")
+                with open(filepath) as fp:
+                    seq = ''
+                    while not tip_name in fp.readline():
+                        continue
+                    line = fp.readline()
+                    while (line != '') and ('>' not in line):
+                        seq = seq + line
+                        line = fp.readline()
+                    seq = seq.replace('-', '').replace('\n', '')
+                    new_seqs.at[idx, 'sseq'] = seq
+                    if self.table['accession'].str.contains(tip_name).any():
+                        print('replace in table')
+                        seq_before = self.table.loc[self.table['accession'] == tip_name, 'sseq'].values[0]
+                        self.table.at[self.table['accession'] == tip_name, 'sseq'] = seq
+                        assert seq_before != seq, (seq_before, seq)
+                        assert seq_before != self.table.loc[self.table['accession'] == tip_name, 'sseq'].values[0], (
+                            seq_before, self.table.loc[self.table['accession'] == tip_name, 'sseq'].values[0])
+                        assert seq == self.table.loc[self.table['accession'] == tip_name, 'sseq'].values[0], (
+                            seq, self.table.loc[self.table['accession'] == tip_name, 'sseq'].values[0])
+
+            if self.tre is None:
+                self.tre_fn = os.path.abspath(os.path.join(self.config.workdir, "updt_aln.fasta.tree"))
+                self.tre = Tree.get(path=os.path.join(self.config.workdir, 'updt_tre.tre'),
+                                    schema="newick",
+                                    preserve_underscores=True,
+                                    taxon_namespace=self.aln.taxon_namespace)
+            self.update_tre()
+            msg = "Time finished: {}.\n".format(datetime.datetime.now())
+            write_msg_logfile(msg, self.config.workdir)
+
+
     def call_input_cleaner(self):
         """
         Calls InputCleaner class and updates input data.
         :return:
         """
+        print(self.mrca)
         cleaner = phylogen_updater.InputCleaner(self.tre_fn, self.tre_schema, self.aln_fn, self.aln_schema, self.table, self.config, self.mrca)
         self.aln = cleaner.aln
         if self.tre_fn is not None:
@@ -430,13 +489,18 @@ class PhylogeneticUpdater:
         :return:
         """
         # print(os.path.abspath(os.path.join(self.workdir, 'updt_aln.fasta')))
+        print('update aln')
         aln = phylogenetic_helpers.read_in_aln(os.path.abspath(os.path.join(self.workdir, 'updt_aln.fasta')), self.aln_schema)
         if self.tre_fn is None:
             tre = None
         else:
             tre = Tree.get(path=os.path.abspath(os.path.join(self.workdir, 'updt_tre.tre')), schema='newick',
                            taxon_namespace=aln.taxon_namespace, preserve_underscores=True)
-        aln_upd = phylogen_updater.AlnUpdater(self.config, aln, self.status, self.table, tre)
+        if self.config.unpublished == True:
+            aln_upd = phylogen_updater.AlnUpdater(self.config, aln, self.status, self.table, self.status, tre)
+
+        else:
+            aln_upd = phylogen_updater.AlnUpdater(self.config, aln, self.status, self.table, tre)
         self.aln = aln_upd.aln
         self.tre = aln_upd.tre
         msg = 'Updating of aln done.\n'
@@ -448,6 +512,7 @@ class PhylogeneticUpdater:
 
         :return:
         """
+        print('update tre')
         phylogen_updater.TreeUpdater(self.config, self.aln, self.table, self.tre)
         msg = 'Updating of aln and tre done.\n'
         write_msg_logfile(msg, self.config.workdir)
