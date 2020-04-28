@@ -203,6 +203,7 @@ class AlnUpdater(object):
         Means, that trim_perc (e.g. 0.75 = 75%) of the sequences need to have a base present.
         This ensures, that not whole chromosomes get dragged in by cutting the ends of long sequences.
         """
+        print('trim alignment')
         if aln_fn:
             aln = DnaCharacterMatrix.get(path=aln_fn, schema=format_aln)
         else:
@@ -523,7 +524,7 @@ class InputCleaner(object):
         :param mrca:
         :return:
         """
-        mrca_name = self.ncbi_parser.get_name_from_id(mrca)
+        mrca_name = self.ncbi_parser.get_name_from_id(list(mrca)[0])
         print('Format mrca: {} - {}'.format(mrca, mrca_name))
         if type(mrca) is int:
             valid = self.ncbi_parser.taxid_is_valid(mrca)

@@ -82,11 +82,12 @@ class PhylogeneticUpdater:
         # if mrca.isdigit():
         #     self.mrca = int(mrca)
         #
+        ncbi_parser = ncbi_data_parser.Parser(names_file=self.config.ncbi_parser_names_fn,
+                                              nodes_file=self.config.ncbi_parser_nodes_fn)
         if mrca == None:
             sys.stdout.write('Get mrca as input was not provided.\n')
             aln_taxids = set(self.table['ncbi_txid'].tolist())
-            ncbi_parser = ncbi_data_parser.Parser(names_file=self.config.ncbi_parser_names_fn,
-                                                  nodes_file=self.config.ncbi_parser_nodes_fn)
+
             self.mrca = set([ncbi_parser.get_mrca(taxid_set=aln_taxids)])
         elif len(mrca.split(',')) > 1:
             mrca_list = set()
@@ -99,7 +100,11 @@ class PhylogeneticUpdater:
         else:
             sys.stderr.write('Something goes wrong with the mrca input.\n')
             exit(-55)
+        for id in self.mrca:
 
+            mrca_name = ncbi_parser.get_name_from_id(id)
+            msg = "MRCA is set to {} - {}. \n".format(id, mrca_name)
+            write_msg_logfile(msg, self.config.workdir)
 
     def extend_with_unpublished(self):
         """
@@ -283,7 +288,7 @@ class PhylogeneticUpdater:
 
     def basic_filters(self, aln, mrca, new_seqs):
         """
-        Calls the basic filters, those which are independent of that had been added earlier.
+        Calls the basic filters, those which are independent of what had been added earlier.
         Sequences filtered here are not being added to table.
 
         :param aln: aln as dendropy object
@@ -386,6 +391,7 @@ class PhylogeneticUpdater:
                 if os.path.exists(os.path.join(self.workdir, 'table.updated')):
                     os.rename(os.path.join(self.workdir, 'table.updated'),
                               os.path.join(self.workdir, "table_updated_tmp"))
+
         print(self.table['sseq'])
         try:
             self.table['sequence_length'] = self.table['sseq'].apply(len)
