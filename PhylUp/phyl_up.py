@@ -403,7 +403,7 @@ class PhylogeneticUpdater:
                     os.rename(os.path.join(self.workdir, 'table.updated'),
                               os.path.join(self.workdir, "table_updated_tmp"))
 
-        print(self.table['sseq'])
+        # print(self.table['sseq'])
         try:
             self.table['sequence_length'] = self.table['sseq'].apply(len)
         except:
@@ -432,12 +432,10 @@ class PhylogeneticUpdater:
         """
         print('replace_complete_withusedseq')
         if self.config.unpublished == True:
-            print('get short used seqs')
             self.update_aln()
             # get shorter seqs from aln - also replace in table
             for idx in new_seqs.index:
                 tip_name = str(new_seqs.loc[idx, 'accession'].split('.')[0])
-                print(tip_name)
                 filepath = os.path.join(self.config.workdir, "updt_aln.fasta")
                 with open(filepath) as fp:
                     seq = ''
@@ -450,7 +448,6 @@ class PhylogeneticUpdater:
                     seq = seq.replace('-', '').replace('\n', '')
                     new_seqs.at[idx, 'sseq'] = seq
                     if self.table['accession'].str.contains(tip_name).any():
-                        print('replace in table')
                         seq_before = self.table.loc[self.table['accession'] == tip_name, 'sseq'].values[0]
                         self.table.at[self.table['accession'] == tip_name, 'sseq'] = seq
                         assert seq_before != seq, (seq_before, seq)

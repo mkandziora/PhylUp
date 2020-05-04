@@ -35,7 +35,7 @@ class AlnUpdater(object):
     """
     Class to update aln with newly retrieved sequences.
     """
-    def __init__(self, config, aln, status, table, status_new =None, tre=None):
+    def __init__(self, config, aln, status, table, status_new=None, tre=None):
         """
         :param tre: dendropy tree object
         :param aln: dendropy alignment object
@@ -122,8 +122,7 @@ class AlnUpdater(object):
             path = os.path.join(os.getcwd(), "papara_alignment.phylip".format())
             assert os.path.exists(path), "{} does not exists".format(path)
         aln_old = self.aln
-        self.aln = DnaCharacterMatrix.get(path=os.path.join(self.config.workdir, "papara_alignment.phylip"),
-                                          schema='phylip')
+        self.aln = DnaCharacterMatrix.get(path=os.path.join(self.config.workdir, "papara_alignment.phylip"), schema='phylip')
         self.aln = self.trim(os.path.join(self.config.workdir, 'papara_alignment.phylip'), 'phylip')
         with cd(self.config.workdir):
             phylogenetic_helpers.truncate_papara_aln(aln_old)
