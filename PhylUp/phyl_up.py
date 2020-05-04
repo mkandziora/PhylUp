@@ -47,6 +47,7 @@ class PhylogeneticUpdater:
         self.blacklist = blacklist
         self.table = phylogenetic_helpers.build_table_from_file(id_to_spn, self.config, self.config.downtorank)
         phylogenetic_helpers.add_seq_to_table(self.aln, self.table)
+        self.table.dropna(subset=["sseq"], inplace=True)  # only keep entries that have a seq
         self.mrca = None
         self.set_mrca(self.config.mrca_input)
         suppress_warnings()

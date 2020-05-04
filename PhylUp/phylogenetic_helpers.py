@@ -305,6 +305,7 @@ def build_table_from_file(id_to_spn, config, downtorank=None):
 
     debug(id_to_spn)
     table = get_txid_for_name_from_file(id_to_spn, ncbi_parser)  # builds name id link
+    table = table.drop_duplicates(subset='accession', keep='first')  # drop duplicated entries from file
     table['status'] = 0
     try:
         table['date'] = pd.Timestamp.strptime('01/01/00', '%d/%m/%y')
