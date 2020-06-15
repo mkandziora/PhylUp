@@ -385,7 +385,6 @@ class PhylogeneticUpdater:
                 write_msg_logfile(msg, self.config.workdir)
                 self.table.to_csv(os.path.join(self.workdir, 'table.updated'), index=False)
 
-                # todo extract this to new method - place in unpublished part only.
                 self.replace_complete_withusedseq(new_seqs)
                 if self.config.perpetual is False:
                     self.config.unpublished = False

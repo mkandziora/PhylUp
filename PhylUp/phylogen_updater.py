@@ -158,7 +158,7 @@ class AlnUpdater(object):
             if len(seq.symbols_as_string().replace("-", "").replace("?", "")) <= seq_len_cutoff:
                 delete_seqs.append(tax)
         if delete_seqs:
-            msg = "Taxa deleted from tree and alignment in delete short sequences" \
+            msg = "Taxa deleted from tree and alignment in delete short sequences " \
                   "as sequences are shorter than {}.\n".format(seq_len_cutoff)
             write_msg_logfile(msg, self.config.workdir)
             for tax in delete_seqs:
@@ -578,11 +578,14 @@ class InputCleaner(object):
                 self.aln.taxon_namespace.remove_taxon_label(item.label)  # can only be removed one by one
                 msg = '{} is only in the alignment, not in the tree and will be deleted.\n'.format(item.label)
                 write_msg_logfile(msg, self.config.workdir)
+                self.table.loc[self.table['accession'] == item.label, 'status'] = -1
+                self.table.loc[self.table['accession'] == item.label, 'status_note'] = 'not in the treer'
         if del_tre != []:
             for item in del_tre:
                 self.tre.taxon_namespace.remove_taxon_label(item.label)  # can only be removed one by one
                 msg = '{} is only in the tree, not in the alignment and will be deleted.\n'.format(item.label)
                 write_msg_logfile(msg, self.config.workdir)
+
         if len(delete_tax) > 0:
             true_false = np.where((self.table.accession.isin(list(delete_tax))), True, False)
             self.table.at[true_false, 'status'] = -1
@@ -669,6 +672,7 @@ class InputCleaner(object):
         Write out original and cleaned tre (no whitespaces).
 
         :param tre_fn: tree file name
+        :param tre_schema: schema of tree
         :return:
         """
         if tre_fn is not None:

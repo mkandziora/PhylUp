@@ -192,12 +192,12 @@ def check_align(aln):
     """
     i = 0
     seqlen = len(aln[i])
-    while seqlen == 0:
-        i = i + 1
-        seqlen = len(aln[i])
+    # while seqlen == 0:  #useless, seqlen never == 0
+    #     i = i + 1
+    #     seqlen = len(aln[i])
     for tax in aln:
         if len(aln[tax]) != seqlen:
-            sys.stderr.write("Alignment is not aligned.")
+            sys.stderr.write("Alignment is not aligned: {} vs {} .\n".format(len(aln[tax]), seqlen))
             return
     return seqlen
 

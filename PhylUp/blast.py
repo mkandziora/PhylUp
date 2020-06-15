@@ -189,7 +189,7 @@ def make_local_blastdb(workdir, db, taxid, path_to_db=None):
             seq_l = content[1::2]
             seq_l = list(filter(None, seq_l))
             # note: a file with multiple seqs can be read in as well
-            assert len(gb_id_l) == len(seq_l), (gb_id_l, seq_l)
+            assert len(gb_id_l) == len(seq_l), (len(gb_id_l), len(seq_l), gb_id_l, seq_l)
 
             for i in range(0, len(gb_id_l)):
                 key = gb_id_l[i].replace(">", "")
