@@ -556,7 +556,7 @@ def read_blast_query_pandas(blast_fn, config, db_name):
     new_seqs['sseq'] = new_seqs['sseq'].str.replace("-", "")
     new_seqs['date'] = datetime.datetime.strptime('01/01/00', '%d/%m/%y')
     # todo this could be made faster by running it on the redundant/non_redundant data first
-    new_seqs = wrapper_get_fullseq(config, new_seqs, db_name)
+    #new_seqs = wrapper_get_fullseq(config, new_seqs, db_name)
     return new_seqs
 
 

@@ -504,6 +504,8 @@ class InputCleaner(object):
         assert type(self.aln) == DnaCharacterMatrix
 
         if tre_fn is not None:
+            if tre_schema is None:
+                tre_schema == 'newick'
             self.tre = self.write_clean_tre(tre_fn, tre_schema)
             if self.config.different_level is False:
                 self.delete_missing()  # turned of for different level, as tre is not updated between runs, aln is.

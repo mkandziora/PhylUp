@@ -212,6 +212,8 @@ class PhylogeneticUpdater:
 
         subcols = new_seqs[['ncbi_txn', 'ncbi_txid', 'status', 'status_note', "date", 'sseq', 'accession']]
         subcols.at[:, 'status'] = self.status
+        if self.config.unpublished == True:
+            subcols.at[:, 'status_note'] = 'unpublished'
         self.table = pd.concat([self.table, subcols], ignore_index=True, sort=True)
         if not self.config.blast_all:
             assert len(subcols) == len(self.table[self.table['status'] == self.status]), \
@@ -237,6 +239,10 @@ class PhylogeneticUpdater:
         if len(new_seqs) > 0:
             debug(new_seqs.columns)
             new_seqs = self.basic_filters(aln, self.mrca, new_seqs)
+
+            # get full sequence only now: removes sequences that have very short hit in blast search
+            new_seqs = blast.wrapper_get_fullseq(self.config, new_seqs, db='Genbank')
+
             # next filter need infos in table
             if len(new_seqs) > 0:
                 new_seqs = self.add_new_seqs(new_seqs)

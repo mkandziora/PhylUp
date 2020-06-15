@@ -126,6 +126,7 @@ class ConfigObj(object):
                 self.perpetual = False
         else:
             self.unpublished = False
+            self.perpetual = False
         self.blast_all = config["unpublished"]['blast_all']
         if self.blast_all == "True" or self.blast_all == "true":
             self.blast_all = True
@@ -189,6 +190,10 @@ class ConfigObj(object):
         assert 1 < self.maxlen, ("Max len is not larger than 1: {}.\n".format(self.maxlen))
         self.trim_perc = float(config["phylup"]["trim_perc"])
         assert 0 < self.trim_perc < 1, ("Percentage for trimming is not between 0 and 1: {}.\n".format(self.trim_perc))
+
+
+        # internal alignment setting
+        self.added_seqs_aln = False
 
         # read in filter settings
         self.filtertype = config["filter"]["filtertype"]
