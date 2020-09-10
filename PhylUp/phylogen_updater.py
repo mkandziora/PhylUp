@@ -182,7 +182,6 @@ class AlnUpdater(object):
         :param taxon_label: taxon_label from dendropy object - aln or phy
         :return:
         """
-
         if self.tre != None:
             # not sure why this function exist. None of them actually remove a tip.
             # tax2 = self.tre.taxon_namespace.get_taxon(taxon_label)
@@ -596,6 +595,7 @@ class InputCleaner(object):
             self.table.at[true_false, 'status_note'] = "deleted, was missing in aln or tre"
         assert self.aln.taxon_namespace == self.tre.taxon_namespace
 
+    #todo: does nothing
     def clean_inputname(self):
         """It rewrites tip names if they start with a number at the beginning of the name.
         Python adds an 'n' to the name.
@@ -622,7 +622,7 @@ class InputCleaner(object):
                     # if original == tax.label or original == newname:
                         # tax.label = self.table.loc[idx, "accession"].split('.')[0]
                         # found_label = 1
-                #if found_label == 0: # and self.table.loc[idx, "ncbi_txid"]:
+                # if found_label == 0: # and self.table.loc[idx, "ncbi_txid"]:
                 #    sys.stderr.write("could not match tip label {} any ncbi taxon name\n".format(tax.label))
 
     def write_clean_aln(self, aln_fn, aln_schema):
@@ -630,6 +630,7 @@ class InputCleaner(object):
         Write out original and cleaned alignemnt (? converted to -, no whitespaces).
 
         :param aln_fn: filename of alignment
+        :param aln_schema: format of alignment
         :return:
         """
         with open(aln_fn, "r") as fin:

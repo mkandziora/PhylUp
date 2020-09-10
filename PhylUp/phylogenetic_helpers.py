@@ -127,13 +127,13 @@ def write_tre(tre, workdir, treepath="updt_tre.tre", treeschema="newick"):
     tre.write(path=os.path.join(workdir, treepath), schema=treeschema, unquoted_underscores=True, suppress_rooting=True)
 
 
-def replace_uid_with_name(file_path, table, type):
+def replace_uid_with_name(file_path, table, matrix_type):
     """
     translate unique ids into species names in file.
 
     :param file_path:
     :param table:
-    :param type: aln or tree, defines which type is being relabeled.
+    :param matrix_type: aln or tree, defines which type is being relabeled.
     :return:
     """
     # print(os.getcwd())
@@ -152,7 +152,7 @@ def replace_uid_with_name(file_path, table, type):
                     if split_name in labelled:
                         debug(split_name)
                         spn = present.loc[idx, 'ncbi_txn'].replace(" ", "_").replace("-", "_").replace("'", "")
-                        if type == 'tree':
+                        if matrix_type == 'tree':
                             labelled = replace_in_tree(idx, labelled, present, split_name, spn)
                         else:
                             labelled = replace_in_aln(idx, labelled, present, split_name, spn)

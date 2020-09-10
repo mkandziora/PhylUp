@@ -366,7 +366,6 @@ class PhylogeneticUpdater:
             self.table = pd.read_csv(os.path.join(self.workdir, 'table.updated'))
             self.aln = DnaCharacterMatrix.get(path=os.path.abspath(os.path.join(self.workdir, 'updt_aln.fasta')),
                                               schema='fasta')
-
             if os.path.exists("{}/updt_tre.tre".format(self.workdir)):
                 self.tre = Tree.get(path=os.path.abspath(os.path.join(self.workdir, 'updt_tre.tre')), schema='newick',
                                 taxon_namespace=self.aln.taxon_namespace, preserve_underscores=True)
@@ -403,7 +402,6 @@ class PhylogeneticUpdater:
                     #self.update_aln()
 
                 if self.config.preferred_taxa == True:
-
                     if not os.path.exists(os.path.join(self.workdir, 'found_taxa.csv')):
                         set_taxid = list(set(new_seqs['ncbi_txid'].values))
                         set_taxname = list(set(new_seqs['ncbi_txn'].values))
@@ -436,7 +434,6 @@ class PhylogeneticUpdater:
                 if os.path.exists(os.path.join(self.workdir, 'found_taxa.csv')):
                     os.rename(os.path.join(self.workdir, 'found_taxa.csv'),
                               os.path.join(self.workdir, "found_taxa_tmp.csv"))
-
 
             msg = "Time before update tre/aln: {}.\n".format(datetime.datetime.now())
             write_msg_logfile(msg, self.config.workdir)
@@ -678,6 +675,7 @@ class FilterNumberOtu(Filter):
     def filter(self, new_seqs, downtorank=None):
         assert_new_seqs_table(new_seqs, self.table, self.status)
         debug("filter FilterNumberOtu")
+
         filtered_new_seqs = new_seqs
 
         # get all seqs and ids from aln and before for next filter
@@ -702,55 +700,53 @@ class FilterNumberOtu(Filter):
         debug('start loop')
         for txid in set(tax_ids_newseqs):
             # generate taxon_subsets
-            ns_txid_df = filtered_new_seqs[tax_ids_newseqs == txid]
+            newseqs_txid_df = filtered_new_seqs[tax_ids_newseqs == txid]
 
             # filter for preferred taxa
-            debug('preferred taxa?')
-            debug(self.config.preferred_taxa)
-            if self.config.preferred_taxa == True:
-                ns_txid_df = self.prefer_taxa_from_locus(ns_txid_df, preferred_taxa_ids)
+            newseqs_txid_df = self.prefer_taxa_from_locus(newseqs_txid_df, preferred_taxa_ids)
 
-            os_txid_df = added_before[txids_added == txid]
-            os_txid_df = os_txid_df[os_txid_df['status'] >= 0]
+            oldseqs_txid_df = added_before[txids_added == txid]
+            oldseqs_txid_df = oldseqs_txid_df[oldseqs_txid_df['status'] >= 0]
             if downtorank is not None and downtorank not in ['species', 'subspecies', 'variety']:
                 # figure out which lower rank are already available
-                avail_txid = os_txid_df['ncbi_txid'].tolist()
+                avail_txid = oldseqs_txid_df['ncbi_txid'].tolist()
                 # filter ns_txid_df to remove lower ranks already available
-                ns_txid_df = ns_txid_df[~ns_txid_df['ncbi_txid'].isin(avail_txid)]
+                newseqs_txid_df = newseqs_txid_df[~newseqs_txid_df['ncbi_txid'].isin(avail_txid)]
+
             # if we still want to add, loop through
-            if len(os_txid_df) < self.config.threshold:
-                if len(ns_txid_df) + len(os_txid_df) > self.config.threshold:  # filter
-                    if len(os_txid_df) == 0:  # new taxa, select random seq for blast
+            if len(oldseqs_txid_df) < self.config.threshold:
+                if len(newseqs_txid_df) + len(oldseqs_txid_df) > self.config.threshold:  # filter
+                    if len(oldseqs_txid_df) == 0:  # new taxa, select random seq for blast
                         # print('taxa new')
                         if self.config.filtertype == 'blast':
-                            filtered_acc = self.wrapper_filter_blast_otu(ns_txid_df, os_txid_df, 'accession', txid)  # returns only add column
+                            filtered_acc = self.wrapper_filter_blast_otu(newseqs_txid_df, oldseqs_txid_df, 'accession', txid)  # returns only add column
                             filtered = filtered_new_seqs[filtered_new_seqs['accession'].isin(filtered_acc)]
                             assert len(filtered_acc) == len(filtered), \
                                 (len(filtered_acc), len(filtered),
                                  [i for i in filtered_acc if i in filtered['accession'].to_list()])
                         elif self.config.filtertype == 'length':
                             debug('filter otu by length')
-                            filtered = self.select_seq_by_length(ns_txid_df, os_txid_df)
+                            filtered = self.select_seq_by_length(newseqs_txid_df, oldseqs_txid_df)
                         else:
                             # print('should not happen')
                             sys.exit(2)
                     else:  # select seq from aln
                         # print('taxa present already')
                         if self.config.filtertype == 'blast':
-                            filtered_acc = self.wrapper_filter_blast_otu(ns_txid_df, os_txid_df, 'tip_name', txid)
+                            filtered_acc = self.wrapper_filter_blast_otu(newseqs_txid_df, oldseqs_txid_df, 'tip_name', txid)
                             filtered = filtered_new_seqs[filtered_new_seqs['accession'].isin(filtered_acc)]
                             assert len(filtered_acc) == len(filtered), (len(filtered_acc), len(filtered))
                         elif self.config.filtertype == 'length':
                             debug('filter otu by length')
-                            filtered = self.select_seq_by_length(ns_txid_df, os_txid_df)
+                            filtered = self.select_seq_by_length(newseqs_txid_df, oldseqs_txid_df)
                         else:
                             # print('should not happen')
                             sys.exit(2)
-                elif len(ns_txid_df) + len(os_txid_df) <= self.config.threshold:  # filter
+                elif len(newseqs_txid_df) + len(oldseqs_txid_df) <= self.config.threshold:  # filter
                     # print('add all')
-                    filtered = ns_txid_df
+                    filtered = newseqs_txid_df
                 self.upd_new_seqs = pd.concat([self.upd_new_seqs, filtered], ignore_index=True, sort=True)  # if this is further below, old filtered entry will be added
-            elif len(os_txid_df) > self.config.threshold:
+            elif len(oldseqs_txid_df) > self.config.threshold:
                 if not self.config.downtorank:
                     # print('sample size to big')
                     sys.exit(-3)
@@ -758,6 +754,7 @@ class FilterNumberOtu(Filter):
                 # print('sample size correct - nothing to add')
                 filtered = pd.DataFrame()
             check_df_index_unique(self.upd_new_seqs)
+
         not_selected = list(set(new_seqs['accession'].values) - set(self.upd_new_seqs['accession'].values))
         del_tab = new_seqs[new_seqs['accession'].isin(not_selected)]
         self.del_table = del_tab
@@ -819,7 +816,7 @@ class FilterNumberOtu(Filter):
         """
         In hierarchical updating prefer new lineage over existing one.
 
-        :param ns_taxid_df:
+        :param ns_txid_df: id of found taxa
         :return:
         """
         if self.config.different_level is True:
@@ -993,7 +990,6 @@ class FilterSeqIdent(Filter):
                 # debug("identical seq new")
                 to_del = new_seqs.loc[idx]
                 # debug(new_seqs.loc[idx, "accession"])
-
                 self.del_table = self.del_table.append(to_del)
                 self.upd_new_seqs = self.upd_new_seqs.drop([idx])
             else:
@@ -1004,7 +1000,6 @@ class FilterSeqIdent(Filter):
                 if len(same_old.index) > 0:
                     # debug("identical old")
                     # debug(new_seqs.loc[idx, "accession"])
-
                     to_del = new_seqs.loc[idx]
                     self.del_table = self.del_table.append(to_del)
                     self.upd_new_seqs = self.upd_new_seqs.drop([idx])
@@ -1217,7 +1212,6 @@ class FilterLength(Filter):
         orig_seqlen = [len(self.aln[tax].symbols_as_string().replace("-", "").replace("N", "")) for tax in self.aln]
         avg_seqlen = sum(orig_seqlen) / len(orig_seqlen)
         return avg_seqlen
-
 
     def filter(self, new_seqs):
         """
