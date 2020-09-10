@@ -432,10 +432,6 @@ class PhylogeneticUpdater:
                 if self.config.perpetual is False:
                     self.config.unpublished = False
 
-                print(retrieved_seqs > 0)
-                print((status_end is None or self.status <= status_end))
-                print(self.status)
-
             if self.config.preferred_taxa:
                 if os.path.exists(os.path.join(self.workdir, 'found_taxa.csv')):
                     os.rename(os.path.join(self.workdir, 'found_taxa.csv'),
@@ -466,6 +462,8 @@ class PhylogeneticUpdater:
 
         if len(all_new_seqs) > 0:
             self.update_aln()
+            self.replace_complete_withusedseq(all_new_seqs)
+
             if self.tre is None:
                 self.tre_fn = os.path.abspath(os.path.join(self.config.workdir, "updt_aln.fasta.tree"))
                 self.tre = Tree.get(path=os.path.join(self.config.workdir, 'updt_tre.tre'),
@@ -698,24 +696,20 @@ class FilterNumberOtu(Filter):
             tax_ids_newseqs = filtered_new_seqs['downtorank']
             txids_added = new_seqs_downto['downtorank']
 
-        #print(len(tax_ids_newseqs))
-
         if self.config.preferred_taxa == True:
             preferred_taxa_ids = self.get_preferred_ids()
 
-        print('start loop')
+        debug('start loop')
         for txid in set(tax_ids_newseqs):
             # generate taxon_subsets
             ns_txid_df = filtered_new_seqs[tax_ids_newseqs == txid]
 
             # filter for preferred taxa
-           # ns_txid_df = self.prefer_different_OTU(ns_txid_df)
-            #print(ns_txid_df)
-            print('preferred taxa?')
-            print(self.config.preferred_taxa)
+            debug('preferred taxa?')
+            debug(self.config.preferred_taxa)
             if self.config.preferred_taxa == True:
                 ns_txid_df = self.prefer_taxa_from_locus(ns_txid_df, preferred_taxa_ids)
-            #print(ns_txid_df)
+
             os_txid_df = added_before[txids_added == txid]
             os_txid_df = os_txid_df[os_txid_df['status'] >= 0]
             if downtorank is not None and downtorank not in ['species', 'subspecies', 'variety']:
@@ -783,7 +777,7 @@ class FilterNumberOtu(Filter):
         :return: list with preferred taxon ncbi id's.
 
         """
-        print('get_preferred_ids')
+        # print('get_preferred_ids')
         with open(self.config.preferred_taxa_fn, 'r') as content:
             preferred_taxa_ids = content.read().splitlines()
             if preferred_taxa_ids[1].isnumeric():
@@ -820,6 +814,7 @@ class FilterNumberOtu(Filter):
         print(new_filtered_taxid_df)
         return new_filtered_taxid_df
 
+    # todo not used
     def prefer_different_OTU(self, ns_txid_df):
         """
         In hierarchical updating prefer new lineage over existing one.

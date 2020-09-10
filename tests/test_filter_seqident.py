@@ -70,6 +70,7 @@ def test_oldseq_longer():
     assert test.table["sseq"].str.contains(old_seq).any() == True
     assert new_seqs['sseq'].str.contains(old_seq_butlonger).any()
     assert test.table.loc[old_index, "status"].item() == 0
+
     f = phyl_up.FilterSeqIdent(test.config, test.table, test.status)
     f.filter(new_seqs)
     new_seqs = f.upd_new_seqs
@@ -77,6 +78,8 @@ def test_oldseq_longer():
     present_table = test.table[test.table['status'] >= 0]
     assert present_table["sseq"].str.contains(old_seq).any()
     assert present_table["sseq"].str.contains(old_seq_butlonger).any()
+    print(test.table.loc[old_index, 'status_note'] )
+    print(test.table.loc[old_index, 'status'] )
     assert test.table.loc[old_index, "status"].item() == -1
 
 
@@ -299,7 +302,9 @@ def test_filter_compare_shorter():
     assert test.table['sseq'].hasnans == False, test.table['sseq']
 
     new_seqs = test.compare_filter(new_seqs)
+    print(new_seqs['sseq'])
 
+    print(new_existing_seq)
     assert new_seqs['sseq'].str.contains(new_existing_seq).any() == False
 
 
