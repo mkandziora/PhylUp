@@ -392,3 +392,37 @@ def add_seq_to_table(aln, table):
     table['sseq'].replace('', np.nan, inplace=True)
     table.dropna(subset=['sseq'], inplace=True)
     return table
+
+
+def make_preferred_taxon_list(other_runs, fn, overlap_complete=True):
+    """
+
+    :param other_runs: dictionary with locus name, folderpath to runs that are part of preferred assesment.
+    :param fn: path to the overlap file
+    :param overlap_complete: either all must overlap, or intersections of diff combined
+    :return:
+    """
+    preferred_taxa_all = dict()
+    for locus in other_runs.keys():
+        preferred_taxa = pd.read_csv(other_runs[locus], names=['taxon_name', 'ncbi_id'])
+        unique_taxa = set(preferred_taxa.ncbi_id.to_list())
+        preferred_taxa_all[locus] = unique_taxa
+    key_list = list(preferred_taxa_all.keys())
+    for i in range(0, len(key_list)-1):
+        set_1 = preferred_taxa_all[key_list[i]]
+        set2 = preferred_taxa_all[key_list[i+1]]
+        overlap2 = set_1.intersection(set2)
+        if overlap_complete == True:
+            print('complete')
+            if i == 0:
+                overlap_all = overlap2
+            else:
+                set_1 = overlap_all
+                set2 = overlap2
+                overlap_all = set_1.intersection(set2)
+        else:
+            overlap_all = overlap_all + overlap2
+
+        with open(fn, mode='wt') as f:
+            for item in overlap_all:
+                f.write("%s\n" % item)

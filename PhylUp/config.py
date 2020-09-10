@@ -214,6 +214,20 @@ class ConfigObj(object):
             self.different_level = False
         assert self.different_level in [True, False], ("self.different_level `%s` "
                                                        "is not True or False" % self.different_level)
+        self.preferred_taxa = config["filter"]["preferred_taxa"]
+        if self.preferred_taxa == "True" or self.preferred_taxa == "true" or self.preferred_taxa == "TRUE":
+            self.preferred_taxa = True
+            self.preferred_taxa_fn = config["filter"]["preferred_taxa_fn"]
+            if self.preferred_taxa_fn == "None" or self.preferred_taxa_fn == "none":
+                self.preferred_taxa_fn = None
+
+            self.allow_parent = config["filter"]["allow_parent"]
+            if self.allow_parent == "True" or self.allow_parent == "true":
+                self.allow_parent = True
+            else:
+                self.allow_parent = False
+        else:
+            self.preferred_taxa = False
 
         # read in tree calculation settings
         self.update_tree = config["tree"]["update_tree"]

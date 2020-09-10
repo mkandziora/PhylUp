@@ -126,6 +126,8 @@ class AlnUpdater(object):
         self.aln = self.trim(os.path.join(self.config.workdir, 'papara_alignment.phylip'), 'phylip')
         with cd(self.config.workdir):
             phylogenetic_helpers.truncate_papara_aln(aln_old)
+        phylogenetic_helpers.write_aln(self.aln, self.config.workdir)
+
         msg = "Following papara alignment, aln has {} seqs \n".format(len(self.aln))
         write_msg_logfile(msg, self.config.workdir)
 
