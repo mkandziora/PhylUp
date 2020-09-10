@@ -75,6 +75,9 @@ def get_taxid_from_acc(gb_acc, blastdb, workdir):
     cmd1 = "blastdbcmd -db {} -entry_batch {} -outfmt %T -out {}/tmp/tax_id_{}.csv".format(blastdb, fn, workdir,
                                                                                                  gb_acc)
     fn_out = "{}/tmp/tax_id_{}.csv".format(workdir, gb_acc)
+    if os.path.exists(fn_out):
+        if not os.stat(fn_out).st_size > 0:
+            os.remove(fn_out)
     if not os.path.exists(fn_out):
         with suppress_stdout():
             os.system(cmd1)
@@ -470,7 +473,7 @@ def run_blast_query(query_seq, taxon, db_name, config, mrca=None):
     # print('run blastn')
     outfmt = " -outfmt '6 sseqid staxids sscinames pident evalue bitscore sseq salltitles sallseqid'"
 
-    DEVNULL = open(os.devnull, 'wb')
+    # DEVNULL = open(os.devnull, 'wb')
     if db_name == "Genbank":
         with cd(os.path.abspath(config.blastdb_path)):
             # TODO MK: blast+ v. 2.8 code - then we can limit search to taxids: -taxids self.mrca_ncbi
@@ -611,9 +614,8 @@ def get_non_redundant_data(config, redundant):
         found_taxids = set()
         t = acc_column.loc[idx]
         shortened = t.dropna()
-        ncbi_parser = ncbi_data_parser.Parser(
-            names_file=config.ncbi_parser_names_fn,
-            nodes_file=config.ncbi_parser_nodes_fn)
+        ncbi_parser = ncbi_data_parser.Parser(names_file=config.ncbi_parser_names_fn,
+                                              nodes_file=config.ncbi_parser_nodes_fn)
         while len(found_taxids) < len(set(all_taxids_set)):
             for i in range(len(shortened)):
                 # if we found all taxon_ids present in the initial list, stop looking for more
@@ -634,8 +636,7 @@ def get_non_redundant_data(config, redundant):
                 queried_acc.add(gb_acc)
     if len(redundant) > 0:
         assert len(non_redundant_redundant) >= len(redundant), \
-            (len(non_redundant_redundant), len(redundant), non_redundant_redundant['accession'],
-             redundant['accession;gi'])
+            (len(non_redundant_redundant), len(redundant), non_redundant_redundant['accession'], redundant['accession;gi'])
     return non_redundant_redundant
 
 

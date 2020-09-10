@@ -46,7 +46,9 @@ class PhylogeneticUpdater:
         self.tre = None
         self.blacklist = blacklist
         self.table = phylogenetic_helpers.build_table_from_file(id_to_spn, self.config, self.config.downtorank)
-        phylogenetic_helpers.add_seq_to_table(self.aln, self.table)
+        #print(self.config.different_level)
+        if self.config.different_level is not True:
+            phylogenetic_helpers.add_seq_to_table(self.aln, self.table)
         self.table.dropna(subset=["sseq"], inplace=True)  # only keep entries that have a seq
         self.mrca = None
         self.set_mrca(self.config.mrca_input)
@@ -60,7 +62,7 @@ class PhylogeneticUpdater:
 
         :return:
         """
-        if self.config.different_level == True and self.status == 0:
+        if self.config.different_level is True and self.status == 0:
             # try:
             #     self.table['date'] = pd.to_datetime('01/01/00', format='%d/%m/%y')
             # except NotImplementedError:
@@ -85,7 +87,7 @@ class PhylogeneticUpdater:
         #
         ncbi_parser = ncbi_data_parser.Parser(names_file=self.config.ncbi_parser_names_fn,
                                               nodes_file=self.config.ncbi_parser_nodes_fn)
-        if mrca == None:
+        if mrca is None:
             sys.stdout.write('Get mrca as input was not provided.\n')
             aln_taxids = set(self.table['ncbi_txid'].tolist())
 
@@ -101,10 +103,9 @@ class PhylogeneticUpdater:
         else:
             sys.stderr.write('Something goes wrong with the mrca input.\n')
             exit(-55)
-        for id in self.mrca:
-
-            mrca_name = ncbi_parser.get_name_from_id(id)
-            msg = "MRCA is set to {} - {}. \n".format(id, mrca_name)
+        for id_mrca in self.mrca:
+            mrca_name = ncbi_parser.get_name_from_id(id_mrca)
+            msg = "MRCA is set to {} - {}. \n".format(id_mrca, mrca_name)
             write_msg_logfile(msg, self.config.workdir)
 
     def extend_with_unpublished(self):
@@ -122,7 +123,8 @@ class PhylogeneticUpdater:
         # convert name to file
         ncbi_parser = ncbi_data_parser.Parser(names_file=self.config.ncbi_parser_names_fn,
                                               nodes_file=self.config.ncbi_parser_nodes_fn)
-        name_txid_unpublished = phylogenetic_helpers.get_txid_for_name_from_file(os.path.abspath(self.config.unpubl_names), ncbi_parser)
+        abs_unpubl_names = os.path.abspath(self.config.unpubl_names)
+        name_txid_unpublished = phylogenetic_helpers.get_txid_for_name_from_file(abs_unpubl_names, ncbi_parser)
         if not os.path.exists(os.path.join(self.workdir, 'tmp')):
             os.mkdir(os.path.join(self.workdir, 'tmp'))
         name_txid_unpublished[['accession', 'ncbi_txid']].to_csv(os.path.join(self.workdir, 'tmp/unpublished_txid.txt'),
@@ -142,7 +144,9 @@ class PhylogeneticUpdater:
         new_seqs_unpubl = pd.merge(new_seqs_unpubl, name_txid_unpublished, on=['accession'], sort=True)
         new_seqs_unpubl['title'] = 'unpublished'
         new_seqs_unpubl['status'] = 0.75
-        assert new_seqs_unpubl['ncbi_txid'].isnull().values.any() == False
+        assert new_seqs_unpubl['ncbi_txid'].isnull().values.any() == False, (new_seqs_unpubl['ncbi_txid'].tolist())
+        assert self.table.accession.is_unique
+
         return new_seqs_unpubl
 
     def extend(self):
@@ -170,7 +174,7 @@ class PhylogeneticUpdater:
             count += 1
             # msg = tip_name
             # write_msg_logfile(msg, self.config.workdir)
-            print('Blast {} sequence out of {}.'.format(count, len(blast_subset.index)))
+            print('Blast {} out of {}.'.format(count, len(blast_subset.index)))
             query_seq = self.table.loc[index, 'sseq']
             self.table.at[index, 'date'] = pd.Timestamp.today()  # this is the new version of pd.set_value(), sometimes it's iat
             new_seq_tax = blast.get_new_seqs(query_seq, tip_name, "Genbank", self.config)
@@ -247,8 +251,7 @@ class PhylogeneticUpdater:
             if len(new_seqs) > 0:
                 new_seqs = self.add_new_seqs(new_seqs)
 
-        for idx in new_seqs.index:
-            assert idx in self.table.index, (idx, self.table.index)
+        assert new_seqs.accession.is_unique
         # filter for seq identity process
         if len(new_seqs) > 0:
             new_seqs = self.compare_filter(new_seqs)
@@ -264,8 +267,10 @@ class PhylogeneticUpdater:
         :return:
         """
         if len(new_seqs) > 0:
-            for idx in new_seqs.index:
-                assert idx in self.table.index, (idx, self.table.index)
+            assert new_seqs.accession.is_unique
+
+            # for idx in new_seqs.index:
+            #     assert idx in self.table.index, (idx, self.table.index)
             if self.config.identical_seqs is False:
                 f = FilterSeqIdent(self.config, self.table, self.status)
                 before_filter = new_seqs
@@ -287,10 +292,11 @@ class PhylogeneticUpdater:
                      new_seqs['accession'], self.table[self.table['status'] == self.status]['accession'])
 
             # filter for number otu
-            f = FilterNumberOtu(self.config, self.table, self.status)
-            f.filter(new_seqs, self.config.downtorank)
-            self.table = f.table
-            new_seqs = f.upd_new_seqs
+            if len(new_seqs) > 0:
+                f = FilterNumberOtu(self.config, self.table, self.status)
+                f.filter(new_seqs, self.config.downtorank)
+                self.table = f.table
+                new_seqs = f.upd_new_seqs
         return new_seqs
 
     def basic_filters(self, aln, mrca, new_seqs):
@@ -348,14 +354,15 @@ class PhylogeneticUpdater:
             self.aln = DnaCharacterMatrix.get(path=os.path.abspath(os.path.join(self.workdir, 'updt_aln.fasta')),
                                               schema='fasta')
 
-            self.tre = Tree.get(path=os.path.abspath(os.path.join(self.workdir, 'updt_tre.tre')), schema='newick',
+            if os.path.exists("{}/updt_tre.tre".format(self.workdir)):
+                self.tre = Tree.get(path=os.path.abspath(os.path.join(self.workdir, 'updt_tre.tre')), schema='newick',
                                 taxon_namespace=self.aln.taxon_namespace, preserve_underscores=True)
             msg = "New round of updating begins with mrca: {}.\n".format(self.mrca)
             write_msg_logfile(msg, self.config.workdir)
 
         self.call_input_cleaner()
-
-        if self.config.different_level == False and os.path.exists(os.path.join(self.workdir, 'all_new_seqs.updated')):
+        assert len(self.table) > 1, (len(self.table), self.table)
+        if self.config.different_level == False and os.path.exists(os.path.join(self.workdir, 'new_seqs.updated')):
             next
         else:
             while retrieved_seqs > 0 and (status_end is None or self.status <= status_end):
@@ -408,6 +415,8 @@ class PhylogeneticUpdater:
                     os.rename(os.path.join(self.workdir, 'table.updated'),
                               os.path.join(self.workdir, "table_updated_tmp"))
 
+        # get full sequence only now: removes sequences that have very short hit in blast search
+        all_new_seqs = blast.wrapper_get_fullseq(self.config, all_new_seqs, db='Genbank')
         # print(self.table['sseq'])
         try:
             self.table['sequence_length'] = self.table['sseq'].apply(len)
@@ -429,7 +438,8 @@ class PhylogeneticUpdater:
 
     def replace_complete_withusedseq(self, new_seqs):
         """
-        Replaces the complete sequence (e.g. plastome) with the part that is actually used in the alignment and also replaces it in the table.
+        Replaces the complete sequence (e.g. plastome or longer seqs) with the part that is actually used in the
+        alignment and also replaces it in the table.
         Note, that therefore the new seqs have to be placed into the alignment first.
 
         :param new_seqs:
@@ -478,7 +488,8 @@ class PhylogeneticUpdater:
         :return:
         """
         print(self.mrca)
-        cleaner = phylogen_updater.InputCleaner(self.tre_fn, self.tre_schema, self.aln_fn, self.aln_schema, self.table, self.config, self.mrca)
+        cleaner = phylogen_updater.InputCleaner(self.tre_fn, self.tre_schema, self.aln_fn, self.aln_schema, self.table,
+                                                self.config, self.mrca)
         self.aln = cleaner.aln
         if self.tre_fn is not None:
             self.tre = cleaner.tre
@@ -493,7 +504,8 @@ class PhylogeneticUpdater:
         """
         # print(os.path.abspath(os.path.join(self.workdir, 'updt_aln.fasta')))
         print('update aln')
-        aln = phylogenetic_helpers.read_in_aln(os.path.abspath(os.path.join(self.workdir, 'updt_aln.fasta')), self.aln_schema)
+        abs_updt_aln = os.path.abspath(os.path.join(self.workdir, 'updt_aln.fasta'))
+        aln = phylogenetic_helpers.read_in_aln(abs_updt_aln, self.aln_schema)
         if self.tre_fn is None:
             tre = None
         else:
@@ -633,7 +645,7 @@ class FilterNumberOtu(Filter):
                 avail_txid = os_txid_df['ncbi_txid'].tolist()
                 # filter ns_txid_df to remove lower ranks already available
                 ns_txid_df = ns_txid_df[~ns_txid_df['ncbi_txid'].isin(avail_txid)]
-            # if we still want to add loop through
+            # if we still want to add, loop through
             if len(os_txid_df) < self.config.threshold:
                 if len(ns_txid_df) + len(os_txid_df) > self.config.threshold:  # filter
                     if len(os_txid_df) == 0:  # new taxa, select random seq for blast
@@ -708,7 +720,8 @@ class FilterNumberOtu(Filter):
     def select_seq_by_length(self, filter_dict, exist_dict):
         """
         This is another mode to filter the sequences, if there are more than the threshold amount available.
-        This one selects new sequences by length instead of by score values. It is selected by "selectby='length'".
+        This one selects new sequences by length instead of by score values. It is selected by "selectby='length'
+        in the configuration file".
 
         :param filter_dict:
         :param exist_dict:

@@ -93,7 +93,7 @@ run from within the PhylUp main folder:
   * **Install the taxonomic rank database:**
        *  `wget 'ftp://ftp.ncbi.nlm.nih.gov/pub/taxonomy/taxdump.tar.gz'`
        *  `gunzip  -cd taxdump.tar.gz | (tar xvf - names.dmp nodes.dmp)`  
-       *  move files into `tests/data/`
+       *  move files into `data/`
        *  `rm taxdump.tar.gz`
 
          
