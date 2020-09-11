@@ -177,7 +177,10 @@ class PhylogeneticUpdater:
         # sets back data for rerun with different tribe or so
         self.set_back_data_in_table()
         self.status += 1
+        print('status')
+        print(self.status)
         present_subset = self.table[self.table['status'] > -1]
+        print(present_subset)
         blast_subset = present_subset[present_subset['status'] >= self.status-1]
         new_seqs_local = pd.DataFrame(columns=['ncbi_txn', 'ncbi_txid', 'status', 'status_note', "date", 'accession',
                                                'pident', 'evalue', 'bitscore', 'sseq', 'title'])
@@ -186,6 +189,7 @@ class PhylogeneticUpdater:
         msg = blast_subset[['accession', 'ncbi_txn',  'status']].to_string()
         write_msg_logfile(msg, self.config.workdir)
         count = 0
+        print(blast_subset)
         for index in blast_subset.index:
             tip_name = self.table.loc[index, 'accession']
             count += 1
@@ -197,6 +201,7 @@ class PhylogeneticUpdater:
             new_seq_tax = blast.get_new_seqs(query_seq, tip_name, "Genbank", self.config)
             # new_seqs_local = new_seqs_local.append(new_seq_tax, ignore_index=True)
             new_seqs_local = pd.concat([new_seqs_local, new_seq_tax], ignore_index=True, sort=True)
+            print(len(new_seqs_local))
         assert len(new_seqs_local) > 0, new_seqs_local
         if self.blacklist is not None:
             assert type(self.blacklist) == list, (type(self.blacklist), self.blacklist)
@@ -282,8 +287,6 @@ class PhylogeneticUpdater:
         if len(new_seqs) > 0:
             assert new_seqs.accession.is_unique
 
-            # for idx in new_seqs.index:
-            #     assert idx in self.table.index, (idx, self.table.index)
             if self.config.identical_seqs is False:
                 f = FilterSeqIdent(self.config, self.table, self.status)
                 before_filter = new_seqs
@@ -378,6 +381,9 @@ class PhylogeneticUpdater:
             next
         else:
             while retrieved_seqs > 0 and (status_end is None or self.status <= status_end):
+                print(self.status)
+                print(status_end)
+                assert self.status <= status_end, (self.status, status_end)
                 msg = "Time before blast: {}.\n".format(datetime.datetime.now())
                 write_msg_logfile(msg, self.config.workdir)
                 if self.config.unpublished is True:
@@ -694,8 +700,6 @@ class FilterNumberOtu(Filter):
             tax_ids_newseqs = filtered_new_seqs['downtorank']
             txids_added = new_seqs_downto['downtorank']
 
-        if self.config.preferred_taxa == True:
-            preferred_taxa_ids = self.get_preferred_ids()
 
         debug('start loop')
         for txid in set(tax_ids_newseqs):
@@ -703,7 +707,7 @@ class FilterNumberOtu(Filter):
             newseqs_txid_df = filtered_new_seqs[tax_ids_newseqs == txid]
 
             # filter for preferred taxa
-            newseqs_txid_df = self.prefer_taxa_from_locus(newseqs_txid_df, preferred_taxa_ids)
+            newseqs_txid_df = self.prefer_taxa_from_locus(newseqs_txid_df)
 
             oldseqs_txid_df = added_before[txids_added == txid]
             oldseqs_txid_df = oldseqs_txid_df[oldseqs_txid_df['status'] >= 0]
@@ -790,24 +794,31 @@ class FilterNumberOtu(Filter):
                 preferred_taxa_ids = list(map(self.ncbi_parser.get_id_from_name, preferred_taxa_ids))
         return preferred_taxa_ids
 
-    def prefer_taxa_from_locus(self, ns_txid_df, preferred_taxa_ids):
+    def prefer_taxa_from_locus(self, ns_txid_df):
         """ This function ensures to find the same OTU as in another run for a different locus."""
-        print('prefer_taxa_from_locus')
-        tax_id_from_df = int(list(set(ns_txid_df.ncbi_txid))[0])
-        if tax_id_from_df in preferred_taxa_ids:
-            new_filtered_taxid_df = ns_txid_df
-        else:
-            if self.config.allow_parent == True:
-                print('check if parent - slow - consider if needed!')
-                for id in preferred_taxa_ids:
-                    # if tax_id_from_df is lower taxon from preferred ids:
-                    part_tax_id_from_df = self.ncbi_parser.match_id_to_mrca(tax_id_from_df, id)
-                    if part_tax_id_from_df != 0:
-                        new_filtered_taxid_df = ns_txid_df
-                    else:
-                        new_filtered_taxid_df = ns_txid_df[0:0]
+        debug('preferred taxa?')
+        debug(self.config.preferred_taxa)
+        if self.config.preferred_taxa == True:
+            print('prefer_taxa_from_locus')
+
+            preferred_taxa_ids = self.get_preferred_ids()
+            tax_id_from_df = int(list(set(ns_txid_df.ncbi_txid))[0])
+            if tax_id_from_df in preferred_taxa_ids:
+                new_filtered_taxid_df = ns_txid_df
             else:
-                new_filtered_taxid_df = ns_txid_df[0:0]
+                if self.config.allow_parent == True:
+                    print('check if parent - slow - consider if needed!')
+                    for tax_id in preferred_taxa_ids:
+                        # if tax_id_from_df is lower taxon from preferred ids:
+                        part_tax_id_from_df = self.ncbi_parser.match_id_to_mrca(tax_id_from_df, tax_id)
+                        if part_tax_id_from_df != 0:
+                            new_filtered_taxid_df = ns_txid_df
+                        else:
+                            new_filtered_taxid_df = ns_txid_df[0:0]
+                else:
+                    new_filtered_taxid_df = ns_txid_df[0:0]
+        else:
+            new_filtered_taxid_df = ns_txid_df
         print(new_filtered_taxid_df)
         return new_filtered_taxid_df
 
@@ -911,6 +922,7 @@ class FilterNumberOtu(Filter):
         subfilter_blast_seqs = remove_mean_sd_nonfit(filter_blast_seqs)
         filtered_seqs = self.select_number_missing(subfilter_blast_seqs, exist_dict)
         filtered_acc = set(list(filtered_seqs['accession']))
+        print('filter wrapper done')
         return filtered_acc
 
     def select_number_missing(self, subfilter_blast_seqs, table_otu_dict):

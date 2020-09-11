@@ -141,6 +141,8 @@ class ConfigObj(object):
         self.blast_type = config['blast']['blast_type']
         assert self.blast_type in ['Genbank', 'own']
         self.blastdb_path = config["blast"]["localblastdb"]
+        if self.blastdb_path[-1] != '/':
+            self.blastdb_path = self.blastdb_path + '/'
         assert os.path.exists(self.blastdb_path), self.blastdb_path
 
         if self.blast_type == 'Genbank':

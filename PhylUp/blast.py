@@ -416,7 +416,6 @@ def get_new_seqs(query_seq, taxon, db_name, config, mrca=None):
 
     :param query_seq: blast query sequence for search
     :param taxon: taxon name (=gb_acc, ncbi id); used for fn
-    :param db_path: path to blast db
     :param db_name: name of blast db
     :param config: config obj
     :param mrca: ncbi id to limit blast results
