@@ -146,6 +146,9 @@ install:
   # install requirements
   - pip install --quiet -r requirements.txt
   - pip install --quiet .
+  - pip install pytest-cov
+  - pip install pytest-xdist
+
 
 # command to run tests
 script:
@@ -157,14 +160,14 @@ script:
   - mkdir tests/output
   - mkdir tests/output/test_runs
   - cp data/data_for_tests/* tests/output/test_runs/
-  #- pytest tests/test_*
-  - pytest tests/test_add_unpublished.py
-  - pytest tests/test_blacklist.py
-  - pytest tests/test_filter_length.py
-  - pytest tests/test_filter_thresh.py
-  - pytest tests/test_filter_unique.py
-  - pytest tests/test_mrca.py
-  - pytest tests/test_reconcile.py
+  - pytest --cov tests/test_*
+#  - pytest tests/test_add_unpublished.py
+#  - pytest tests/test_ignore_acc.py
+#  - pytest tests/test_filter_length.py
+#  - pytest tests/test_filter_thresh.py
+#  - pytest tests/test_filter_unique.py
+#  - pytest tests/test_mrca.py
+#  - pytest tests/test_reconcile.py
 
 after_success:
   - curl -s https://codecov.io/bash | bash

@@ -4,6 +4,7 @@ from distutils.dir_util import copy_tree
 from PhylUp import phyl_up, config
 import pandas as pd
 
+
 def test_oldseq_longer():
     workdir = "tests/output/test_runs"
     trfn = "data/tiny_test_example/test.tre"
@@ -37,7 +38,6 @@ def test_oldseq_longer():
     old_index = test.table[test.table["sseq"].str.contains(old_seq)].index
     old_txid = test.table.loc[old_index, "ncbi_txid"].values[0]
     new_seqs = new_seqs[~new_seqs['accession'].isin(test.table['accession'])]  # ~ is the pd not in/!
-
 
     aln = test.aln
     count = 0
@@ -78,8 +78,8 @@ def test_oldseq_longer():
     present_table = test.table[test.table['status'] >= 0]
     assert present_table["sseq"].str.contains(old_seq).any()
     assert present_table["sseq"].str.contains(old_seq_butlonger).any()
-    print(test.table.loc[old_index, 'status_note'] )
-    print(test.table.loc[old_index, 'status'] )
+    print(test.table.loc[old_index, 'status_note'])
+    print(test.table.loc[old_index, 'status'])
     assert test.table.loc[old_index, "status"].item() == -1
 
     # check that old seq is not part of alignment anymore
@@ -159,8 +159,8 @@ def test_not_add_identical():
     f.filter(new_seqs)
     new_seqs = f.upd_new_seqs
 
-    print( new_seqs['sseq'].str.contains(new_ident))
-    print( new_seqs['sseq'].str.contains(new_ident).any())
+    print(new_seqs['sseq'].str.contains(new_ident))
+    print(new_seqs['sseq'].str.contains(new_ident).any())
     assert new_seqs['sseq'].str.contains(new_ident).any() == False, (new_seqs['sseq'].str.contains(new_ident))
     print(new_ident_key)
     print(new_seqs['accession'].str.contains(new_ident_key).any())
@@ -174,7 +174,6 @@ def test_not_add_identical():
     print(found.count())
     assert found.count() == 1, found.count()
 
-# df[~df["col"].str.contains(word)]
 def test_contain():
 
     present = {'ncbi_txn': ['1', '2'],
