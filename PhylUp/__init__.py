@@ -88,7 +88,7 @@ def license_print():
     sys.stdout.write(
     """
     PhylUp: automatic updating of phylogenetic data
-    Copyright (C) 2019  M. Kandziora
+    Copyright (C) 2020  M. Kandziora
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by

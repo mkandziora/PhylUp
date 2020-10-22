@@ -29,7 +29,7 @@ def test_blacklist():
     new_seqs = test.extend()
     len_no_bl = len(new_seqs)
 
-    test = phyl_up.PhylogeneticUpdater(id_to_spn, seqaln, mattype, trfn, schema_trf, conf, blacklist=blacklist)
+    test = phyl_up.PhylogeneticUpdater(id_to_spn, seqaln, mattype, trfn, schema_trf, conf, ignore_acc_list=blacklist)
     new_seqs = test.extend()
     len_bl = len(new_seqs)
 

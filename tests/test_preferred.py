@@ -24,7 +24,7 @@ def test_preferred():
     mattype = "fasta"
     configfi = "data/localblast_test_preferred.config"
 
-    blacklist1 = []  # sequence accession numbers that shall not be added
+    ignore_acc1 = []  # sequence accession numbers that shall not be added
 
     # define the different loci to be updated and matched
     dict1 = {'workdir': workdir,
@@ -33,7 +33,7 @@ def test_preferred():
              'mattype': mattype,
              'trfn': trfn,
              'schema_trf': schema_trf,
-             'blacklist': blacklist1
+             'ignore_acc_list': ignore_acc1
              }
 
     dict2 = {'workdir': "tests/output/test_run_preferred/test_ets/",
@@ -42,7 +42,7 @@ def test_preferred():
              'mattype': "fasta",
              'trfn': 'data/tiny_test_ETS/test_ets.tre',
              'schema_trf': 'newick',
-             'blacklist': blacklist1
+             'ignore_acc_list': ignore_acc1
              }
 
     # define the configuration files to use, min one has to be provided

@@ -34,7 +34,7 @@ from . import suppress_warnings, debug
 
 
 class PhylogeneticUpdater:
-    def __init__(self, id_to_spn, aln, aln_schema, tre, tre_schema, config, blacklist=None):
+    def __init__(self, id_to_spn, aln, aln_schema, tre, tre_schema, config, ignore_acc_list=None):
         self.config = config
         self.workdir = self.config.workdir
         self.status = 0  # -1 = deleted, positive values = round, 0 = present at beginning
@@ -44,7 +44,7 @@ class PhylogeneticUpdater:
         self.tre_fn = tre
         self.tre_schema = tre_schema
         self.tre = None
-        self.blacklist = blacklist
+        self.ignore_acc_list = ignore_acc_list
         self.table = phylogenetic_helpers.build_table_from_file(id_to_spn, self.config, self.config.downtorank)
         #print(self.config.different_level)
         if self.config.different_level is not True:
@@ -203,19 +203,19 @@ class PhylogeneticUpdater:
             new_seqs_local = pd.concat([new_seqs_local, new_seq_tax], ignore_index=True, sort=True)
             print(len(new_seqs_local))
         assert len(new_seqs_local) > 0, new_seqs_local
-        if self.blacklist is not None:
-            assert type(self.blacklist) == list, (type(self.blacklist), self.blacklist)
-            new_seqs_local = self.remove_blacklist_items(new_seqs_local)
+        if self.ignore_acc_list is not None:
+            assert type(self.ignore_acc_list) == list, (type(self.ignore_acc_list), self.ignore_acc_list)
+            new_seqs_local = self.remove_ignore_acc_list(new_seqs_local)
         return new_seqs_local
 
-    def remove_blacklist_items(self, new_seqs):
+    def remove_ignore_acc_list(self, new_seqs):
         """
         Removes accession numbers specified in the analysis file that shall not be added.
 
         :param new_seqs:  pandas dataframe with the new sequences retrieved earlier
         :return:
         """
-        drop_boolean = np.where((new_seqs.accession.isin(self.blacklist)), True, False)
+        drop_boolean = np.where((new_seqs.accession.isin(self.ignore_acc_list)), True, False)
         new_seqs = new_seqs[drop_boolean != True]
         return new_seqs
 
