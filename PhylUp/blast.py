@@ -21,7 +21,7 @@ import subprocess
 from tempfile import NamedTemporaryFile
 import pandas as pd
 from Bio.Seq import Seq
-from Bio.Alphabet import generic_dna
+#from Bio.Alphabet import generic_dna
 
 import ncbiTAXONparser.ncbi_data_parser as ncbi_data_parser  # is the ncbi data parser class and associated functions
 from . import cd
@@ -75,6 +75,9 @@ def get_taxid_from_acc(gb_acc, blastdb, workdir):
     cmd1 = "blastdbcmd -db {} -entry_batch {} -outfmt %T -out {}/tmp/tax_id_{}.csv".format(blastdb, fn, workdir,
                                                                                                  gb_acc)
     fn_out = "{}/tmp/tax_id_{}.csv".format(workdir, gb_acc)
+    if os.path.exists(fn_out):
+        if not os.stat(fn_out).st_size > 0:
+            os.remove(fn_out)
     if not os.path.exists(fn_out):
         with suppress_stdout():
             os.system(cmd1)
@@ -189,7 +192,7 @@ def make_local_blastdb(workdir, db, taxid, path_to_db=None):
             seq_l = content[1::2]
             seq_l = list(filter(None, seq_l))
             # note: a file with multiple seqs can be read in as well
-            assert len(gb_id_l) == len(seq_l), (gb_id_l, seq_l)
+            assert len(gb_id_l) == len(seq_l), (len(gb_id_l), len(seq_l), gb_id_l, seq_l)
 
             for i in range(0, len(gb_id_l)):
                 key = gb_id_l[i].replace(">", "")
@@ -387,7 +390,8 @@ def check_directionality(blast_seq, seq):
     """
     assert blast_seq is not "", blast_seq
     assert seq is not "", seq
-    orig = Seq(seq, generic_dna)  # generic_dna and Alphabet will be deprecated soon. I've not yet found a solution.
+    #orig = Seq(seq, generic_dna)  # generic_dna and Alphabet will be deprecated soon. I've not yet found a solution.
+    orig = Seq(seq)  # generic_dna and Alphabet will be deprecated soon. I've not yet found a solution.
     dna_comp = orig.complement()
     dna_rcomp = orig.reverse_complement()
     dna_r = orig[::-1]
@@ -413,7 +417,6 @@ def get_new_seqs(query_seq, taxon, db_name, config, mrca=None):
 
     :param query_seq: blast query sequence for search
     :param taxon: taxon name (=gb_acc, ncbi id); used for fn
-    :param db_path: path to blast db
     :param db_name: name of blast db
     :param config: config obj
     :param mrca: ncbi id to limit blast results
@@ -470,7 +473,7 @@ def run_blast_query(query_seq, taxon, db_name, config, mrca=None):
     # print('run blastn')
     outfmt = " -outfmt '6 sseqid staxids sscinames pident evalue bitscore sseq salltitles sallseqid'"
 
-    DEVNULL = open(os.devnull, 'wb')
+    # DEVNULL = open(os.devnull, 'wb')
     if db_name == "Genbank":
         with cd(os.path.abspath(config.blastdb_path)):
             # TODO MK: blast+ v. 2.8 code - then we can limit search to taxids: -taxids self.mrca_ncbi
@@ -498,7 +501,7 @@ def run_blast_query(query_seq, taxon, db_name, config, mrca=None):
         with cd(os.path.join(config.workdir, "tmp")):
             blastcmd = "blastn -query {} -db {} -out ".format(input_fn, db) + query_output_fn + \
                        " {} -num_threads {}".format(outfmt, config.num_threads) + \
-                       " -max_target_seqs {} -max_hsps {}".format(config.hitlist_size, config.hitlist_size)
+                       " -max_target_seqs {} -max_hsps {}".format(config.hitlist_size_unpublished, config.hitlist_size_unpublished)
             with suppress_stdout():
                 os.system(blastcmd)
             #subprocess.call(blastcmd, shell=False, stderr=DEVNULL)
@@ -556,7 +559,7 @@ def read_blast_query_pandas(blast_fn, config, db_name):
     new_seqs['sseq'] = new_seqs['sseq'].str.replace("-", "")
     new_seqs['date'] = datetime.datetime.strptime('01/01/00', '%d/%m/%y')
     # todo this could be made faster by running it on the redundant/non_redundant data first
-    new_seqs = wrapper_get_fullseq(config, new_seqs, db_name)
+    #new_seqs = wrapper_get_fullseq(config, new_seqs, db_name)
     return new_seqs
 
 
@@ -611,9 +614,8 @@ def get_non_redundant_data(config, redundant):
         found_taxids = set()
         t = acc_column.loc[idx]
         shortened = t.dropna()
-        ncbi_parser = ncbi_data_parser.Parser(
-            names_file=config.ncbi_parser_names_fn,
-            nodes_file=config.ncbi_parser_nodes_fn)
+        ncbi_parser = ncbi_data_parser.Parser(names_file=config.ncbi_parser_names_fn,
+                                              nodes_file=config.ncbi_parser_nodes_fn)
         while len(found_taxids) < len(set(all_taxids_set)):
             for i in range(len(shortened)):
                 # if we found all taxon_ids present in the initial list, stop looking for more
@@ -634,8 +636,7 @@ def get_non_redundant_data(config, redundant):
                 queried_acc.add(gb_acc)
     if len(redundant) > 0:
         assert len(non_redundant_redundant) >= len(redundant), \
-            (len(non_redundant_redundant), len(redundant), non_redundant_redundant['accession'],
-             redundant['accession;gi'])
+            (len(non_redundant_redundant), len(redundant), non_redundant_redundant['accession'], redundant['accession;gi'])
     return non_redundant_redundant
 
 

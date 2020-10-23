@@ -35,7 +35,7 @@ class AlnUpdater(object):
     """
     Class to update aln with newly retrieved sequences.
     """
-    def __init__(self, config, aln, status, table, tre=None):
+    def __init__(self, config, aln, status, table, status_new=None, tre=None):
         """
         :param tre: dendropy tree object
         :param aln: dendropy alignment object
@@ -49,7 +49,10 @@ class AlnUpdater(object):
         self.tre_fn = "updt_aln.fasta.tree"
         self.tre = tre
         self.config = config
-        self.new_seq_table = self.table[self.table['status'] >= 1]  # gets all new seqs (status>0.5)
+        if status_new == None:
+            self.new_seq_table = self.table[self.table['status'] >= 1]  # gets all new seqs (status>0.5)
+        else:
+            self.new_seq_table = self.table[self.table['status'] >= status_new]  # gets all new seqs (status>0.5)
         self.newseqs_file = "new_seqs.fasta"
         self.update_data()
 
@@ -60,6 +63,7 @@ class AlnUpdater(object):
         :return: output files
         """
         print('update data')
+        print(len(self.new_seq_table.index))
         if len(self.new_seq_table) > 0:
             self.delete_short_seqs()
             self.write_papara_queryseqs()
@@ -118,11 +122,12 @@ class AlnUpdater(object):
             path = os.path.join(os.getcwd(), "papara_alignment.phylip".format())
             assert os.path.exists(path), "{} does not exists".format(path)
         aln_old = self.aln
-        self.aln = DnaCharacterMatrix.get(path=os.path.join(self.config.workdir, "papara_alignment.phylip"),
-                                          schema='phylip')
+        self.aln = DnaCharacterMatrix.get(path=os.path.join(self.config.workdir, "papara_alignment.phylip"), schema='phylip')
         self.aln = self.trim(os.path.join(self.config.workdir, 'papara_alignment.phylip'), 'phylip')
         with cd(self.config.workdir):
             phylogenetic_helpers.truncate_papara_aln(aln_old)
+        phylogenetic_helpers.write_aln(self.aln, self.config.workdir)
+
         msg = "Following papara alignment, aln has {} seqs \n".format(len(self.aln))
         write_msg_logfile(msg, self.config.workdir)
 
@@ -155,7 +160,7 @@ class AlnUpdater(object):
             if len(seq.symbols_as_string().replace("-", "").replace("?", "")) <= seq_len_cutoff:
                 delete_seqs.append(tax)
         if delete_seqs:
-            msg = "Taxa deleted from tree and alignment in delete short sequences" \
+            msg = "Taxa deleted from tree and alignment in delete short sequences " \
                   "as sequences are shorter than {}.\n".format(seq_len_cutoff)
             write_msg_logfile(msg, self.config.workdir)
             for tax in delete_seqs:
@@ -177,7 +182,6 @@ class AlnUpdater(object):
         :param taxon_label: taxon_label from dendropy object - aln or phy
         :return:
         """
-
         if self.tre != None:
             # not sure why this function exist. None of them actually remove a tip.
             # tax2 = self.tre.taxon_namespace.get_taxon(taxon_label)
@@ -203,6 +207,7 @@ class AlnUpdater(object):
         Means, that trim_perc (e.g. 0.75 = 75%) of the sequences need to have a base present.
         This ensures, that not whole chromosomes get dragged in by cutting the ends of long sequences.
         """
+        print('trim alignment')
         if aln_fn:
             aln = DnaCharacterMatrix.get(path=aln_fn, schema=format_aln)
         else:
@@ -500,6 +505,8 @@ class InputCleaner(object):
         assert type(self.aln) == DnaCharacterMatrix
 
         if tre_fn is not None:
+            if tre_schema is None:
+                tre_schema = 'newick'
             self.tre = self.write_clean_tre(tre_fn, tre_schema)
             if self.config.different_level is False:
                 self.delete_missing()  # turned of for different level, as tre is not updated between runs, aln is.
@@ -523,7 +530,7 @@ class InputCleaner(object):
         :param mrca:
         :return:
         """
-        mrca_name = self.ncbi_parser.get_name_from_id(mrca)
+        mrca_name = self.ncbi_parser.get_name_from_id(list(mrca)[0])
         print('Format mrca: {} - {}'.format(mrca, mrca_name))
         if type(mrca) is int:
             valid = self.ncbi_parser.taxid_is_valid(mrca)
@@ -574,17 +581,21 @@ class InputCleaner(object):
                 self.aln.taxon_namespace.remove_taxon_label(item.label)  # can only be removed one by one
                 msg = '{} is only in the alignment, not in the tree and will be deleted.\n'.format(item.label)
                 write_msg_logfile(msg, self.config.workdir)
+                self.table.loc[self.table['accession'] == item.label, 'status'] = -1
+                self.table.loc[self.table['accession'] == item.label, 'status_note'] = 'not in the treer'
         if del_tre != []:
             for item in del_tre:
                 self.tre.taxon_namespace.remove_taxon_label(item.label)  # can only be removed one by one
                 msg = '{} is only in the tree, not in the alignment and will be deleted.\n'.format(item.label)
                 write_msg_logfile(msg, self.config.workdir)
+
         if len(delete_tax) > 0:
             true_false = np.where((self.table.accession.isin(list(delete_tax))), True, False)
             self.table.at[true_false, 'status'] = -1
             self.table.at[true_false, 'status_note'] = "deleted, was missing in aln or tre"
         assert self.aln.taxon_namespace == self.tre.taxon_namespace
 
+    #todo: does nothing
     def clean_inputname(self):
         """It rewrites tip names if they start with a number at the beginning of the name.
         Python adds an 'n' to the name.
@@ -611,7 +622,7 @@ class InputCleaner(object):
                     # if original == tax.label or original == newname:
                         # tax.label = self.table.loc[idx, "accession"].split('.')[0]
                         # found_label = 1
-                #if found_label == 0: # and self.table.loc[idx, "ncbi_txid"]:
+                # if found_label == 0: # and self.table.loc[idx, "ncbi_txid"]:
                 #    sys.stderr.write("could not match tip label {} any ncbi taxon name\n".format(tax.label))
 
     def write_clean_aln(self, aln_fn, aln_schema):
@@ -619,6 +630,7 @@ class InputCleaner(object):
         Write out original and cleaned alignemnt (? converted to -, no whitespaces).
 
         :param aln_fn: filename of alignment
+        :param aln_schema: format of alignment
         :return:
         """
         with open(aln_fn, "r") as fin:
@@ -665,6 +677,7 @@ class InputCleaner(object):
         Write out original and cleaned tre (no whitespaces).
 
         :param tre_fn: tree file name
+        :param tre_schema: schema of tree
         :return:
         """
         if tre_fn is not None:

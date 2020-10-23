@@ -127,13 +127,13 @@ def write_tre(tre, workdir, treepath="updt_tre.tre", treeschema="newick"):
     tre.write(path=os.path.join(workdir, treepath), schema=treeschema, unquoted_underscores=True, suppress_rooting=True)
 
 
-def replace_uid_with_name(file_path, table, type):
+def replace_uid_with_name(file_path, table, matrix_type):
     """
     translate unique ids into species names in file.
 
     :param file_path:
     :param table:
-    :param type: aln or tree, defines which type is being relabeled.
+    :param matrix_type: aln or tree, defines which type is being relabeled.
     :return:
     """
     # print(os.getcwd())
@@ -152,7 +152,7 @@ def replace_uid_with_name(file_path, table, type):
                     if split_name in labelled:
                         debug(split_name)
                         spn = present.loc[idx, 'ncbi_txn'].replace(" ", "_").replace("-", "_").replace("'", "")
-                        if type == 'tree':
+                        if matrix_type == 'tree':
                             labelled = replace_in_tree(idx, labelled, present, split_name, spn)
                         else:
                             labelled = replace_in_aln(idx, labelled, present, split_name, spn)
@@ -192,12 +192,12 @@ def check_align(aln):
     """
     i = 0
     seqlen = len(aln[i])
-    while seqlen == 0:
-        i = i + 1
-        seqlen = len(aln[i])
+    # while seqlen == 0:  #useless, seqlen never == 0
+    #     i = i + 1
+    #     seqlen = len(aln[i])
     for tax in aln:
         if len(aln[tax]) != seqlen:
-            sys.stderr.write("Alignment is not aligned.")
+            sys.stderr.write("Alignment is not aligned: {} vs {} .\n".format(len(aln[tax]), seqlen))
             return
     return seqlen
 
@@ -305,6 +305,7 @@ def build_table_from_file(id_to_spn, config, downtorank=None):
 
     debug(id_to_spn)
     table = get_txid_for_name_from_file(id_to_spn, ncbi_parser)  # builds name id link
+    table = table.drop_duplicates(subset='accession', keep='first')  # drop duplicated entries from file
     table['status'] = 0
     try:
         table['date'] = pd.Timestamp.strptime('01/01/00', '%d/%m/%y')
@@ -391,3 +392,37 @@ def add_seq_to_table(aln, table):
     table['sseq'].replace('', np.nan, inplace=True)
     table.dropna(subset=['sseq'], inplace=True)
     return table
+
+
+def make_preferred_taxon_list(other_runs, fn, overlap_complete=True):
+    """
+
+    :param other_runs: dictionary with locus name, folderpath to runs that are part of preferred assesment.
+    :param fn: path to the overlap file
+    :param overlap_complete: either all must overlap, or intersections of diff combined
+    :return:
+    """
+    preferred_taxa_all = dict()
+    for locus in other_runs.keys():
+        preferred_taxa = pd.read_csv(other_runs[locus], names=['taxon_name', 'ncbi_id'])
+        unique_taxa = set(preferred_taxa.ncbi_id.to_list())
+        preferred_taxa_all[locus] = unique_taxa
+    key_list = list(preferred_taxa_all.keys())
+    for i in range(0, len(key_list)-1):
+        set_1 = preferred_taxa_all[key_list[i]]
+        set2 = preferred_taxa_all[key_list[i+1]]
+        overlap2 = set_1.intersection(set2)
+        if overlap_complete == True:
+            print('complete')
+            if i == 0:
+                overlap_all = overlap2
+            else:
+                set_1 = overlap_all
+                set2 = overlap2
+                overlap_all = set_1.intersection(set2)
+        else:
+            overlap_all = overlap_all + overlap2
+
+        with open(fn, mode='wt') as f:
+            for item in overlap_all:
+                f.write("%s\n" % item)
