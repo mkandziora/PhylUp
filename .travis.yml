@@ -37,7 +37,7 @@ before_install:
   - conda update -q conda
   - conda create -q -n test-environment python=$TRAVIS_PYTHON_VERSION
   - source activate test-environment
-  - pip install --force-reinstall numpy==1.14.5
+  - pip install --force-reinstall numpy>= 1.15.4
   - conda install -c bioconda raxml-ng
 
 
