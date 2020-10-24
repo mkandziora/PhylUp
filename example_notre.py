@@ -8,9 +8,9 @@ seqaln = "data/tiny_test_example/test.fas"  # alignment
 mattype = "fasta"  # format of alignment
 configfi = "data/localblast.config"  # configuration file
 
-blacklist = ['JX895419.1']  # sequence accession numbers that shall not be added
+ignore_acc = ['JX895419.1']  # sequence accession numbers that shall not be added
 
 # update the data:
 conf = config.ConfigObj(configfi, workdir, interactive=False)
-test = phyl_up.PhylogeneticUpdater(id_to_spn, seqaln, mattype, trfn, schema_trf, conf, blacklist=blacklist)
+test = phyl_up.PhylogeneticUpdater(id_to_spn, seqaln, mattype, trfn, schema_trf, conf, ignore_acc_list=ignore_acc)
 test.run()

@@ -21,7 +21,7 @@ import subprocess
 from tempfile import NamedTemporaryFile
 import pandas as pd
 from Bio.Seq import Seq
-from Bio.Alphabet import generic_dna
+#from Bio.Alphabet import generic_dna
 
 import ncbiTAXONparser.ncbi_data_parser as ncbi_data_parser  # is the ncbi data parser class and associated functions
 from . import cd
@@ -390,7 +390,8 @@ def check_directionality(blast_seq, seq):
     """
     assert blast_seq is not "", blast_seq
     assert seq is not "", seq
-    orig = Seq(seq, generic_dna)  # generic_dna and Alphabet will be deprecated soon. I've not yet found a solution.
+    #orig = Seq(seq, generic_dna)  # generic_dna and Alphabet will be deprecated soon. I've not yet found a solution.
+    orig = Seq(seq)  # generic_dna and Alphabet will be deprecated soon. I've not yet found a solution.
     dna_comp = orig.complement()
     dna_rcomp = orig.reverse_complement()
     dna_r = orig[::-1]
