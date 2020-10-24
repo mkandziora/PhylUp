@@ -143,7 +143,7 @@ class ConfigObj(object):
         self.blastdb_path = config["blast"]["localblastdb"]
         if self.blastdb_path[-1] != '/':
             self.blastdb_path = self.blastdb_path + '/'
-        assert os.path.exists(self.blastdb_path), self.blastdb_path
+        assert os.path.exists(self.blastdb_path), "Path of blast database does not exist: {}".format(self.blastdb_path)
 
         if self.blast_type == 'Genbank':
             self.blastdb = '{}/nt'.format(self.blastdb_path)
