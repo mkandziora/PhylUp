@@ -359,6 +359,9 @@ class PhylogeneticUpdater:
         write_msg_logfile(msg, self.config.workdir)
         print(msg)
 
+        if status_end == None:
+            status_end = 10000
+
         columns = ['ncbi_txn', 'ncbi_txid', 'status', 'status_note', "date",
                    'accession', 'pident', 'evalue', 'bitscore', 'sseq', 'title']
         all_new_seqs = pd.DataFrame(columns=columns)
