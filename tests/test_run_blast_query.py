@@ -29,9 +29,15 @@ def test_run_blast_query():
     min_date_blast = today - datetime.timedelta(days=90)
     present_subset_df = test.table['status'] > -1
     present_subset_df = test.table[present_subset_df == True]
+
+
+    min_date_blast = datetime.datetime.strptime(str(min_date_blast),"%Y-%m-%d")
+
+    timestamp = datetime.datetime.timestamp(min_date_blast)
+
+
     present_subset_df = present_subset_df[(present_subset_df.date <= min_date_blast)]
     present_subset = present_subset_df
-
 
     for index in present_subset.index:
         print('blast table seq')
