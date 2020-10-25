@@ -50,7 +50,7 @@ class AlnUpdater(object):
         self.tre = tre
         self.config = config
         if status_new == None:
-            self.new_seq_table = self.table[self.table['status'] >= 1]  # gets all new seqs (status>0.5)
+            self.new_seq_table = self.table[self.table['status'] > 0]  # gets all new seqs (status>0.5)
         else:
             self.new_seq_table = self.table[self.table['status'] >= status_new]  # gets all new seqs (status>0.5)
         self.newseqs_file = "new_seqs.fasta"
