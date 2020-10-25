@@ -49,7 +49,11 @@ class AlnUpdater(object):
         self.tre_fn = "updt_aln.fasta.tree"
         self.tre = tre
         self.config = config
+        print('status')
+        print(status_new)
         if status_new == None:
+            self.new_seq_table = self.table[self.table['status'] > 0]  # gets all new seqs (status>0.5)
+        elif status_new == 0.5:
             self.new_seq_table = self.table[self.table['status'] > 0]  # gets all new seqs (status>0.5)
         else:
             self.new_seq_table = self.table[self.table['status'] >= status_new]  # gets all new seqs (status>0.5)
