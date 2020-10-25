@@ -10,7 +10,7 @@ from PhylUp import phyl_up, config, blast
 
 
 
-def test_preferred():
+def fixtest_preferred():
     copy_tree('tests/output/test_runs/', 'tests/output/test_run_preferred/test_its')
     copy_tree('./data/blast_for_tests', 'tests/output/test_run_preferred/test_its/blast')
     copy_tree('./data/blast_for_test_ets', 'tests/output/test_run_preferred/test_ets/blast')
@@ -60,6 +60,7 @@ def test_preferred():
     overlap_folder = "tests/output/test_run_preferred/"
 
     ############################################
+    #todo fix run multiple - need to copy from somewhere
     # end defines the number of blast rounds. is limited to one if you want to match taxa across loci
     wrapper.run_multiple(data, confs, end=0, overlap_folder=overlap_folder)
 
