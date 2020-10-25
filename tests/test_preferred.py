@@ -15,6 +15,8 @@ def test_preferred():
     copy_tree('./data/blast_for_tests', 'tests/output/test_run_preferred/test_its/blast')
     copy_tree('./data/blast_for_test_ets', 'tests/output/test_run_preferred/test_ets/blast')
     copy_tree('./data/tmp_for_test_ETS', 'tests/output/test_run_preferred/test_ets/tmp')
+    copy_tree('./data/tiny_test_ETS/', 'tests/output/test_run_preferred/test_ets')
+
 
     workdir = "tests/output/test_run_preferred/test_its"
     trfn = "data/tiny_test_example/test.tre"
@@ -48,6 +50,7 @@ def test_preferred():
     # define the configuration files to use, min one has to be provided
     confs = [configfi
              ]
+    conf = config.ConfigObj(confs[0], workdir, interactive=False)
 
     data = {
         'its': dict1,
@@ -69,11 +72,11 @@ def test_preferred():
     taxid_its = []
     taxid_ets = []
     for tax, seq in new_seqs_its.items():
-        txid = blast.get_taxid_from_acc(tax.label, '/media/blubb/schmuh/local_blast_db_new/nt', workdir)
+        txid = blast.get_taxid_from_acc(tax.label, conf.blastdb_path, workdir)
         taxid_its.append(txid[0])
 
     for tax, seq in new_seqs_ets.items():
-        txid = blast.get_taxid_from_acc(tax.label, '/media/blubb/schmuh/local_blast_db_new/nt',
+        txid = blast.get_taxid_from_acc(tax.label, conf.blastdb_path,
                                         'tests/output/test_run_preferred/test_ets')
         taxid_ets.append(txid[0])
     print(taxid_its)
