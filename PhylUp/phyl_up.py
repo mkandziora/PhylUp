@@ -576,7 +576,7 @@ class PhylogeneticUpdater:
             self.config.added_seqs_aln = True
             updated = True
         elif self.config.added_seqs_aln == True:
-            if self.status > 1:
+            if self.status >= 1:
                 aln_upd = phylogen_updater.AlnUpdater(self.config, aln, self.status, self.table, self.status, tre)
                 updated = True
         else:
