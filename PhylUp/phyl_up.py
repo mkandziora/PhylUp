@@ -46,6 +46,7 @@ class PhylogeneticUpdater:
         self.tre = None
         self.ignore_acc_list = ignore_acc_list
         self.table = phylogenetic_helpers.build_table_from_file(id_to_spn, self.config, self.config.downtorank)
+        self.table.at[:, 'status_note'] = 'original'
         #print(self.config.different_level)
         if self.config.different_level is not True:
             phylogenetic_helpers.add_seq_to_table(self.aln, self.table)
@@ -62,7 +63,7 @@ class PhylogeneticUpdater:
 
         :return:
         """
-        if self.config.different_level is True and self.status == 0:
+        if self.config.different_level is True and self.status < 1:
             # try:
             #     self.table['date'] = pd.to_datetime('01/01/00', format='%d/%m/%y')
             # except NotImplementedError:
@@ -245,6 +246,8 @@ class PhylogeneticUpdater:
             assert len(subcols) == len(self.table[self.table['status'] == self.status]), \
                 (len(subcols), len(self.table[self.table['status'] == self.status]), subcols['accession'])
         new_seqs_upd_index = self.table[self.table['status'] == self.status]
+        new_seqs_upd_index = new_seqs_upd_index[new_seqs_upd_index['status_note'] != 'original']
+        assert (len(new_seqs) == len(new_seqs_upd_index)), (len(new_seqs), len(new_seqs_upd_index))
         return new_seqs_upd_index
 
     def call_filter(self, new_seqs, aln):
@@ -400,8 +403,8 @@ class PhylogeneticUpdater:
                     #     self.config.unpublished = False
 
                     if self.config.blast_all is True:
-                        self.table.at[self.table.status == self.status, 'status'] = 0
-                        self.status = 0
+                        self.table.at[self.table.status == self.status, 'status'] = 0.5
+                        self.status = 0.5
 
                 else:
                     print('extend with Genbank')
