@@ -1,12 +1,12 @@
 import os
 from distutils.dir_util import copy_tree
-
+import shutil
 from PhylUp import phyl_up, config
 import pandas as pd
 
 
 def test_oldseq_longer():
-    workdir = "tests/output/test_runs"
+    workdir = "tests/output/test_run_seqident"
     trfn = "data/tiny_test_example/test.tre"
     schema_trf = "newick"
     id_to_spn = "data/tiny_test_example/test_nicespl.csv"
@@ -19,6 +19,8 @@ def test_oldseq_longer():
         os.mkdir(tmp_folder)
     # call(['cp', '-a', 'data/tmp_for_test/', tmp_folder])
     copy_tree('data/tmp_for_test/', tmp_folder)
+    shutil.copyfile('data/tiny_test_example/updt_aln.fasta', os.path.join(workdir, 'updt_aln.fasta'))
+    shutil.copyfile('data/tiny_test_example/updt_tre.tre', os.path.join(workdir, 'updt_tre.tre'))
 
     conf = config.ConfigObj(configfi, workdir, interactive=False)
     conf.threshold = 2
@@ -109,7 +111,7 @@ def test_oldseq_longer():
 
 
 def test_not_add_identical():
-    workdir = "tests/output/test_runs"
+    workdir = "tests/output/test_run_seqident"
     trfn = "data/tiny_test_example/test.tre"
     schema_trf = "newick"
     id_to_spn = "data/tiny_test_example/test_nicespl.csv"
@@ -199,7 +201,7 @@ def test_contain():
 
 def test_filter_compare():
     print('test_filter_seqident')
-    workdir = "tests/output/test_runs"
+    workdir = "tests/output/test_run_seqident"
     trfn = "data/tiny_test_example/test.tre"
     schema_trf = "newick"
     id_to_spn = "data/tiny_test_example/test_nicespl.csv"
@@ -210,6 +212,16 @@ def test_filter_compare():
     conf = config.ConfigObj(configfi, workdir, interactive=False)
     conf.threshold = 2
     conf.blast_folder = os.path.abspath("./data/blast_for_tests")
+
+    tmp_folder = os.path.join(workdir, 'tmp')
+    if not os.path.exists(tmp_folder):
+        os.mkdir(tmp_folder)
+    # call(['cp', '-a', 'data/tmp_for_test/', tmp_folder])
+    copy_tree('data/tmp_for_test/', tmp_folder)
+    shutil.copyfile('data/tiny_test_example/updt_aln.fasta', os.path.join(workdir, 'updt_aln.fasta'))
+    shutil.copyfile('data/tiny_test_example/updt_tre.tre', os.path.join(workdir, 'updt_tre.tre'))
+
+
     test = phyl_up.PhylogeneticUpdater(id_to_spn, seqaln, mattype, trfn, schema_trf, conf)
 
     new_seqs = test.extend()
@@ -250,9 +262,10 @@ def test_filter_compare():
     assert found.count() == 1, found.count()
 
 
+
 def test_filter_compare_shorter():
     print('test_filter_seqident')
-    workdir = "tests/output/test_runs"
+    workdir = "tests/output/test_run_seqident"
     trfn = "data/tiny_test_example/test.tre"
     schema_trf = "newick"
     id_to_spn = "data/tiny_test_example/test_nicespl.csv"
@@ -307,7 +320,7 @@ def test_filter_compare_shorter():
 
 def test_filter_seqident_newexist():
     print('test_filter_seqident')
-    workdir = "tests/output/test_runs"
+    workdir = "tests/output/test_run_seqident"
     trfn = "data/tiny_test_example/test.tre"
     schema_trf = "newick"
     id_to_spn = "data/tiny_test_example/test_nicespl.csv"
@@ -379,7 +392,7 @@ def test_filter_seqident_newexist():
 
 
 def test_oldseq():
-    workdir = "tests/output/test_runs"
+    workdir = "tests/output/test_run_seqident"
     trfn = "data/tiny_test_example/test.tre"
     schema_trf = "newick"
     id_to_spn = "data/tiny_test_example/test_nicespl.csv"
@@ -453,7 +466,7 @@ def test_oldseq():
 
 
 def test_no_similar():
-    workdir = "tests/output/test_runs"
+    workdir = "tests/output/test_run_seqident"
     trfn = "data/tiny_test_example/test.tre"
     schema_trf = "newick"
     id_to_spn = "data/tiny_test_example/test_nicespl.csv"
