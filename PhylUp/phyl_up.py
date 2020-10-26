@@ -382,7 +382,7 @@ class PhylogeneticUpdater:
             write_msg_logfile(msg, self.config.workdir)
 
         self.call_input_cleaner()
-        assert len(self.table) > 1, (len(self.table), self.table)
+        # assert len(self.table) > 1, (len(self.table), self.table)  # not the case if single seq is used as input
         if self.config.different_level == False and os.path.exists(os.path.join(self.workdir, 'new_seqs.updated')):
             next
         else:
