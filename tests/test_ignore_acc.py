@@ -1,7 +1,7 @@
 import os
 from distutils.dir_util import copy_tree
 
-from PhylUp import phyl_up, config, phylogen_updater
+from PhylUp import phyl_up, config
 
 def test_ignore_acc():
     workdir = "tests/output/test_runs_ignoreacc"

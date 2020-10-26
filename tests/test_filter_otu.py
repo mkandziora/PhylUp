@@ -9,7 +9,7 @@ from copy import deepcopy
 
 @pytest.fixture(autouse=True)
 def configure():
-    workdir = "tests/output/test_runs"
+    workdir = "tests/output/test_runs_filter_otu"
     trfn = "data/tiny_test_example/test.tre"
     schema_trf = "newick"
     id_to_spn = "data/tiny_test_example/test_nicespl.csv"
