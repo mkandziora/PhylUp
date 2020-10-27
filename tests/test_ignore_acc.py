@@ -32,7 +32,7 @@ def test_ignore_acc():
     new_seqs = test.extend()
     len_no_bl = len(new_seqs)
 
-    test = phyl_up.PhylogeneticUpdater(id_to_spn, seqaln, mattype, trfn, schema_trf, conf, ignore_acc_list=ignore_acc)
+    test = phyl_up.PhylogeneticUpdater(id_to_spn, seqaln, mattype, trfn, schema_trf, conf, ignore_acc)
     new_seqs = test.extend()
     len_bl = len(new_seqs)
 
