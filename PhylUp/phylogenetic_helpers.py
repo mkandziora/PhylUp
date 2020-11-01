@@ -305,8 +305,8 @@ def build_table_from_file(id_to_spn, config, downtorank=None):
     if os.path.exists(os.path.join(config.workdir, 'spn_input_ncbiid.txt')):
         table = pd.read_csv(os.path.join(config.workdir, 'spn_input_ncbiid.txt'), sep=' ')
 
-    debug(id_to_spn)
     else:
+        debug(id_to_spn)
         table = get_txid_for_name_from_file(id_to_spn, ncbi_parser)  # builds name id link
         table.to_csv(os.path.join(config.workdir, 'spn_input_ncbiid.txt'), sep=' ', header=True, index=False)
     table = table.drop_duplicates(subset='accession', keep='first')  # drop duplicated entries from file
