@@ -212,7 +212,7 @@ class PhylogeneticUpdater:
 
             # msg = tip_name
             # write_msg_logfile(msg, self.config.workdir)
-            sys.stdout.write('Blast {} out of {}, subsample size is {}.'.format(count, len(blast_subset.index), self.config.subsample))
+            sys.stdout.write('Blast {} out of {}, subsample size is {}.\n'.format(count, len(blast_subset.index), self.config.subsample))
             query_seq = self.table.loc[index, 'sseq']
             self.table.at[index, 'date'] = pd.Timestamp.today()  # this is the new version of pd.set_value(), sometimes it's iat
             new_seq_tax = blast.get_new_seqs(query_seq, tip_name, "Genbank", self.config)
@@ -1034,13 +1034,16 @@ class FilterSeqIdent(Filter):
                 if len(same_old.index) > 0:
                     # debug("identical old")
                     # debug(new_seqs.loc[idx, "accession"])
-                    to_del = new_seqs.loc[idx]
+                    to_del = self.upd_new_seqs.loc[idx]
+                    #to_del = new_seqs.loc[idx]
                     self.del_table = self.del_table.append(to_del)
                     self.upd_new_seqs = self.upd_new_seqs.drop([idx])
                     assert idx not in self.upd_new_seqs.index
         for index in self.del_table.index:
             self.table.at[index, 'status'] = -1
             self.table.loc[index, 'status_note'] = 'same seq ident'
+            assert not self.upd_new_seqs['accession'].str.contains(self.del_table.loc[index, 'accession']).any(), (self.del_table.loc[index, 'accession'], self.upd_new_seqs['accession'].to_list())
+            assert not self.del_table['accession'].isin(self.upd_new_seqs['accession']).any()
             # assert self.table.loc[index, 'status'] == -1
         self.assert_after_filter(new_seqs)
         assert self.table['sseq'].hasnans == False, self.table['sseq']
