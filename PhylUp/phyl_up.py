@@ -152,7 +152,12 @@ class PhylogeneticUpdater:
                                  taxid=os.path.join(self.workdir, 'tmp/unpublished_txid.txt'),
                                  path_to_db=self.config.unpubl_data)
         # get new seqs from seqs in blast table seq
+        subsample_count = 0
         for index in present_subset.index:
+            if self.config.subsample > 1:
+                if subsample_count < self.config.subsample:
+                    subsample_count += 1
+                    continue
             tip_name = self.table.loc[index, 'accession']
             query_seq = self.table.loc[index, 'sseq']
             # Note: should be empty in later rounds...that is why it does not matter that new_seq_tax is reassigned
@@ -191,13 +196,23 @@ class PhylogeneticUpdater:
         msg = blast_subset[['accession', 'ncbi_txn',  'status']].to_string()
         write_msg_logfile(msg, self.config.workdir)
         count = 0
+        subsample_count = 1
         print(blast_subset)
         for index in blast_subset.index:
-            tip_name = self.table.loc[index, 'accession']
             count += 1
+            print(count)
+            if self.config.subsample > 1:
+                print('subsample')
+                if subsample_count < self.config.subsample:
+                    print('add count')
+                    subsample_count += 1
+                    continue
+
+            tip_name = self.table.loc[index, 'accession']
+
             # msg = tip_name
             # write_msg_logfile(msg, self.config.workdir)
-            print('Blast {} out of {}.'.format(count, len(blast_subset.index)))
+            sys.stdout.write('Blast {} out of {}, subsample size is {}.'.format(count, len(blast_subset.index), self.config.subsample))
             query_seq = self.table.loc[index, 'sseq']
             self.table.at[index, 'date'] = pd.Timestamp.today()  # this is the new version of pd.set_value(), sometimes it's iat
             new_seq_tax = blast.get_new_seqs(query_seq, tip_name, "Genbank", self.config)

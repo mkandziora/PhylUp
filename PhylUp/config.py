@@ -185,6 +185,9 @@ class ConfigObj(object):
             self.fix_blast = False
             self.blast_folder = os.path.abspath(os.path.join(self.workdir, "blast"))
 
+        self.subsample = config["blast"]["subsample"]
+        self.subsample = int(self.subsample)
+
         # read in alignment settings
         self.minlen = float(config["phylup"]["min_len"])
         assert 0 < self.minlen <= 1, ("Min len is not between 0 and 1: {}.\n".format(self.minlen))
