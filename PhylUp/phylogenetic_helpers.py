@@ -302,9 +302,13 @@ def build_table_from_file(id_to_spn, config, downtorank=None):
                                           nodes_file=config.ncbi_parser_nodes_fn,
                                           interactive=False)
     sys.stdout.write("Build table with information about sequences and taxa.\n")
+    if os.path.exists(os.path.join(config.workdir, 'spn_input_ncbiid.txt')):
+        table = pd.read_csv(os.path.join(config.workdir, 'spn_input_ncbiid.txt'), sep=' ')
 
     debug(id_to_spn)
-    table = get_txid_for_name_from_file(id_to_spn, ncbi_parser)  # builds name id link
+    else:
+        table = get_txid_for_name_from_file(id_to_spn, ncbi_parser)  # builds name id link
+        table.to_csv(os.path.join(config.workdir, 'spn_input_ncbiid.txt'), sep=' ', header=True, index=False)
     table = table.drop_duplicates(subset='accession', keep='first')  # drop duplicated entries from file
     table['status'] = 0
     try:
@@ -368,7 +372,8 @@ def get_txid_for_name_from_file(tipname_id_fn, ncbi_parser):
     columns = ['accession', 'ncbi_txn']
     name_id = pd.read_csv(tipname_id_fn, names=columns,  sep=",", header=None)
     name_id['ncbi_txid'] = name_id['ncbi_txn'].apply(ncbi_parser.get_id_from_name)
-    name_id['ncbi_txid'].isnull().values.any() == False
+    assert name_id['ncbi_txid'].isnull().values.any() == False, ('not all ncbi taxon ids assigned.',
+                                                                 name_id['ncbi_txid'].isnull().values.any())
     return name_id
 
 
@@ -376,17 +381,16 @@ def add_seq_to_table(aln, table):
     """
     Puts input sequences from alignment into the pandas table.
 
-    :return:
+    :return:build_table_from_file
     """
     queried_taxa = []
     for taxon, seq in aln.items():
         seq = seq.symbols_as_string().replace('?', '')
         seq = seq.replace('-', '')
-        for index in table.index:
-            tip_name = table.loc[index, 'accession']
-            if taxon.label in tip_name:
-                table.at[index, 'sseq'] = seq
-                queried_taxa.append(tip_name)
+        contains_string = table['accession'].str.contains(taxon.label)
+        if contains_string.any():
+            table.at[table['accession'] == taxon.label, 'sseq'] = seq
+            queried_taxa.append(taxon.label)
         assert taxon.label in queried_taxa, (taxon.label, queried_taxa, 'often missing in spn translation table')
 
     table['sseq'].replace('', np.nan, inplace=True)

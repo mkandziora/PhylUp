@@ -1,7 +1,7 @@
 """
 PhylUp: automatically update alignments.
 Copyright (C) 2019  Martha Kandziora
-martha.kandziora@yahoo.com
+martha.kandziora@mailbox.org
 
 All rights reserved. No warranty, explicit or implicit, provided. No distribution or modification of code allowed.
 All classes and methods will be distributed under an open license in the near future.
@@ -9,7 +9,6 @@ All classes and methods will be distributed under an open license in the near fu
 Package to automatically update alignments and phylogenies using local sequences or a local Genbank database
 while controlling for the number of sequences per OTU.
 
-Parts are inspired by the program physcraper developed by me and Emily Jane McTavish.
 """
 
 import sys
@@ -45,10 +44,12 @@ class PhylogeneticUpdater:
         self.tre_schema = tre_schema
         self.tre = None
         self.ignore_acc_list = ignore_acc_list
+        sys.stdout.write('translate input names to ncbi taxonomy...\n')
         self.table = phylogenetic_helpers.build_table_from_file(id_to_spn, self.config, self.config.downtorank)
         self.table.at[:, 'status_note'] = 'original'
         #print(self.config.different_level)
         if self.config.different_level is not True:
+            sys.stdout.write('load sequences...\n')
             phylogenetic_helpers.add_seq_to_table(self.aln, self.table)
         self.table.dropna(subset=["sseq"], inplace=True)  # only keep entries that have a seq
         self.mrca = None
