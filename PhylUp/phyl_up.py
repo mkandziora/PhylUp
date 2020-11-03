@@ -44,12 +44,12 @@ class PhylogeneticUpdater:
         self.tre_schema = tre_schema
         self.tre = None
         self.ignore_acc_list = ignore_acc_list
-        sys.stdout.write('translate input names to ncbi taxonomy...\n')
+        sys.stdout.write('Translate input names to ncbi taxonomy...\n')
         self.table = phylogenetic_helpers.build_table_from_file(id_to_spn, self.config, self.config.downtorank)
         self.table.at[:, 'status_note'] = 'original'
         #print(self.config.different_level)
         if self.config.different_level is not True:
-            sys.stdout.write('load sequences...\n')
+            sys.stdout.write('Load sequences...\n')
             phylogenetic_helpers.add_seq_to_table(self.aln, self.table)
         self.table.dropna(subset=["sseq"], inplace=True)  # only keep entries that have a seq
         self.mrca = None
@@ -212,7 +212,8 @@ class PhylogeneticUpdater:
 
             # msg = tip_name
             # write_msg_logfile(msg, self.config.workdir)
-            sys.stdout.write('Blast {} out of {}, subsample size is {}.\n'.format(count, len(blast_subset.index), self.config.subsample))
+            sys.stdout.write('Blast {} out of {}, subsample size is {}.\n'.format(count, len(blast_subset.index),
+                                                                                  self.config.subsample))
             query_seq = self.table.loc[index, 'sseq']
             self.table.at[index, 'date'] = pd.Timestamp.today()  # this is the new version of pd.set_value(), sometimes it's iat
             new_seq_tax = blast.get_new_seqs(query_seq, tip_name, "Genbank", self.config)
@@ -303,6 +304,7 @@ class PhylogeneticUpdater:
         :param new_seqs: pandas dataframe with the new sequences retrieved/not filtered from earlier
         :return:
         """
+        debug('compare filter')
         if len(new_seqs) > 0:
             assert new_seqs.accession.is_unique
 
@@ -316,9 +318,9 @@ class PhylogeneticUpdater:
                 del_seq = f.del_table
 
                 # check that all del_tab entries are deleted in table
-                assert any(x in del_seq['accession'].to_list() for x in self.table.loc[self.table['status'] >= 0,
-                                                                                       'accession'].to_list()) == False, \
-                    ([i for i in del_seq['accession'].to_list() if i in self.table.loc[self.table['status'] >= 0, 'accession'].to_list()])
+                table_list = self.table.loc[self.table['status'] >= 0, 'accession'].to_list()
+                assert any(x in del_seq['accession'].to_list() for x in table_list) == False, \
+                    ([i for i in del_seq['accession'].to_list() if i in table_list])
                 check_df_index_unique(new_seqs)
                 check_df_index_unique(self.table)
                 check_filter_numbers(del_seq, new_seqs, before_filter)
@@ -393,7 +395,7 @@ class PhylogeneticUpdater:
                                               schema='fasta')
             if os.path.exists("{}/updt_tre.tre".format(self.workdir)):
                 self.tre = Tree.get(path=os.path.abspath(os.path.join(self.workdir, 'updt_tre.tre')), schema='newick',
-                                taxon_namespace=self.aln.taxon_namespace, preserve_underscores=True)
+                                    taxon_namespace=self.aln.taxon_namespace, preserve_underscores=True)
             msg = "New round of updating begins with mrca: {}.\n".format(self.mrca)
             write_msg_logfile(msg, self.config.workdir)
 
@@ -403,8 +405,7 @@ class PhylogeneticUpdater:
             next
         else:
             while retrieved_seqs > 0 and (status_end is None or self.status <= status_end):
-                print(self.status)
-                print(status_end)
+                sys.stdout.write('Blast round number {}. Max. rounds set to {}.\n'.format(self.status, status_end))
                 assert self.status <= status_end, (self.status, status_end)
                 msg = "Time before blast: {}.\n".format(datetime.datetime.now())
                 write_msg_logfile(msg, self.config.workdir)
@@ -412,7 +413,7 @@ class PhylogeneticUpdater:
                     msg = "Blast against unpublished sequences.\n"
                     write_msg_logfile(msg, self.config.workdir)
                     new_seqs = self.extend_with_unpublished()
-                    #self.update_aln()
+                    # self.update_aln()  # wong location for it
                     if len(new_seqs) == 0:
                         self.config.unpublished = False
                     # if self.config.perpetual is False:
@@ -423,11 +424,12 @@ class PhylogeneticUpdater:
                         self.status = 0.5
 
                 else:
-                    print('extend with Genbank')
+                    msg = "Blast against Genbank sequences.\n"
+                    write_msg_logfile(msg, self.config.workdir)
                     new_seqs = self.extend()  # todo rename to find new seqs
                     msg = "Time after BLAST: {}.\n".format(datetime.datetime.now())
                     write_msg_logfile(msg, self.config.workdir)
-                    #self.update_aln()
+                    # self.update_aln()  # wrong location to do this
 
                 if self.config.preferred_taxa == True:
                     if not os.path.exists(os.path.join(self.workdir, 'found_taxa.csv')):
@@ -451,7 +453,7 @@ class PhylogeneticUpdater:
                     all_new_seqs = pd.concat([all_new_seqs, new_seqs], ignore_index=True, sort=True)
                 print('Length of new seqs after filtering: {}'.format(len(new_seqs)))
                 retrieved_seqs = len(new_seqs)
-                msg = "Newly found seqs: {}.\n".format(len(new_seqs))
+                msg = "Newly added seqs: {}.\n".format(len(new_seqs))
                 write_msg_logfile(msg, self.config.workdir)
                 self.table.to_csv(os.path.join(self.workdir, 'table.updated'), index=False)
 
@@ -508,7 +510,7 @@ class PhylogeneticUpdater:
         :param new_seqs:
         :return:
         """
-        print('replace_complete_withusedseq')
+        debug('replace_complete_withusedseq')
 
         # get shorter seqs from aln - also replace in table
         for idx in new_seqs.index:
@@ -528,7 +530,7 @@ class PhylogeneticUpdater:
 
             with open(filepath) as fp:
                 seq = ''
-                while not tip_name in fp.readline():
+                while tip_name not in fp.readline():
                     continue
                 line = fp.readline()
                 while (line != '') and ('>' not in line):
@@ -537,13 +539,13 @@ class PhylogeneticUpdater:
                 seq = seq.replace('-', '').replace('\n', '')
                 new_seqs.at[idx, 'sseq'] = seq
                 if self.table['accession'].str.contains(tip_name).any():
-                    #seq_before = self.table.loc[self.table['accession'] == tip_name, 'sseq'].values[0]
+                    # seq_before = self.table.loc[self.table['accession'] == tip_name, 'sseq'].values[0]
                     self.table.at[self.table['accession'] == tip_name, 'sseq'] = seq
                     # don't assert seq_before and after differ - must not be the case
-                    #assert seq_before != seq, (seq_before, seq)
-                    #assert seq_before != self.table.loc[self.table['accession'] == tip_name, 'sseq'].values[0], (
+                    # assert seq_before != seq, (seq_before, seq)
+                    # assert seq_before != self.table.loc[self.table['accession'] == tip_name, 'sseq'].values[0], (
                     #    seq_before, self.table.loc[self.table['accession'] == tip_name, 'sseq'].values[0])
-                    #assert seq == self.table.loc[self.table['accession'] == tip_name, 'sseq'].values[0], (
+                    # assert seq == self.table.loc[self.table['accession'] == tip_name, 'sseq'].values[0], (
                     #    seq, self.table.loc[self.table['accession'] == tip_name, 'sseq'].values[0])
 
         # if self.tre is None:
@@ -561,7 +563,7 @@ class PhylogeneticUpdater:
         Calls InputCleaner class and updates input data.
         :return:
         """
-        print(self.mrca)
+        # debug(self.mrca)
         cleaner = phylogen_updater.InputCleaner(self.tre_fn, self.tre_schema, self.aln_fn, self.aln_schema, self.table,
                                                 self.config, self.mrca)
         self.aln = cleaner.aln
@@ -577,7 +579,7 @@ class PhylogeneticUpdater:
         :return:
         """
         # print(os.path.abspath(os.path.join(self.workdir, 'updt_aln.fasta')))
-        print('update aln')
+        sys.stdout.write('Update aln...\n')
         abs_updt_aln = os.path.abspath(os.path.join(self.workdir, 'updt_aln.fasta'))
         aln = phylogenetic_helpers.read_in_aln(abs_updt_aln, self.aln_schema)
         if self.tre_fn is None:
@@ -610,9 +612,9 @@ class PhylogeneticUpdater:
 
         :return:
         """
-        print('update tre')
+        sys.stdout.write('Update tree...\n')
         phylogen_updater.TreeUpdater(self.config, self.aln, self.table, self.tre)
-        msg = 'Updating of aln and tre done.\n'
+        msg = 'Updating of aln and tree done.\n'
         write_msg_logfile(msg, self.config.workdir)
 
 
@@ -636,21 +638,22 @@ class Filter(object):
         :param new_seqs: pandas new seqs
         :return:
         """
-        assert all(x in new_seqs['accession'].tolist() for x in self.upd_new_seqs['accession'].tolist())
+        deltable_list = self.del_table['accession'].tolist()
+        newseqs_list = new_seqs['accession'].tolist()
+        updnewseqs_list = self.upd_new_seqs['accession'].tolist()
+        assert all(x in newseqs_list for x in updnewseqs_list)
 
-        assert all(x in new_seqs['accession'].tolist() for x in self.del_table['accession'].tolist())
+        assert all(x in newseqs_list for x in deltable_list)
 
-        assert any(x in self.upd_new_seqs['accession'].tolist() for x in self.del_table['accession'].tolist()) == False, \
-            ([i for i in self.upd_new_seqs['accession'].tolist() if i in self.del_table['accession'].tolist()])
+        assert any(x in updnewseqs_list for x in deltable_list) == False, \
+            ([i for i in updnewseqs_list if i in deltable_list])
 
-        assert self.upd_new_seqs.index.is_unique is True, self.upd_new_seqs.index
-        assert self.del_table.index.is_unique is True, self.upd_new_seqs.index
+        check_df_index_unique(self.upd_new_seqs)
+        check_df_index_unique(self.del_table)
 
         assert len(self.del_table) + len(self.upd_new_seqs) == len(new_seqs), \
-            (len(self.del_table), len(self.upd_new_seqs), len(new_seqs), [x in new_seqs['accession'].tolist() for x
-                                                                          in self.del_table['accession'].tolist()],
-             [x in new_seqs['accession'].tolist() for x in self.upd_new_seqs['accession'].tolist()])
-        assert self.upd_new_seqs.index.is_unique is True, self.upd_new_seqs.index
+            (len(self.del_table), len(self.upd_new_seqs), len(new_seqs), [x in newseqs_list for x in deltable_list],
+             [x in newseqs_list for x in updnewseqs_list])
 
 
 def assert_new_seqs_table(new_seqs, table, status):
@@ -664,7 +667,7 @@ def assert_new_seqs_table(new_seqs, table, status):
     """
     assert len(new_seqs) == len(table[table['status'] == status]), \
         (len(new_seqs), len(table[table['status'] == status]), new_seqs['accession'])
-    assert new_seqs.index.is_unique is True, new_seqs.index
+    check_df_index_unique(new_seqs)
     assert new_seqs['ncbi_txid'].hasnans == False, new_seqs[['ncbi_txid', 'accession']].hasnans
     for idx in new_seqs.index:
         assert idx in table.index, (idx, table.index)
@@ -692,7 +695,7 @@ class FilterNumberOtu(Filter):
     def __init__(self, config, table, status):
         super().__init__(config)
         self.table = table
-        assert self.table.index.is_unique is True, self.table.index
+        check_df_index_unique(self.table)
         self.status = status
         assert len(self.upd_new_seqs) == 0, self.upd_new_seqs
 
@@ -745,7 +748,8 @@ class FilterNumberOtu(Filter):
                     if len(oldseqs_txid_df) == 0:  # new taxa, select random seq for blast
                         # print('taxa new')
                         if self.config.filtertype == 'blast':
-                            filtered_acc = self.wrapper_filter_blast_otu(newseqs_txid_df, oldseqs_txid_df, 'accession', txid)  # returns only add column
+                            filtered_acc = self.wrapper_filter_blast_otu(newseqs_txid_df, oldseqs_txid_df,
+                                                                         'accession', txid)  # returns only add column
                             filtered = filtered_new_seqs[filtered_new_seqs['accession'].isin(filtered_acc)]
                             assert len(filtered_acc) == len(filtered), \
                                 (len(filtered_acc), len(filtered),
@@ -759,7 +763,8 @@ class FilterNumberOtu(Filter):
                     else:  # select seq from aln
                         # print('taxa present already')
                         if self.config.filtertype == 'blast':
-                            filtered_acc = self.wrapper_filter_blast_otu(newseqs_txid_df, oldseqs_txid_df, 'tip_name', txid)
+                            filtered_acc = self.wrapper_filter_blast_otu(newseqs_txid_df, oldseqs_txid_df,
+                                                                         'tip_name', txid)
                             filtered = filtered_new_seqs[filtered_new_seqs['accession'].isin(filtered_acc)]
                             assert len(filtered_acc) == len(filtered), (len(filtered_acc), len(filtered))
                         elif self.config.filtertype == 'length':
@@ -771,7 +776,8 @@ class FilterNumberOtu(Filter):
                 elif len(newseqs_txid_df) + len(oldseqs_txid_df) <= self.config.threshold:  # filter
                     # print('add all')
                     filtered = newseqs_txid_df
-                self.upd_new_seqs = pd.concat([self.upd_new_seqs, filtered], ignore_index=True, sort=True)  # if this is further below, old filtered entry will be added
+                # if next line is further below, old filtered entry will be added
+                self.upd_new_seqs = pd.concat([self.upd_new_seqs, filtered], ignore_index=True, sort=True)
             elif len(oldseqs_txid_df) > self.config.threshold:
                 if not self.config.downtorank:
                     # print('sample size to big')
@@ -829,7 +835,7 @@ class FilterNumberOtu(Filter):
                 new_filtered_taxid_df = ns_txid_df
             else:
                 if self.config.allow_parent == True:
-                    print('check if parent - slow - consider if needed!')
+                    sys.stdout.write('check if parent - slow - consider if needed!')
                     for tax_id in preferred_taxa_ids:
                         # if tax_id_from_df is lower taxon from preferred ids:
                         part_tax_id_from_df = self.ncbi_parser.match_id_to_mrca(tax_id_from_df, tax_id)
@@ -841,10 +847,10 @@ class FilterNumberOtu(Filter):
                     new_filtered_taxid_df = ns_txid_df[0:0]
         else:
             new_filtered_taxid_df = ns_txid_df
-        print(new_filtered_taxid_df)
+        debug(new_filtered_taxid_df)
         return new_filtered_taxid_df
 
-    # todo not used
+    # todo not yet used
     def prefer_different_OTU(self, ns_txid_df):
         """
         In hierarchical updating prefer new lineage over existing one.
@@ -856,7 +862,7 @@ class FilterNumberOtu(Filter):
             present_subset = self.table[self.table['status'] > -1]
             new_filtered_taxid_df = ns_txid_df[ns_txid_df['ncbi_txid'].isin(present_subset.ncbi_txid)]
 
-            #new_filtered_taxid_df = ns_txid_df[ns_txid_df.ncbi_txid not in present_subset.ncbi_txid]
+            # new_filtered_taxid_df = ns_txid_df[ns_txid_df.ncbi_txid not in present_subset.ncbi_txid]
         else:
             new_filtered_taxid_df = ns_txid_df
         return new_filtered_taxid_df
@@ -875,7 +881,7 @@ class FilterNumberOtu(Filter):
             self.initialize(self.config)
         for txid in set(new_seqs['ncbi_txid']):
             downtorank_id = self.ncbi_parser.get_downtorank_id(txid, downtorank)
-            if downtorank_id == 0:  # added for sequences that have no corresponding rank defined - which results in id 0
+            if downtorank_id == 0:  # added for seqs that have no corresponding rank defined - which results in id 0
                 downtorank_id = txid
             new_seqs.at[new_seqs.ncbi_txid == txid, 'downtorank'] = downtorank_id
         return new_seqs
@@ -944,7 +950,7 @@ class FilterNumberOtu(Filter):
         subfilter_blast_seqs = remove_mean_sd_nonfit(filter_blast_seqs)
         filtered_seqs = self.select_number_missing(subfilter_blast_seqs, exist_dict)
         filtered_acc = set(list(filtered_seqs['accession']))
-        print('filter wrapper done')
+        # print('filter wrapper done')
         return filtered_acc
 
     def select_number_missing(self, subfilter_blast_seqs, table_otu_dict):
@@ -963,7 +969,7 @@ class FilterNumberOtu(Filter):
             # print('subfilter-all')
             filtered_seqs = subfilter_blast_seqs
         else:
-            print('should not happen')
+            sys.stdout.write('Should not happen!')
             sys.exit(-2)
         return filtered_seqs
 
@@ -997,7 +1003,7 @@ class FilterSeqIdent(Filter):
         super().__init__(config)
         self.status = status
         self.table = table
-        assert self.table.index.is_unique is True, self.table.index
+        check_df_index_unique(self.table)
         assert self.table['ncbi_txid'].hasnans == False, self.table['ncbi_txid'].hasnans
         assert self.table['sseq'].hasnans == False, self.table['sseq']
 
@@ -1019,7 +1025,8 @@ class FilterSeqIdent(Filter):
             seq_compare = new_seqs.loc[idx, 'sseq']
 
             # go through new_seqs to check if there is more than one identical (1 is the one we compare here)
-            same_seqs = self.upd_new_seqs[(self.upd_new_seqs.sseq.str.contains(seq_compare)) & (self.upd_new_seqs['ncbi_txid'] == txid_compare)]
+            same_seqs = self.upd_new_seqs[(self.upd_new_seqs.sseq.str.contains(seq_compare)) &
+                                          (self.upd_new_seqs['ncbi_txid'] == txid_compare)]
             if len(same_seqs.index) > 1:
                 # debug("identical seq new")
                 to_del = new_seqs.loc[idx]
@@ -1028,23 +1035,25 @@ class FilterSeqIdent(Filter):
                 self.upd_new_seqs = self.upd_new_seqs.drop([idx])
             else:
                 same_table = self.table[self.table['status'].between(-1, self.status, inclusive=False)]
-                same_old = same_table[(same_table.sseq.str.contains(seq_compare)) & (same_table['ncbi_txid'] == int(txid_compare))]
+                same_old = same_table[(same_table.sseq.str.contains(seq_compare)) &
+                                      (same_table['ncbi_txid'] == int(txid_compare))]
 
                 # go through avail seq in table to check if there is one identical
                 if len(same_old.index) > 0:
                     # debug("identical old")
                     # debug(new_seqs.loc[idx, "accession"])
                     to_del = self.upd_new_seqs.loc[idx]
-                    #to_del = new_seqs.loc[idx]
+                    # to_del = new_seqs.loc[idx]  # wrong object - fixed 1.11.2020
                     self.del_table = self.del_table.append(to_del)
                     self.upd_new_seqs = self.upd_new_seqs.drop([idx])
                     assert idx not in self.upd_new_seqs.index
         for index in self.del_table.index:
             self.table.at[index, 'status'] = -1
             self.table.loc[index, 'status_note'] = 'same seq ident'
-            assert not self.upd_new_seqs['accession'].str.contains(self.del_table.loc[index, 'accession']).any(), (self.del_table.loc[index, 'accession'], self.upd_new_seqs['accession'].to_list())
-            assert not self.del_table['accession'].isin(self.upd_new_seqs['accession']).any()
             # assert self.table.loc[index, 'status'] == -1
+            assert not self.upd_new_seqs['accession'].str.contains(self.del_table.loc[index, 'accession']).any(), \
+                (self.del_table.loc[index, 'accession'], self.upd_new_seqs['accession'].to_list())
+        assert not self.del_table['accession'].isin(self.upd_new_seqs['accession']).any()
         self.assert_after_filter(new_seqs)
         assert self.table['sseq'].hasnans == False, self.table['sseq']
         msg = "Filter FilterSeqIdent reduced the new seqs from {} to {}.\n".format(len(new_seqs),
@@ -1073,8 +1082,6 @@ class FilterSeqIdent(Filter):
                 self.table.at[idx, 'status'] = -1
                 self.table.at[idx, 'status_note'] = 'new seq found - identical but longer'
 
-                #self.table[idx, 'status'] = -1
-                #self.table.loc[idx, 'status_note'] = 'new seq found - identical but longer'
                 tip_name = self.table.loc[idx, "accession"]
                 for tax, seq in aln.items():
                     if tip_name == tax.label:
