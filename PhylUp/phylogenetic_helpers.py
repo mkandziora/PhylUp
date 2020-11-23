@@ -313,7 +313,8 @@ def build_table_from_file(id_to_spn, config, downtorank=None):
                                           interactive=False)
     sys.stdout.write("Build table with information about sequences and taxa.\n")
     if os.path.exists(os.path.join(config.workdir, 'spn_input_ncbiid.txt')):
-        table = pd.read_csv(os.path.join(config.workdir, 'spn_input_ncbiid.txt'), sep=' ')
+        columns = ['accession', 'ncbi_txn', 'ncbi_txid']
+        table = pd.read_csv(os.path.join(config.workdir, 'spn_input_ncbiid.txt'), names=columns,  sep=' ', header=0 )
 
     else:
         debug(id_to_spn)
