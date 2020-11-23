@@ -850,7 +850,8 @@ class FilterNumberOtu(Filter):
                     for tax_id in preferred_taxa_ids:
                         # if tax_id_from_df is lower taxon from preferred ids:
                         part_tax_id_from_df = self.ncbi_parser.match_id_to_mrca(tax_id_from_df, tax_id)
-                        if part_tax_id_from_df != 0:
+                        # if part_tax_id_from_df != 0:
+                        if part_tax_id_from_df is True:
                             new_filtered_taxid_df = ns_txid_df
                         else:
                             new_filtered_taxid_df = ns_txid_df[0:0]

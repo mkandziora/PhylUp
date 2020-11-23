@@ -284,6 +284,19 @@ def test_filter_compare_shorter():
     conf = config.ConfigObj(configfi, workdir, interactive=False)
     conf.threshold = 2
     conf.blast_folder = os.path.abspath("./data/blast_for_tests")
+
+    if not os.path.exists(workdir):
+        os.rename(workdir)
+    if not os.path.exists(workdir):
+        os.mkdir(workdir)
+    tmp_folder = os.path.join(workdir, 'tmp')
+    if not os.path.exists(tmp_folder):
+        os.mkdir(tmp_folder)
+    # call(['cp', '-a', 'data/tmp_for_test/', tmp_folder])
+    copy_tree('data/tmp_for_test/', tmp_folder)
+    shutil.copyfile('data/tiny_test_example/updt_aln.fasta', os.path.join(workdir, 'updt_aln.fasta'))
+    shutil.copyfile('data/tiny_test_example/updt_tre.tre', os.path.join(workdir, 'updt_tre.tre'))
+
     test = phyl_up.PhylogeneticUpdater(id_to_spn, seqaln, mattype, trfn, schema_trf, conf)
 
     new_seqs = test.extend()
@@ -296,6 +309,7 @@ def test_filter_compare_shorter():
     f.filter(new_seqs)
     new_seqs = f.upd_new_seqs
     new_seqs.loc[1, 'sseq'] = new_existing_seq
+    new_seq_acc = new_seqs.loc[1, 'accession']
     assert new_seqs.loc[1, 'sseq'] == new_existing_seq
     assert new_seqs['sseq'].str.contains(new_existing_seq).any()
     assert test.table['sseq'].str.contains(new_existing_seq).any()
@@ -311,10 +325,15 @@ def test_filter_compare_shorter():
 
     assert test.table['sseq'].hasnans == False, test.table['sseq']
 
+    assert new_seqs['sseq'].str.contains(new_existing_seq).any() == True
+
     new_seqs = test.compare_filter(new_seqs)
     print(new_seqs['sseq'])
 
     print(new_existing_seq)
+    print(test.table['sseq'].str.contains(new_existing_seq).any())
+    print(new_seqs['sseq'].str.contains(new_existing_seq).any())
+    assert new_seqs['accession'].str.contains(new_seq_acc).any() == False
     assert new_seqs['sseq'].str.contains(new_existing_seq).any() == False
 
     all_avail_data = test.table[test.table['status'].between(0, test.status, inclusive=True)]
