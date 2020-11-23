@@ -1,13 +1,24 @@
 """
-PhylUp: automatically update alignments.
-Copyright (C) 2019  Martha Kandziora
+PhylUp: phylogenetic alignment building with custom taxon sampling
+Copyright (C) 2020  Martha Kandziora
 martha.kandziora@mailbox.org
-
-All rights reserved. No warranty, explicit or implicit, provided. No distribution or modification of code allowed.
-All classes and methods will be distributed under an open license in the near future.
 
 Package to automatically update alignments and phylogenies using local sequences or a local Genbank database
 while controlling for the number of sequences per OTU.
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
 
 """
 
