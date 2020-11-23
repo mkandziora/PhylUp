@@ -1,15 +1,25 @@
 """
-PhylUp: automatically update alignments.
-Copyright (C) 2019  Martha Kandziora
-martha.kandziora@yahoo.com
-
-All rights reserved. No warranty, explicit or implicit, provided. No distribution or modification of code allowed.
-All classes and methods will be distributed under an open license in the near future.
+PhylUp: phylogenetic alignment building with custom taxon sampling
+Copyright (C) 2020  Martha Kandziora
+martha.kandziora@mailbox.org
 
 Package to automatically update alignments and phylogenies using local sequences or a local Genbank database
 while controlling for the number of sequences per OTU.
 
-Parts are inspired by the program physcraper developed by me and Emily Jane McTavish.
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+
 """
 
 
@@ -17,7 +27,7 @@ import os
 import subprocess
 import sys
 import pandas as pd
-
+import numpy as np
 from copy import deepcopy
 from dendropy import DnaCharacterMatrix, Tree
 
@@ -127,13 +137,13 @@ def write_tre(tre, workdir, treepath="updt_tre.tre", treeschema="newick"):
     tre.write(path=os.path.join(workdir, treepath), schema=treeschema, unquoted_underscores=True, suppress_rooting=True)
 
 
-def replace_uid_with_name(file_path, table, type):
+def replace_uid_with_name(file_path, table, matrix_type):
     """
     translate unique ids into species names in file.
 
     :param file_path:
     :param table:
-    :param type: aln or tree, defines which type is being relabeled.
+    :param matrix_type: aln or tree, defines which type is being relabeled.
     :return:
     """
     # print(os.getcwd())
@@ -152,7 +162,7 @@ def replace_uid_with_name(file_path, table, type):
                     if split_name in labelled:
                         debug(split_name)
                         spn = present.loc[idx, 'ncbi_txn'].replace(" ", "_").replace("-", "_").replace("'", "")
-                        if type == 'tree':
+                        if matrix_type == 'tree':
                             labelled = replace_in_tree(idx, labelled, present, split_name, spn)
                         else:
                             labelled = replace_in_aln(idx, labelled, present, split_name, spn)
@@ -174,11 +184,11 @@ def replace_in_tree(idx, labelled, present, split_name, spn):
 def replace_in_aln(idx, labelled, present, split_name, spn):
 
     try:
-        labelled = labelled.replace(">{}".format(split_name),
-                                    ">{}_{}".format(spn, split_name))
+        labelled = labelled.replace(">{}\n".format(split_name),
+                                    ">{}_{}\n".format(spn, split_name))
     except AttributeError:
-        labelled = labelled.replace(">{}".format(split_name),
-                                    ">{}_{}".format(present.loc[idx, 'ncbi_txid'],
+        labelled = labelled.replace(">{}\n".format(split_name),
+                                    ">{}_{}\n".format(present.loc[idx, 'ncbi_txid'],
                                                     split_name))
     return labelled
 
@@ -192,12 +202,12 @@ def check_align(aln):
     """
     i = 0
     seqlen = len(aln[i])
-    while seqlen == 0:
-        i = i + 1
-        seqlen = len(aln[i])
+    # while seqlen == 0:  #useless, seqlen never == 0
+    #     i = i + 1
+    #     seqlen = len(aln[i])
     for tax in aln:
         if len(aln[tax]) != seqlen:
-            sys.stderr.write("Alignment is not aligned.")
+            sys.stderr.write("Alignment is not aligned: {} vs {} .\n".format(len(aln[tax]), seqlen))
             return
     return seqlen
 
@@ -279,7 +289,7 @@ def estimate_number_threads_raxml(workdir, aln_fn, model):
     """
     print('estimate_number_threads_raxml')
     with cd(workdir):
-        subprocess.run(['raxml-ng-mpi', '--parse', '--msa', aln_fn,
+        subprocess.run(['raxml-ng', '--parse', '--msa', aln_fn,
                         '--prefix', 'numthreads', '--model', model, '--redo'])
         with open('numthreads.raxml.log') as f:
             datafile = f.readlines()
@@ -302,9 +312,15 @@ def build_table_from_file(id_to_spn, config, downtorank=None):
                                           nodes_file=config.ncbi_parser_nodes_fn,
                                           interactive=False)
     sys.stdout.write("Build table with information about sequences and taxa.\n")
+    if os.path.exists(os.path.join(config.workdir, 'spn_input_ncbiid.txt')):
+        columns = ['accession', 'ncbi_txn', 'ncbi_txid']
+        table = pd.read_csv(os.path.join(config.workdir, 'spn_input_ncbiid.txt'), names=columns,  sep=' ', header=0 )
 
-    debug(id_to_spn)
-    table = get_txid_for_name_from_file(id_to_spn, ncbi_parser)  # builds name id link
+    else:
+        debug(id_to_spn)
+        table = get_txid_for_name_from_file(id_to_spn, ncbi_parser)  # builds name id link
+        table.to_csv(os.path.join(config.workdir, 'spn_input_ncbiid.txt'), sep=' ', header=True, index=False)
+    table = table.drop_duplicates(subset='accession', keep='first')  # drop duplicated entries from file
     table['status'] = 0
     try:
         table['date'] = pd.Timestamp.strptime('01/01/00', '%d/%m/%y')
@@ -367,7 +383,8 @@ def get_txid_for_name_from_file(tipname_id_fn, ncbi_parser):
     columns = ['accession', 'ncbi_txn']
     name_id = pd.read_csv(tipname_id_fn, names=columns,  sep=",", header=None)
     name_id['ncbi_txid'] = name_id['ncbi_txn'].apply(ncbi_parser.get_id_from_name)
-    name_id['ncbi_txid'].isnull().values.any() == False
+    assert name_id['ncbi_txid'].isnull().values.any() == False, ('not all ncbi taxon ids assigned.',
+                                                                 name_id['ncbi_txid'].isnull().values.any())
     return name_id
 
 
@@ -375,16 +392,52 @@ def add_seq_to_table(aln, table):
     """
     Puts input sequences from alignment into the pandas table.
 
-    :return:
+    :return:build_table_from_file
     """
     queried_taxa = []
     for taxon, seq in aln.items():
         seq = seq.symbols_as_string().replace('?', '')
         seq = seq.replace('-', '')
-        for index in table.index:
-            tip_name = table.loc[index, 'accession']
-            if taxon.label in tip_name:
-                table.at[index, 'sseq'] = seq
-                queried_taxa.append(tip_name)
-    assert tip_name in queried_taxa, (tip_name, queried_taxa)
+        contains_string = table['accession'].str.contains(taxon.label)
+        if contains_string.any():
+            table.at[table['accession'] == taxon.label, 'sseq'] = seq
+            queried_taxa.append(taxon.label)
+        assert taxon.label in queried_taxa, (taxon.label, queried_taxa, 'often missing in spn translation table')
+
+    table['sseq'].replace('', np.nan, inplace=True)
+    table.dropna(subset=['sseq'], inplace=True)
     return table
+
+
+def make_preferred_taxon_list(other_runs, fn, overlap_complete=True):
+    """
+
+    :param other_runs: dictionary with locus name, folderpath to runs that are part of preferred assesment.
+    :param fn: path to the overlap file
+    :param overlap_complete: either all must overlap, or intersections of diff combined
+    :return:
+    """
+    preferred_taxa_all = dict()
+    for locus in other_runs.keys():
+        preferred_taxa = pd.read_csv(other_runs[locus], names=['taxon_name', 'ncbi_id'])
+        unique_taxa = set(preferred_taxa.ncbi_id.to_list())
+        preferred_taxa_all[locus] = unique_taxa
+    key_list = list(preferred_taxa_all.keys())
+    for i in range(0, len(key_list)-1):
+        set_1 = preferred_taxa_all[key_list[i]]
+        set2 = preferred_taxa_all[key_list[i+1]]
+        overlap2 = set_1.intersection(set2)
+        if overlap_complete == True:
+            print('complete')
+            if i == 0:
+                overlap_all = overlap2
+            else:
+                set_1 = overlap_all
+                set2 = overlap2
+                overlap_all = set_1.intersection(set2)
+        else:
+            overlap_all = overlap_all + overlap2
+
+        with open(fn, mode='wt') as f:
+            for item in overlap_all:
+                f.write("%s\n" % item)

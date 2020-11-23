@@ -4,7 +4,7 @@ from distutils.dir_util import copy_tree
 from PhylUp import phyl_up, config, phylogen_updater
 
 def test_reconcile():
-    workdir = "tests/output/test_runs"
+    workdir = "tests/output/test_runs_reconcile"
     trfn = "data/tiny_test_example/test.tre"
     schema_trf = "newick"
     id_to_spn = "data/tiny_test_example/test_nicespl.csv"
@@ -15,6 +15,8 @@ def test_reconcile():
     seqalnmiss = "data/tiny_test_example/test_missingseq.fas"
     treefilemiss = "data/tiny_test_example/test_missingtip.tre"
 
+    if not os.path.exists(workdir):
+        os.mkdir(workdir)
     tmp_folder = os.path.join(workdir, 'tmp')
     if not os.path.exists(tmp_folder):
         os.mkdir(tmp_folder)

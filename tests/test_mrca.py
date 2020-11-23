@@ -7,7 +7,7 @@ from PhylUp import phyl_up, config
 
 
 def test_mrca():
-    workdir = "tests/output/test_runs"
+    workdir = "tests/output/test_runs_mrca"
     trfn = "data/tiny_test_example/test.tre"
     schema_trf = "newick"
     id_to_spn = "data/tiny_test_example/test_nicespl.csv"
@@ -15,6 +15,8 @@ def test_mrca():
     mattype = "fasta"
     configfi = "data/localblast_test.config"
 
+    if not os.path.exists(workdir):
+        os.mkdir(workdir)
     tmp_folder = os.path.join(workdir, 'tmp')
     if not os.path.exists(tmp_folder):
         os.mkdir(tmp_folder)
@@ -31,7 +33,7 @@ def test_mrca():
 
 # #################################
 def test_mrca_list():
-    workdir = "tests/output/test_runs"
+    workdir = "tests/output/test_runs_mrca_list"
     trfn = "data/tiny_test_example/test.tre"
     schema_trf = "newick"
     id_to_spn = "data/tiny_test_example/test_nicespl.csv"
@@ -48,7 +50,7 @@ def test_mrca_list():
     assert test.mrca == {18794, 422320, 422327, 422329, 422331}  # Senecionineae
 
 def test_no_mrca():
-    workdir = "tests/output/test_runs"
+    workdir = "tests/output/test_runs_nomrca"
     trfn = "data/tiny_test_example/test.tre"
     schema_trf = "newick"
     id_to_spn = "data/tiny_test_example/test_nicespl.csv"

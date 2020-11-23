@@ -13,7 +13,8 @@ def test_add_unpublished():
     mattype = "fasta"
     configfi = "data/localblast_test.config"
 
-
+    if not os.path.exists(workdir):
+        os.mkdir(workdir)
     tmp_folder = os.path.join(workdir, 'tmp')
     if not os.path.exists(tmp_folder):
         os.mkdir(tmp_folder)

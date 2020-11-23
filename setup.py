@@ -9,7 +9,7 @@ setup(name='PhylUp',
       author_email='martha.kandziora@yahoo.com',
       packages=['PhylUp'],
       install_requires=[
-          'dendropy',
+         # 'dendropy',
           'biopython'
       ]
      )

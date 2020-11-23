@@ -1,10 +1,10 @@
 import os
 from distutils.dir_util import copy_tree
 
-from PhylUp import phyl_up, config, phylogen_updater
+from PhylUp import phyl_up, config
 
-def test_blacklist():
-    workdir = "tests/output/test_runs"
+def test_ignore_acc():
+    workdir = "tests/output/test_runs_ignoreacc"
     trfn = "data/tiny_test_example/test.tre"
     schema_trf = "newick"
     id_to_spn = "data/tiny_test_example/test_nicespl.csv"
@@ -12,8 +12,11 @@ def test_blacklist():
     mattype = "fasta"
     configfi = "data/localblast_test.config"
 
-    blacklist = ['JX895419.1']
+    ignore_acc = ['JX895419.1']
 
+
+    if not os.path.exists(workdir):
+        os.mkdir(workdir)
     tmp_folder = os.path.join(workdir, 'tmp')
     if not os.path.exists(tmp_folder):
         os.mkdir(tmp_folder)
@@ -29,7 +32,7 @@ def test_blacklist():
     new_seqs = test.extend()
     len_no_bl = len(new_seqs)
 
-    test = phyl_up.PhylogeneticUpdater(id_to_spn, seqaln, mattype, trfn, schema_trf, conf, blacklist=blacklist)
+    test = phyl_up.PhylogeneticUpdater(id_to_spn, seqaln, mattype, trfn, schema_trf, conf, ignore_acc)
     new_seqs = test.extend()
     len_bl = len(new_seqs)
 

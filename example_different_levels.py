@@ -9,10 +9,10 @@ id_to_spn = "data/tiny_test_example/test_nicespl.csv"
 seqaln = "data/tiny_test_example/test.fas"
 mattype = "fasta"
 configfi = "data/localblast_Senecio.config"
-blacklist = ['JX895419.1']
+ignore_acc = ['JX895419.1']
 
 conf = config.ConfigObj(configfi, workdir, interactive=False)
-test = phyl_up.PhylogeneticUpdater(id_to_spn, seqaln, mattype, trfn, schema_trf, conf, blacklist=blacklist)
+test = phyl_up.PhylogeneticUpdater(id_to_spn, seqaln, mattype, trfn, schema_trf, conf, ignore_acc_list=ignore_acc)
 test.run()
 
 
@@ -21,10 +21,10 @@ test.run()
 
 seqaln = "tests/output/different_level/updt_aln.fasta"
 configfi = "data/localblast_Senecioneae.config"
-blacklist = ['JX895419.1']
+ignore_acc = ['JX895419.1']
 
 conf = config.ConfigObj(configfi, workdir, interactive=False)
-test = phyl_up.PhylogeneticUpdater(id_to_spn, seqaln, mattype, trfn, schema_trf, conf, blacklist=blacklist)
+test = phyl_up.PhylogeneticUpdater(id_to_spn, seqaln, mattype, trfn, schema_trf, conf, ignore_acc_list=ignore_acc)
 test.run()
 
 
@@ -33,10 +33,9 @@ test.run()
 
 seqaln = "tests/output/different_level/updt_aln.fasta"
 configfi = "data/localblast_Asteroideae.config"
-blacklist = ['JX895419.1']
+ignore_acc = ['JX895419.1']
 
 conf = config.ConfigObj(configfi, workdir, interactive=False)
-test = phyl_up.PhylogeneticUpdater(id_to_spn, seqaln, mattype, trfn, schema_trf, conf, blacklist=blacklist)
+test = phyl_up.PhylogeneticUpdater(id_to_spn, seqaln, mattype, trfn, schema_trf, conf, ignore_acc_list=ignore_acc)
 test.run()
-
 

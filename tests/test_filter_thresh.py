@@ -5,7 +5,7 @@ from PhylUp import phyl_up, config
 
 def test_filter_thresh():
     print('test_filter_unique')
-    workdir = "tests/output/test_runs"
+    workdir = "tests/output/test_runs_thresh"
     trfn = "data/tiny_test_example/test.tre"
     schema_trf = "newick"
     id_to_spn = "data/tiny_test_example/test_nicespl.csv"
@@ -13,6 +13,8 @@ def test_filter_thresh():
     mattype = "fasta"
     configfi = "data/localblast_test.config"
 
+    if not os.path.exists(workdir):
+        os.mkdir(workdir)
     tmp_folder = os.path.join(workdir, 'tmp')
     if not os.path.exists(tmp_folder):
         os.mkdir(tmp_folder)

@@ -1,15 +1,25 @@
 """
-PhylUp: automatically update alignments.
-Copyright (C) 2019  Martha Kandziora
-martha.kandziora@yahoo.com
-
-All rights reserved. No warranty, explicit or implicit, provided. No distribution or modification of code allowed.
-All classes and methods will be distributed under an open license in the near future.
+PhylUp: phylogenetic alignment building with custom taxon sampling
+Copyright (C) 2020  Martha Kandziora
+martha.kandziora@mailbox.org
 
 Package to automatically update alignments and phylogenies using local sequences or a local Genbank database
 while controlling for the number of sequences per OTU.
 
-Parts are inspired by the program physcraper developed by me and Emily Jane McTavish.
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+
 """
 
 # user settings class
@@ -49,6 +59,8 @@ class ConfigObj(object):
             * **self.e_value_thresh**: the defined threshold for the e-value during Blast searches, check out:
                 https://blast.ncbi.nlm.nih.gov/Blast.cgi?CMD=Web&PAGE_TYPE=BlastDocs&DOC_TYPE=FAQ
             * **self.hitlist_size**: the maximum number of sequences retrieved by a single blast search
+            * **self.hitlist_size_unpublished**: the maximum number of sequences retrieved by a single blast search
+                                                in the unpublished database
             * **self.fix_blast**: T/F; use same blast folder across runs
 
             * self.ncbi_parser_nodes_fn: path to 'nodes.dmp' file, that contains the hierarchical information
@@ -124,6 +136,7 @@ class ConfigObj(object):
                 self.perpetual = False
         else:
             self.unpublished = False
+            self.perpetual = False
         self.blast_all = config["unpublished"]['blast_all']
         if self.blast_all == "True" or self.blast_all == "true":
             self.blast_all = True
@@ -138,7 +151,9 @@ class ConfigObj(object):
         self.blast_type = config['blast']['blast_type']
         assert self.blast_type in ['Genbank', 'own']
         self.blastdb_path = config["blast"]["localblastdb"]
-        assert os.path.exists(self.blastdb_path), self.blastdb_path
+        if self.blastdb_path[-1] != '/':
+            self.blastdb_path = self.blastdb_path + '/'
+        assert os.path.exists(self.blastdb_path), "Path of blast database does not exist: {}".format(self.blastdb_path)
 
         if self.blast_type == 'Genbank':
             self.blastdb = '{}/nt'.format(self.blastdb_path)
@@ -162,6 +177,10 @@ class ConfigObj(object):
         assert self.hitlist_size.split('.')[0].isdigit(), ("Hitlist size is not defined as "
                                                            "a number: {}.\n".format(self.hitlist_size))
         self.hitlist_size = int(self.hitlist_size)
+        self.hitlist_size_unpublished = config["blast"]["hitlist_size_unpublished"]
+        assert self.hitlist_size_unpublished.split('.')[0].isdigit(), ("Hitlist size  unpublished is not defined as "
+                                                           "a number: {}.\n".format(self.hitlist_size))
+        self.hitlist_size_unpublished = int(self.hitlist_size_unpublished)
 
         self.fix_blast = config["blast"]["fix_blast_result_folder"]
         if self.fix_blast == "True" or self.fix_blast == "true":
@@ -176,7 +195,8 @@ class ConfigObj(object):
             self.fix_blast = False
             self.blast_folder = os.path.abspath(os.path.join(self.workdir, "blast"))
 
-
+        self.subsample = config["blast"]["subsample"]
+        self.subsample = int(self.subsample)
 
         # read in alignment settings
         self.minlen = float(config["phylup"]["min_len"])
@@ -185,6 +205,10 @@ class ConfigObj(object):
         assert 1 < self.maxlen, ("Max len is not larger than 1: {}.\n".format(self.maxlen))
         self.trim_perc = float(config["phylup"]["trim_perc"])
         assert 0 < self.trim_perc < 1, ("Percentage for trimming is not between 0 and 1: {}.\n".format(self.trim_perc))
+
+
+        # internal alignment setting
+        self.added_seqs_aln = False
 
         # read in filter settings
         self.filtertype = config["filter"]["filtertype"]
@@ -205,6 +229,20 @@ class ConfigObj(object):
             self.different_level = False
         assert self.different_level in [True, False], ("self.different_level `%s` "
                                                        "is not True or False" % self.different_level)
+        self.preferred_taxa = config["filter"]["preferred_taxa"]
+        if self.preferred_taxa == "True" or self.preferred_taxa == "true" or self.preferred_taxa == "TRUE":
+            self.preferred_taxa = True
+            self.preferred_taxa_fn = config["filter"]["preferred_taxa_fn"]
+            if self.preferred_taxa_fn == "None" or self.preferred_taxa_fn == "none":
+                self.preferred_taxa_fn = None
+
+            self.allow_parent = config["filter"]["allow_parent"]
+            if self.allow_parent == "True" or self.allow_parent == "true":
+                self.allow_parent = True
+            else:
+                self.allow_parent = False
+        else:
+            self.preferred_taxa = False
 
         # read in tree calculation settings
         self.update_tree = config["tree"]["update_tree"]

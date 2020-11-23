@@ -6,7 +6,7 @@ from PhylUp import phyl_up, config, blast
 # from PhylUp import cd
 
 def test_run_blast_query():
-    workdir = "tests/output/test_runs"
+    workdir = "tests/output/test_runs_runblast"
     trfn = "data/tiny_test_example/test.tre"
     schema_trf = "newick"
     id_to_spn = "data/tiny_test_example/test_nicespl.csv"
@@ -14,6 +14,8 @@ def test_run_blast_query():
     mattype = "fasta"
     configfi = "data/localblast_test.config"
 
+    if not os.path.exists(workdir):
+        os.mkdir(workdir)
     tmp_folder = os.path.join(workdir, 'tmp')
     if not os.path.exists(tmp_folder):
         os.mkdir(tmp_folder)
@@ -29,9 +31,14 @@ def test_run_blast_query():
     min_date_blast = today - datetime.timedelta(days=90)
     present_subset_df = test.table['status'] > -1
     present_subset_df = test.table[present_subset_df == True]
+
+    min_date_blast = datetime.datetime.strptime(str(min_date_blast),"%Y-%m-%d")
+
+    timestamp = datetime.datetime.timestamp(min_date_blast)
+
+
     present_subset_df = present_subset_df[(present_subset_df.date <= min_date_blast)]
     present_subset = present_subset_df
-
 
     for index in present_subset.index:
         print('blast table seq')
