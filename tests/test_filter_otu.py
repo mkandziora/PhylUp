@@ -56,6 +56,7 @@ def configure():
                      phyl_up.FilterMRCA(test.config, test.mrca)
                      ]
     for f in remove_basics:
+        print(f)
         internal_new_seq = new_seqs
         f.filter(new_seqs)
         new_seqs = f.upd_new_seqs
