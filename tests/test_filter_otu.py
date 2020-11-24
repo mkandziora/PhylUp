@@ -36,10 +36,16 @@ def configure():
     pytest.test = test
 
     new_seqs = test.extend()
+    assert len(new_seqs) > 0, len(new_seqs)
+
     aln = phylogenetic_helpers.read_in_aln(test.aln_fn, test.aln_schema)
 
     new_seqs = new_seqs[~new_seqs['accession'].isin(test.table['accession'])]  # ~ is the pd not in/!
+    assert len(new_seqs) > 0, len(new_seqs)
+
     new_seqs = test.basic_filters(aln, test.mrca, new_seqs)
+    assert len(new_seqs) > 0, len(new_seqs)
+
     # next filter need infos in table
     new_seqs = test.add_new_seqs(new_seqs)
     pytest.new_seqs = new_seqs
