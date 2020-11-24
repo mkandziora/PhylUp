@@ -78,3 +78,4 @@ def test_filterlen():
 
     assert before > after
     assert del_tab > 0
+    assert before == after + del_tab

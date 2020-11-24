@@ -44,6 +44,8 @@ def configure():
     new_seqs = test.add_new_seqs(new_seqs)
     pytest.new_seqs = new_seqs
 
+    assert len(pytest.new_seqs) > 0, len(pytest.new_seqs)
+
 
 def test_filter_otu_no_rank():
     test = pytest.test
