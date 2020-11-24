@@ -43,6 +43,8 @@ def configure():
 
     new_seqs = new_seqs[~new_seqs['accession'].isin(test.table['accession'])]  # ~ is the pd not in/!
     assert len(new_seqs) > 0, len(new_seqs)
+    
+    assert test.mrca == {18794}, test.mrca
 
     #new_seqs = test.basic_filters(aln, test.mrca, new_seqs)
     orig_len = new_seqs
