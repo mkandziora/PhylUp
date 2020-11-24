@@ -1,4 +1,5 @@
 import os
+import pandas as pd
 import pytest
 
 from distutils.dir_util import copy_tree
@@ -43,7 +44,30 @@ def configure():
     new_seqs = new_seqs[~new_seqs['accession'].isin(test.table['accession'])]  # ~ is the pd not in/!
     assert len(new_seqs) > 0, len(new_seqs)
 
-    new_seqs = test.basic_filters(aln, test.mrca, new_seqs)
+    #new_seqs = test.basic_filters(aln, test.mrca, new_seqs)
+    orig_len = new_seqs
+    columns = ['ncbi_txn', 'ncbi_txid', 'status', 'status_note', "date",
+               'accession', 'pident', 'evalue', 'bitscore', 'sseq', 'title']
+    all_del = pd.DataFrame(columns=columns)
+
+    remove_basics = [phyl_up.FilterUniqueAcc(test.config, test.table),
+                     # FilterBLASTThreshold(self.config),
+                     phyl_up.FilterLength(test.config, aln),
+                     phyl_up.FilterMRCA(test.config, test.mrca)
+                     ]
+    for f in remove_basics:
+        internal_new_seq = new_seqs
+        f.filter(new_seqs)
+        new_seqs = f.upd_new_seqs
+        del_seq = f.del_table
+        # all_del = all_del.append(del_seq, ignore_index=True)
+        all_del = pd.concat([all_del, del_seq], ignore_index=True, sort=True)
+        phyl_up.check_filter_numbers(del_seq, new_seqs, internal_new_seq)
+        assert len(new_seqs) > 0, len(new_seqs)
+
+        if len(new_seqs) == 0:
+            return new_seqs  # stop filtering if new seqs is 0
+    phyl_up.check_filter_numbers(all_del, new_seqs, orig_len)
     assert len(new_seqs) > 0, len(new_seqs)
 
     # next filter need infos in table
@@ -55,11 +79,15 @@ def configure():
 
 def test_filter_otu_no_rank():
     test = pytest.test
+    print(test.table)
     new_seqs = pytest.new_seqs
+    assert len(new_seqs) > 0, len(new_seqs)
+
     conf = pytest.conf
 
 
     before = len(new_seqs)
+    print(before)
     new_seqs_org = new_seqs
     before_table = deepcopy(test.table)
 
