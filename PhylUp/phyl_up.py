@@ -1170,6 +1170,7 @@ class FilterMRCA(Filter):
                     self.del_table = pd.concat([self.del_table, to_del], axis=0, ignore_index=True, sort=True)
             elif type(self.mrca) == set:
                 # print(mrca_tx in self.mrca, mrca_tx, self.mrca)
+                print(mrca_tx in self.mrca, mrca_tx, self.mrca)
                 if mrca_tx in self.mrca:
                     to_add = new_seqs[select_tf]
                     assert len(to_add) != 0, len(to_add)
