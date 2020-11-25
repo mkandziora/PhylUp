@@ -214,6 +214,7 @@ def test_filter_compare():
     conf = config.ConfigObj(configfi, workdir, interactive=False)
     conf.threshold = 2
     conf.blast_folder = os.path.abspath("./data/blast_for_tests")
+    conf.identical_seqs = False
 
     if not os.path.exists(workdir):
         os.rename(workdir)
@@ -229,36 +230,62 @@ def test_filter_compare():
 
     test = phyl_up.PhylogeneticUpdater(id_to_spn, seqaln, mattype, trfn, schema_trf, conf)
 
+    new_existing_seq = """AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAATCGAAACCTGCATAGCAGAACGACCTGTGAACATGTAAAACAATTGGGTGTTCTAAGTATCGGGCTCTTGTCCGATTCCTAGGATGCCATGTTGACGTGCGTCTTTGGCAAGCCCCTTGGGTGTCTAAGGACGTCACGTCGACGCAACAACAAACCCCCGGCACGGCATGTGCCAAGGAAATATAAACTTAAGAAGGGCTTGTTCCATGCATTGCCGTTCGTGGTGACTGCATTGAAACTTGCTTCTCTATAATTAATAAACGACTCTCGGCAACGGATATCTCGGCTCACGCATCGATGAAGAACGTAGCAAAATGCGATACTTGGTGTGAATTGCAGAATCCCGTGAACCATCGAGTTTTTGAACGCAAGTTGCGCCCGAAACCTTTTGGTTGAGGGCACGTCTGCCTGGGCGTCACACATCGCGTCGCCCCCATCACACCTCTTGACGGGGATGTTTGAATGGGGACGAAGATTGGTCTCCTGTTCCTAAGGTGCGGTTGGCTGAATTTTGAGTCCTCTTCGACGGACGCACGATTAGTGGTGGTTGACAAGACCTTCTTATCGAGTTGTGTGTTCCAAGAAGTAAGGAATATCTCTTTAACGACCCTAAAGTGTTGTCTCATGACGATGCTTCGACTGC"""
+
+    test.table.loc[1, 'sseq'] = new_existing_seq
+    test.table.loc[1, 'ncbi_txid'] = 123456
+    test.table.loc[1, 'status'] = 0
+
+    assert test.table['sseq'].str.contains(new_existing_seq).any() == True
+
     new_seqs = test.extend()
 
-    new_existing_seq = """TCGAAACCTGCATAGCAGAACGACCTGTGAACATGTAAAACAATTGGGTGTTCTAAGTATCGGGCTCTTGTCCGATTCCTAGGATGCCATGTTGACGTGCGTCTTTGGCAAGCCCCTTGGGTGTCTAAGGACGTCACGTCGACGCAACAACAAACCCCCGGCACGGCATGTGCCAAGGAAATATAAACTTAAGAAGGGCTTGTTCCATGCATTGCCGTTCGTGGTGACTGCATTGAAACTTGCTTCTCTATAATTAATAAACGACTCTCGGCAACGGATATCTCGGCTCACGCATCGATGAAGAACGTAGCAAAATGCGATACTTGGTGTGAATTGCAGAATCCCGTGAACCATCGAGTTTTTGAACGCAAGTTGCGCCCGAAACCTTTTGGTTGAGGGCACGTCTGCCTGGGCGTCACACATCGCGTCGCCCCCATCACACCTCTTGACGGGGATGTTTGAATGGGGACGAAGATTGGTCTCCTGTTCCTAAGGTGCGGTTGGCTGAATTTTGAGTCCTCTTCGACGGACGCACGATTAGTGGTGGTTGACAAGACCTTCTTATCGAGTTGTGTGTTCCAAGAAGTAAGGAATATCTCTTTAACGACCCTAAAGTGTTGTCTCATGACGATGCTTCGACTGC"""
-
     new_seqs = new_seqs[~new_seqs['accession'].isin(test.table['accession'])]  # ~ is the pd not in/!
+
 
     f = phyl_up.FilterUniqueAcc(test.config, test.table)
     f.filter(new_seqs)
     new_seqs = f.upd_new_seqs
     new_seqs.loc[1, 'sseq'] = new_existing_seq
+    new_seqs.loc[1, 'ncbi_txid'] = 123456
     assert new_seqs.loc[1, 'sseq'] == new_existing_seq
-    assert new_seqs['sseq'].str.contains(new_existing_seq).any()
-    assert test.table['sseq'].str.contains(new_existing_seq).any()
+    assert new_seqs['sseq'].str.contains(new_existing_seq).any() == True
+    assert test.table['sseq'].str.contains(new_existing_seq).any() == True
+    new_seqs.loc[1, 'ncbi_txid'] = 123456
+    new_seq_acc = new_seqs.loc[1, 'accession']
+
 
     new_seqs_before = new_seqs
 
     len_table_before = len(test.table)
     new_seqs = test.add_new_seqs(new_seqs)
     assert new_seqs.index.tolist() != new_seqs_before.index.tolist()
-    # assert new_existing_seq in [new_seqs['sseq']]
+    assert new_seqs['sseq'].str.contains(new_existing_seq).any() == True
     len_table_after = len(test.table)
     assert len_table_before < len_table_after, (len_table_before, len_table_after)
 
     assert test.table['sseq'].hasnans == False, test.table['sseq']
 
     assert new_seqs['sseq'].str.contains(new_existing_seq).any() == True
+    assert new_seqs['accession'].str.contains(new_seq_acc).any() == True
+    assert test.table['sseq'].str.contains(new_existing_seq).any() == True
+    print(new_seqs.index[new_seqs['sseq'].str.contains(new_existing_seq).any()])
 
-    new_seqs = test.compare_filter(new_seqs)
+#     new_seqs = test.compare_filter(new_seqs)
+    f = phyl_up.FilterSeqIdent(test.config, test.table, test.status)
+    before_filter = new_seqs
+    f.filter(new_seqs)
+    test.aln = f.aln
+    new_seqs = f.upd_new_seqs  # assign new_seqs to last upd from filter before
+    test.table = f.table
+    del_seq = f.del_table
+    print(new_seq_acc)
+
     print(test.table['sseq'].str.contains(new_existing_seq).any())
     print(new_seqs['sseq'].str.contains(new_existing_seq).any())
+    print(test.table.loc[1, ])
+    assert new_seqs['accession'].str.contains(new_seq_acc).any() == False
+
     assert new_seqs['sseq'].str.contains(new_existing_seq).any() == False
 
     all_avail_data = test.table[test.table['status'].between(0, test.status, inclusive=True)]
@@ -269,8 +296,7 @@ def test_filter_compare():
     print(found.count())
     assert found.count() == 1, found.count()
 
-
-
+# todo check: seems to be testing the same as above but differnt and fails now
 def test_filter_compare_shorter():
     print('test_filter_seqident')
     workdir = "tests/output/test_run_seqident"
@@ -299,9 +325,17 @@ def test_filter_compare_shorter():
 
     test = phyl_up.PhylogeneticUpdater(id_to_spn, seqaln, mattype, trfn, schema_trf, conf)
 
+    new_existing_seq = """AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAATCGAAACCTGCATAGCAGAACGACCTGTGAACATGTAAAACAATTGGGTGTTCTAAGTATCGGGCTCTTGTCCGATTCCTAGGATGCCATGTTGACGTGCGTCTTTGGCAAGCCCCTTGGGTGTCTAAGGACGTCACGTCGACGCAACAACAAACCCCCGGCACGGCATGTGCCAAGGAAATATAAACTTAAGAAGGGCTTGTTCCATGCATTGCCGTTCGTGGTGACTGCATTGAAACTTGCTTCTCTATAATTAATAAACGACTCTCGGCAACGGATATCTCGGCTCACGCATCGATGAAGAACGTAGCAAAATGCGATACTTGGTGTGAATTGCAGAATCCCGTGAACCATCGAGTTTTTGAACGCAAGTTGCGCCCGAAACCTTTTGGTTGAGGGCACGTCTGCCTGGGCGTCACACATCGCGTCGCCCCCATCACACCTCTTGACGGGGATGTTTGAATGGGGACGAAGATTGGTCTCCTGTTCCTAAGGTGCGGTTGGCTGAATTTTGAGTCCTCTTCGACGGACGCACGATTAGTGGTGGTTGACAAGACCTTCTTATCGAGTTGTGTGTTCCAAGAAGTAAGGAATATCTCTTTAACGACCCTAAAGTGTTGTCTCATGACGATGCTTCGACTGC"""
+
+    test.table.loc[1, 'sseq'] = new_existing_seq
+    test.table.loc[1, 'ncbi_txid'] = 123456
+    test.table.loc[1, 'status'] = 0
+
+    assert test.table['sseq'].str.contains(new_existing_seq).any() == True
+
     new_seqs = test.extend()
 
-    new_existing_seq = """AGAACGACCTGTGAACATGTAAAACAATTGGGTGTTCTAAGTATCGGGCTCTTGTCCGATTCCTAGGATGCCATGTTGACGTGCGTCTTTGGCAAGCCCCTTGGGTGTCTAAGGACGTCACGTCGACGCAACAACAAACCCCCGGCACGGCATGTGCCAAGGAAATATAAACTTAAGAAGGGCTTGTTCCATGCATTGCCGTTCGTGGTGACTGCATTGAAACTTGCTTCTCTATAATTAATAAACGACTCTCGGCAACGGATATCTCGGCTCACGCATCGATGAAGAACGTAGCAAAATGCGATACTTGGTGTGAATTGCAGAATCCCGTGAACCATCGAGTTTTTGAACGCAAGTTGCGCCCGAAACCTTTTGGTTGAGGGCACGTCTGCCTGGGCGTCACACATCGCGTCGCCCCCATCACACCTCTTGACGGGGATGTTTGAATGGGGACGAAGATTGGTCTCCTGTTCCTAAGGTGCGGTTGGCTGAATTTTGAGTCCTCTTCGACGGACGCACGATTAGTGGTGGTTGACAAGACCTTCTTATCGAGTTGTGTGTTCCAAGAAGTAAGGAATATCTCTTTAACGACCCTAAAGTGTTGTCTCATGACGATGCTTCGACTGC"""
+ #   new_existing_seq = """AGAACGACCTGTGAACATGTAAAACAATTGGGTGTTCTAAGTATCGGGCTCTTGTCCGATTCCTAGGATGCCATGTTGACGTGCGTCTTTGGCAAGCCCCTTGGGTGTCTAAGGACGTCACGTCGACGCAACAACAAACCCCCGGCACGGCATGTGCCAAGGAAATATAAACTTAAGAAGGGCTTGTTCCATGCATTGCCGTTCGTGGTGACTGCATTGAAACTTGCTTCTCTATAATTAATAAACGACTCTCGGCAACGGATATCTCGGCTCACGCATCGATGAAGAACGTAGCAAAATGCGATACTTGGTGTGAATTGCAGAATCCCGTGAACCATCGAGTTTTTGAACGCAAGTTGCGCCCGAAACCTTTTGGTTGAGGGCACGTCTGCCTGGGCGTCACACATCGCGTCGCCCCCATCACACCTCTTGACGGGGATGTTTGAATGGGGACGAAGATTGGTCTCCTGTTCCTAAGGTGCGGTTGGCTGAATTTTGAGTCCTCTTCGACGGACGCACGATTAGTGGTGGTTGACAAGACCTTCTTATCGAGTTGTGTGTTCCAAGAAGTAAGGAATATCTCTTTAACGACCCTAAAGTGTTGTCTCATGACGATGCTTCGACTGC"""
 
     new_seqs = new_seqs[~new_seqs['accession'].isin(test.table['accession'])]  # ~ is the pd not in/!
 
@@ -309,6 +343,10 @@ def test_filter_compare_shorter():
     f.filter(new_seqs)
     new_seqs = f.upd_new_seqs
     new_seqs.loc[1, 'sseq'] = new_existing_seq
+    assert new_seqs.loc[1, 'sseq'] == new_existing_seq
+    assert new_seqs['sseq'].str.contains(new_existing_seq).any() == True
+    assert test.table['sseq'].str.contains(new_existing_seq).any() == True
+    new_seqs.loc[1, 'ncbi_txid'] = 123456
     new_seq_acc = new_seqs.loc[1, 'accession']
     assert new_seqs.loc[1, 'sseq'] == new_existing_seq
     assert new_seqs['sseq'].str.contains(new_existing_seq).any()
@@ -327,10 +365,16 @@ def test_filter_compare_shorter():
 
     assert new_seqs['sseq'].str.contains(new_existing_seq).any() == True
 
-    new_seqs = test.compare_filter(new_seqs)
-    print(new_seqs['sseq'])
+    # new_seqs = test.compare_filter(new_seqs)
+    f = phyl_up.FilterSeqIdent(test.config, test.table, test.status)
+    before_filter = new_seqs
+    f.filter(new_seqs)
+    test.aln = f.aln
+    new_seqs = f.upd_new_seqs  # assign new_seqs to last upd from filter before
+    test.table = f.table
+    del_seq = f.del_table
+    print(new_seq_acc)
 
-    print(new_existing_seq)
     print(test.table['sseq'].str.contains(new_existing_seq).any())
     print(new_seqs['sseq'].str.contains(new_existing_seq).any())
     assert new_seqs['accession'].str.contains(new_seq_acc).any() == False
