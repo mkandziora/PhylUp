@@ -62,4 +62,8 @@ echo "export PATH=$PWD:\$PATH" >> ~/.bashrctest
 cd ..
 cd ..
 
+wget 'https://ftp.ncbi.nlm.nih.gov/pub/taxonomy/taxdump.tar.gz'
+gunzip  -cd taxdump.tar.gz | (tar xvf - names.dmp nodes.dmp)
+mv *.dmp ./data/
+
 source ~/.bashrc
