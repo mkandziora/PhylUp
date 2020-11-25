@@ -53,7 +53,9 @@ class PhylogeneticUpdater:
         self.aln = DnaCharacterMatrix.get(path=self.aln_fn, schema=self.aln_schema)
         self.tre_fn = tre
         self.tre_schema = tre_schema
-        self.tre = None
+        if not self.tre_fn == None:
+            self.tre = Tree.get(path=os.path.abspath(self.tre_fn), schema=self.tre_schema,
+                                    taxon_namespace=self.aln.taxon_namespace, preserve_underscores=True)
         self.ignore_acc_list = ignore_acc_list
         sys.stdout.write('Translate input names to ncbi taxonomy...\n')
         self.table = phylogenetic_helpers.build_table_from_file(id_to_spn, self.config, self.config.downtorank)
@@ -850,7 +852,8 @@ class FilterNumberOtu(Filter):
                     for tax_id in preferred_taxa_ids:
                         # if tax_id_from_df is lower taxon from preferred ids:
                         part_tax_id_from_df = self.ncbi_parser.match_id_to_mrca(tax_id_from_df, tax_id)
-                        if part_tax_id_from_df != 0:
+                        # if part_tax_id_from_df != 0:
+                        if part_tax_id_from_df is True:
                             new_filtered_taxid_df = ns_txid_df
                         else:
                             new_filtered_taxid_df = ns_txid_df[0:0]
@@ -1156,7 +1159,8 @@ class FilterMRCA(Filter):
             if type(self.mrca) == int:
                 # TODO: make self.mrca to be a set - single id is type int
                 print("DO I EVER GET HERE - MRCA IS INT")
-                if mrca_tx == self.mrca:
+                #if mrca_tx == self.mrca:
+                if mrca_tx == True:
                     to_add = new_seqs[select_tf]
                     assert len(to_add) != 0, len(to_add)
                     self.upd_new_seqs = pd.concat([self.upd_new_seqs, to_add], axis=0, ignore_index=True, sort=True)
@@ -1166,8 +1170,9 @@ class FilterMRCA(Filter):
                     to_del.at[:, 'status'] = 'deleted - mrca'
                     self.del_table = pd.concat([self.del_table, to_del], axis=0, ignore_index=True, sort=True)
             elif type(self.mrca) == set:
-                # print(mrca_tx in self.mrca, mrca_tx, self.mrca)
-                if mrca_tx in self.mrca:
+                #print(mrca_tx in self.mrca, mrca_tx, self.mrca)
+                # if mrca_tx in self.mrca:
+                if mrca_tx == True:
                     to_add = new_seqs[select_tf]
                     assert len(to_add) != 0, len(to_add)
                     self.upd_new_seqs = pd.concat([self.upd_new_seqs, to_add], axis=0, ignore_index=True, sort=True)
@@ -1227,7 +1232,12 @@ class FilterUniqueAcc(Filter):
     def filter(self, new_seqs):
         debug('FilterUniqueAcc')
         # delete things in table
-        new_seqs_unique = new_seqs.drop_duplicates(subset=['accession'], keep='first')  #todo: keep longest - might affect length filter
+        new_seqs_unique = drop_shortest_among_duplicates(new_seqs)
+        #new_seqs_unique_old = new_seqs.drop_duplicates(subset=['accession'], keep='first')  #todo: keep longest - might affect length filter
+        #assert new_seqs_unique_old['sseq'].isin(new_seqs_unique['sseq']).all()
+        #assert new_seqs_unique_old['accession'].isin(new_seqs_unique['accession']).all()
+        #assert new_seqs_unique.sseq == new_seqs_unique_new.sseq
+
         drop = new_seqs.drop(new_seqs_unique.index.tolist())
 
         self.upd_new_seqs = new_seqs_unique
@@ -1238,6 +1248,24 @@ class FilterUniqueAcc(Filter):
 
         msg = "FilterUniqueAcc has lowered the new seqs df from {} to {}.\n".format(len(new_seqs), len(new_seqs_unique))
         write_msg_logfile(msg, self.config.workdir)
+
+
+def drop_shortest_among_duplicates(new_seqs):
+    """
+    Keep the entry with the longest sequences from the duplicated accessions.
+
+    :param new_seqs:
+    :return:
+    """
+    accs = new_seqs.drop_duplicates(subset=['accession'], keep='first')
+
+    new_seqs['seq_len'] = new_seqs['sseq'].apply(len)
+    grouped_df = new_seqs.groupby("accession")
+    maximums_idx = grouped_df.seq_len.idxmax()
+    maximums = new_seqs.loc[maximums_idx]
+
+    assert len(maximums) == len(accs.accession), (len(maximums), len(accs.accession))
+    return maximums
 
 
 def check_df_index_unique(df):
