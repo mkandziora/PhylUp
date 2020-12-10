@@ -76,7 +76,7 @@ class AlnUpdater(object):
 
         :return: output files
         """
-        print('update data')
+        print('update aln data')
         print(len(self.new_seq_table.index))
         if len(self.new_seq_table) > 0:
             self.delete_short_seqs()
@@ -401,13 +401,13 @@ class TreeUpdater(object):
                 else:
                     cmd1 = "raxml-ng-mpi --threads {} --model {} --msa {} --tree-constraint updt_tre.tre --seed {}" \
                            " --prefix fulltree".format(num_threads, best_subst_model, aln_fn, seed)
-                print(todo)
-                print(cmd1)
+                sys.stdout.write(todo)
+                sys.stdout.write(cmd1)
 
     def calculate_bootstrap_ng(self, best_subst_model, num_threads, aln_fn='updt_aln.fasta'):
         """Calculates bootstrap and consensus trees.
         """
-        print("calculate bootstrap")
+        sys.stdout.write("calculate bootstrap")
         with cd(self.config.workdir):
             # check if job was started with mpi: this checks if actual several cores and nodes were allocated
             ntasks = os.environ.get('SLURM_NTASKS_PER_NODE')
@@ -452,11 +452,11 @@ class TreeUpdater(object):
                 cmd3 = "raxml-ng-mpi --consense STRICT --tree fulltree.raxml.bootstraps --prefix consSTRICT"
                 cmd4 = "raxml-ng-mpi --consense MR --tree fulltree.raxml.bootstraps --prefix consMR"
 
-                print(todo)
-                print(cmd1)
-                print(cmd2)
-                print(cmd3)
-                print(cmd4)
+                sys.stdout.write(todo)
+                sys.stdout.write(cmd1)
+                sys.stdout.write(cmd2)
+                sys.stdout.write(cmd3)
+                sys.stdout.write(cmd4)
 
                 lfd = os.path.join(self.config.workdir, "logfile")
                 with open(lfd, "a") as log:
@@ -471,7 +471,7 @@ class TreeUpdater(object):
 
         :return: final data
         """
-        print("calculate final tree")
+        sys.stdout.write("calculate final tree")
         aln_fn = 'updt_aln.fasta'
 
         best_subst_model = phylogenetic_helpers.run_modeltest(aln_fn, self.config.workdir,
@@ -502,7 +502,7 @@ class InputCleaner(object):
     This is the input class, that cleans the data before updating the phylogeny.
     """
     def __init__(self, tre_fn, tre_schema, aln_fn, aln_schema, table, config_obj, mrca=None):
-        print('Clean the input data: {}, {}.'.format(tre_fn, aln_fn))
+        sys.stdout.write('Clean the input data: {}, {}.'.format(tre_fn, aln_fn))
         self.config = config_obj
         if not os.path.exists(self.config.workdir):
             os.makedirs(self.config.workdir)
@@ -545,7 +545,7 @@ class InputCleaner(object):
         :return:
         """
         mrca_name = self.ncbi_parser.get_name_from_id(list(mrca)[0])
-        print('Format mrca: {} - {}'.format(mrca, mrca_name))
+        sys.stdout.write('Format mrca: {} - {}'.format(mrca, mrca_name))
         if type(mrca) is int:
             valid = self.ncbi_parser.taxid_is_valid(mrca)
             mrca = {mrca}

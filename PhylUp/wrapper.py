@@ -28,8 +28,6 @@ import os
 
 
 def run_multiple(data, confs, end, overlap_folder=None, first_locus=False):
-
-
     count = 0
     for item in confs:
         if len(confs) > 1:
@@ -63,17 +61,17 @@ def run_multiple(data, confs, end, overlap_folder=None, first_locus=False):
             found_taxa_list = {}
             for locus in data.keys():
                 files = data[locus]
-
                 found_taxa_list[locus] = "{}/found_taxa.csv".format(files['workdir'])
-
+            mrca = test.set_mrca(test.config.mrca_input)
             if conf.preferred_taxa_fn == None:
                 conf.preferred_taxa_fn = os.path.join(overlap_folder, 'overlap.csv')
+                if not os.path.exists(overlap_folder):
+                    os.mkdir(overlap_folder)
+                conf.preferred_taxa_fn = os.path.join(overlap_folder, 'overlap{}.csv'.format(mrca))
+                assert conf.preferred_taxa_fn != None, conf.preferred_taxa_fn
                 phylogenetic_helpers.make_preferred_taxon_list(found_taxa_list, conf.preferred_taxa_fn, overlap_complete=True)
             else:
                 assert os.path.exists(conf.preferred_taxa_fn), conf.preferred_taxa_fn
-
-
-
 
             for locus in data.keys():
                 files = data[locus]
@@ -86,11 +84,14 @@ def run_multiple(data, confs, end, overlap_folder=None, first_locus=False):
                         files['seqaln'] = "{}/updt_aln.fasta".format(files['workdir'])
 
                 conf = config.ConfigObj(conffi, files['workdir'], interactive=False)
+                if conf.preferred_taxa_fn == None:
+                    conf.preferred_taxa_fn = os.path.join(overlap_folder,  'overlap{}.csv'.format(mrca))
+                    print(conf.preferred_taxa_fn)
+                    assert conf.preferred_taxa_fn != None, conf.preferred_taxa_fn
 
                 test = phyl_up.PhylogeneticUpdater(files['idtospn'], files['seqaln'], files['mattype'], files['trfn'],
                                                    files['schema_trf'], conf, ignore_acc_list=files['ignore_acc_list'])
                 test.run(status_end=end)
-
 
                 # new implementation - restricts overlap to species from first locus.
                 if first_locus == True:

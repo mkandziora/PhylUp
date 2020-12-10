@@ -14,5 +14,5 @@ ignore_acc = ['JX895419.1']  # sequence accession numbers that shall not be adde
 conf = config.ConfigObj(configfi, workdir, interactive=False)
 
 test = phyl_up.PhylogeneticUpdater(id_to_spn, seqaln, mattype, trfn, schema_trf, conf, ignore_acc_list=ignore_acc)
-test.run(status_end=1)
+test.run(status_end=1) # status ends limits the number of blast rounds
 

@@ -1,7 +1,7 @@
 import os
 import pandas as pd
 import pytest
-
+import shutil
 from distutils.dir_util import copy_tree
 
 from PhylUp import phyl_up, config, phylogenetic_helpers
@@ -31,6 +31,8 @@ def configure():
         os.mkdir(tmp_folder)
     # call(['cp', '-a', 'data/tmp_for_test/', tmp_folder])
     copy_tree('data/tmp_for_test/', tmp_folder)
+    shutil.copyfile('data/tiny_test_example/updt_aln.fasta', os.path.join(workdir, 'updt_aln.fasta'))
+    shutil.copyfile('data/tiny_test_example/updt_tre.tre', os.path.join(workdir, 'updt_tre.tre'))
 
     test = phyl_up.PhylogeneticUpdater(id_to_spn, seqaln, mattype, trfn, schema_trf, pytest.conf)
     print(test)

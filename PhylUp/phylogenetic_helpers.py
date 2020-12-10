@@ -160,7 +160,6 @@ def replace_uid_with_name(file_path, table, matrix_type):
                     split_name = present.loc[idx, 'accession'].split('.')[0]
                 if split_name not in name_list:
                     if split_name in labelled:
-                        debug(split_name)
                         spn = present.loc[idx, 'ncbi_txn'].replace(" ", "_").replace("-", "_").replace("'", "")
                         if matrix_type == 'tree':
                             labelled = replace_in_tree(idx, labelled, present, split_name, spn)
@@ -287,7 +286,7 @@ def estimate_number_threads_raxml(workdir, aln_fn, model):
     :param model: substitution model
     :return: optimal number of threads
     """
-    print('estimate_number_threads_raxml')
+    sys.stdout.write('Estimate number of threads raxml')
     with cd(workdir):
         subprocess.run(['raxml-ng', '--parse', '--msa', aln_fn,
                         '--prefix', 'numthreads', '--model', model, '--redo'])

@@ -54,6 +54,9 @@ class PhylogeneticUpdater:
         self.tre_fn = tre
         self.tre_schema = tre_schema
         if not self.tre_fn == None:
+            if self.tre_schema == None:
+                self.tre_schema = 'newick'
+
             self.tre = Tree.get(path=os.path.abspath(self.tre_fn), schema=self.tre_schema,
                                     taxon_namespace=self.aln.taxon_namespace, preserve_underscores=True)
         self.ignore_acc_list = ignore_acc_list
@@ -122,7 +125,6 @@ class PhylogeneticUpdater:
         if mrca is None:
             sys.stdout.write('Get mrca as input was not provided.\n')
             aln_taxids = set(self.table['ncbi_txid'].tolist())
-
             self.mrca = set([ncbi_parser.get_mrca(taxid_set=aln_taxids)])
         elif len(mrca.split(',')) > 1:
             mrca_list = set()
@@ -197,10 +199,10 @@ class PhylogeneticUpdater:
         # sets back data for rerun with different tribe or so
         self.set_back_data_in_table()
         self.status += 1
-        print('status')
-        print(self.status)
+        # print('status')
+        # print(self.status)
         present_subset = self.table[self.table['status'] > -1]
-        print(present_subset)
+        # print(present_subset)
         blast_subset = present_subset[present_subset['status'] >= self.status-1]
         new_seqs_local = pd.DataFrame(columns=['ncbi_txn', 'ncbi_txid', 'status', 'status_note', "date", 'accession',
                                                'pident', 'evalue', 'bitscore', 'sseq', 'title'])
@@ -210,14 +212,11 @@ class PhylogeneticUpdater:
         write_msg_logfile(msg, self.config.workdir)
         count = 0
         subsample_count = 1
-        print(blast_subset)
+        # print(blast_subset)
         for index in blast_subset.index:
             count += 1
-            print(count)
             if self.config.subsample > 1:
-                print('subsample')
                 if subsample_count < self.config.subsample:
-                    print('add count')
                     subsample_count += 1
                     continue
 
@@ -232,7 +231,7 @@ class PhylogeneticUpdater:
             new_seq_tax = blast.get_new_seqs(query_seq, tip_name, "Genbank", self.config)
             # new_seqs_local = new_seqs_local.append(new_seq_tax, ignore_index=True)
             new_seqs_local = pd.concat([new_seqs_local, new_seq_tax], ignore_index=True, sort=True)
-            print(len(new_seqs_local))
+            # print(len(new_seqs_local))
         assert len(new_seqs_local) > 0, new_seqs_local
         if self.ignore_acc_list is not None:
             assert type(self.ignore_acc_list) == list, (type(self.ignore_acc_list), self.ignore_acc_list)
@@ -440,7 +439,7 @@ class PhylogeneticUpdater:
                     msg = "Blast against Genbank sequences.\n"
                     write_msg_logfile(msg, self.config.workdir)
                     new_seqs = self.extend()  # todo rename to find new seqs
-                    msg = "Time after BLAST: {}.\n".format(datetime.datetime.now())
+                    msg = "\nTime after BLAST: {}.\n".format(datetime.datetime.now())
                     write_msg_logfile(msg, self.config.workdir)
                     # self.update_aln()  # wrong location to do this
 
@@ -738,8 +737,7 @@ class FilterNumberOtu(Filter):
             tax_ids_newseqs = filtered_new_seqs['downtorank']
             txids_added = new_seqs_downto['downtorank']
 
-
-        debug('start loop')
+        # print('start loop')
         for txid in set(tax_ids_newseqs):
             # generate taxon_subsets
             newseqs_txid_df = filtered_new_seqs[tax_ids_newseqs == txid]
@@ -793,7 +791,7 @@ class FilterNumberOtu(Filter):
                 self.upd_new_seqs = pd.concat([self.upd_new_seqs, filtered], ignore_index=True, sort=True)
             elif len(oldseqs_txid_df) > self.config.threshold:
                 if not self.config.downtorank:
-                    # print('sample size to big')
+                    sys.stderr.write('sample size to big')
                     sys.exit(-3)
             else:
                 # print('sample size correct - nothing to add')
@@ -1086,7 +1084,7 @@ class FilterSeqIdent(Filter):
             txid_compare = existing_old.loc[idx, 'ncbi_txid']
             seq_compare = existing_old.loc[idx, 'sseq']
             # use those to compare to new seqs:
-            #if len(self.upd_new_seqs.sseq) > len(seq_compare):
+            # if len(self.upd_new_seqs.sseq) > len(seq_compare):
             #    print('1')
             same_new = self.upd_new_seqs[(self.upd_new_seqs.sseq.str.contains(seq_compare)) & (
                             self.upd_new_seqs['ncbi_txid'] == int(txid_compare))]
@@ -1193,6 +1191,7 @@ class FilterMRCA(Filter):
         if len(to_del) > 0:
             to_del.to_csv(os.path.join(self.config.workdir, 'wrong_mrca.csv'), mode='a')
 
+
 #todo: unused. is being filtered in blast
 class FilterBLASTThreshold(Filter):
     """
@@ -1233,7 +1232,7 @@ class FilterUniqueAcc(Filter):
         debug('FilterUniqueAcc')
         # delete things in table
         new_seqs_unique = drop_shortest_among_duplicates(new_seqs)
-        #new_seqs_unique_old = new_seqs.drop_duplicates(subset=['accession'], keep='first')  #todo: keep longest - might affect length filter
+        #new_seqs_unique_old = new_seqs.drop_duplicates(subset=['accession'], keep='first')  #donetodo: keep longest - might affect length filter. see above
         #assert new_seqs_unique_old['sseq'].isin(new_seqs_unique['sseq']).all()
         #assert new_seqs_unique_old['accession'].isin(new_seqs_unique['accession']).all()
         #assert new_seqs_unique.sseq == new_seqs_unique_new.sseq

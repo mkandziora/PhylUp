@@ -35,7 +35,7 @@ import ncbiTAXONparser.ncbi_data_parser as ncbi_data_parser
 from . import blast, phylogenetic_helpers
 
 
-# TODO: make global blast folders that can be shared across runs
+# TODOdone: make global blast folders that can be shared across runs
 
 
 class ConfigObj(object):
