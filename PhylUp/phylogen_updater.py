@@ -62,7 +62,7 @@ class AlnUpdater(object):
         print('status')
         print(status_new)
         if status_new == None:
-            self.new_seq_table = self.table[self.table['status'] > 0]  # gets all new seqs (status>0.5)
+            self.new_seq_table = self.table[self.table['status'] >= 1]  # gets all new seqs (status>0.5) - gets here if not unpublished
         elif status_new == 0.5:
             self.new_seq_table = self.table[self.table['status'] > 0]  # gets all new seqs (status>0.5)
         else:
@@ -106,7 +106,7 @@ class AlnUpdater(object):
 
     def add_queryseqs_to_singleseq(self):
         """
-        If input is single sequence, add new seqs to it using mafft.
+        If input is single sequence, add new seqs to it using mafft. - irrespective of how many seqs. works also with more
 
         :return:
         """
@@ -345,26 +345,28 @@ class TreeUpdater(object):
         Just for placement, to use as starting tree.
         """
         print("place query seq")
-        phylogenetic_helpers.write_papara_trefile(self.tre, self.config.workdir)
+        if len(self.tre.taxon_namespace) > 2:
 
-        # prepare tree
-        self.tre.resolve_polytomies()
-        self.tre.deroot()
-        with open(os.path.join(self.config.workdir, "epa_tree.tre"), "w") as tre_file:
-            tre_file.write("{}".format(self.tre.as_string(schema='newick', suppress_rooting=True)))
+            phylogenetic_helpers.write_papara_trefile(self.tre, self.config.workdir)
 
-        with cd(self.config.workdir):
-            # todo: get model for epa-ng
-            with suppress_stdout():
-                subprocess.call(["epa-ng", "--ref-msa", "old_seqs.fasta", "--tree", "epa_tree.tre",
-                                 "--query",  "new_seqs.fasta", "--outdir", "./", "--model", 'GTR+G', '--redo'], shell=False)
-                # make newick tre
-                subprocess.call(["gappa", "examine", "graft", "--jplace-path", "epa_result.jplace",
-                                 "--allow-file-overwriting"], shell=False)
-            self.tre = Tree.get(path="epa_result.newick", schema="newick", preserve_underscores=True)
-            #self.tre.write(path="place_resolve.tre", schema="newick", unquoted_underscores=True, suppress_rooting=True)
-            self.tre.write(path="updt_tre.tre", schema="newick", unquoted_underscores=True, suppress_rooting=True)
-            # phylogenetic_helpers.evaluate_raxmlng_alignment()
+            # prepare tree
+            self.tre.resolve_polytomies()
+            self.tre.deroot()
+            with open(os.path.join(self.config.workdir, "epa_tree.tre"), "w") as tre_file:
+                tre_file.write("{}".format(self.tre.as_string(schema='newick', suppress_rooting=True)))
+
+            with cd(self.config.workdir):
+                # todo: get model for epa-ng
+                with suppress_stdout():
+                    subprocess.call(["epa-ng", "--ref-msa", "old_seqs.fasta", "--tree", "epa_tree.tre",
+                                     "--query",  "new_seqs.fasta", "--outdir", "./", "--model", 'GTR+G', '--redo'], shell=False)
+                    # make newick tre
+                    subprocess.call(["gappa", "examine", "graft", "--jplace-path", "epa_result.jplace",
+                                     "--allow-file-overwriting"], shell=False)
+                self.tre = Tree.get(path="epa_result.newick", schema="newick", preserve_underscores=True)
+                #self.tre.write(path="place_resolve.tre", schema="newick", unquoted_underscores=True, suppress_rooting=True)
+                self.tre.write(path="updt_tre.tre", schema="newick", unquoted_underscores=True, suppress_rooting=True)
+                # phylogenetic_helpers.evaluate_raxmlng_alignment()
 
     def update_tree(self, aln_fn, best_subst_model, num_threads):
         """Estimate tree, using correct substitution model and a starting tree.

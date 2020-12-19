@@ -29,12 +29,11 @@ import os
 
 def run_multiple(data, confs, end, overlap_folder=None, first_locus=False):
     count = 0
-    for item in confs:
+    for conffi in confs:
         if len(confs) > 1:
             count += 1
-        conffi = item
         print('configuration file is:')
-        print(item)
+        print(conffi)
 
         for locus in data.keys():
             print(locus)
@@ -64,10 +63,10 @@ def run_multiple(data, confs, end, overlap_folder=None, first_locus=False):
                 found_taxa_list[locus] = "{}/found_taxa.csv".format(files['workdir'])
             mrca = test.set_mrca(test.config.mrca_input)
             if conf.preferred_taxa_fn == None:
-                conf.preferred_taxa_fn = os.path.join(overlap_folder, 'overlap.csv')
                 if not os.path.exists(overlap_folder):
                     os.mkdir(overlap_folder)
                 conf.preferred_taxa_fn = os.path.join(overlap_folder, 'overlap{}.csv'.format(mrca))
+                print(conf.preferred_taxa_fn)
                 assert conf.preferred_taxa_fn != None, conf.preferred_taxa_fn
                 phylogenetic_helpers.make_preferred_taxon_list(found_taxa_list, conf.preferred_taxa_fn, overlap_complete=True)
             else:

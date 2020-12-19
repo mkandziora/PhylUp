@@ -543,19 +543,26 @@ def read_blast_query_pandas(blast_fn, config, db_name):
     data = pd.read_csv(query_output_fn, names=colnames, sep="\t", header=None)
 
     if data['ncbi_txid'].isnull().values.any() == True:
-        colnames = ['accession;gi', 'ncbi_txid']
-        tax_id_map = pd.read_csv(os.path.join(config.workdir, 'tmp/unpublished_txid.txt'), names=colnames, sep=" ",
-                                 header=None)
         before = len(data)
-        for idx in data.index:
-            if data.loc[idx, 'ncbi_txid'] == None:
-                acc = data.loc[idx, 'accession;gi']
-                map_id = tax_id_map[tax_id_map['accession;gi'] == acc, 'ncbi_txid']
-                data.loc[idx, 'ncbi_txid'] = map_id
+        if db_name == 'unpublished':
+            colnames = ['accession;gi', 'ncbi_txid']
+            tax_id_map = pd.read_csv(os.path.join(config.workdir, 'tmp/unpublished_txid.txt'), names=colnames, sep=" ",
+                                     header=None)
+            for idx in data.index:
+                if data.loc[idx, 'ncbi_txid'] == None:
+                    acc = data.loc[idx, 'accession;gi']
+                    map_id = tax_id_map[tax_id_map['accession;gi'] == acc, 'ncbi_txid']
+                    data.loc[idx, 'ncbi_txid'] = map_id
+        else:
+            data['ncbi_txid'].isnull().values = 0
         after=len(data)
         assert after == before, (before, after)
 
-    if not db_name == 'unpublished':
+
+    if db_name == "filterrun":
+        if len(data) == 0:
+            sys.stdout.write("bad blast - no seq found")
+    elif not db_name == 'unpublished':
         assert len(data) > 0, data
     redundant = data[data['accession'].str.contains(';')]
     non_redundant_redundant = get_non_redundant_data(config, redundant)  # new data frame with split value columns
@@ -626,6 +633,7 @@ def get_non_redundant_data(config, redundant):
         shortened = t.dropna()
         ncbi_parser = ncbi_data_parser.Parser(names_file=config.ncbi_parser_names_fn,
                                               nodes_file=config.ncbi_parser_nodes_fn)
+
         while len(found_taxids) < len(set(all_taxids_set)):
             for i in range(len(shortened)):
                 # if we found all taxon_ids present in the initial list, stop looking for more
@@ -644,6 +652,7 @@ def get_non_redundant_data(config, redundant):
                 non_redundant_redundant = pd.concat([non_redundant_redundant, split_df], ignore_index=True, sort=True)
                 found_taxids.add(tax_id)
                 queried_acc.add(gb_acc)
+
     if len(redundant) > 0:
         assert len(non_redundant_redundant) >= len(redundant), \
             (len(non_redundant_redundant), len(redundant), non_redundant_redundant['accession'], redundant['accession;gi'])

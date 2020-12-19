@@ -50,27 +50,30 @@ def truncate_papara_aln(aln):
     # # split does not work, as original aln_papara often shorter than extended:
     # subprocess.call(["epa-ng", "--split", "aln_papara.phy", "papara_alignment.extended"])
     debug('truncate papara aln')
-    len_aln = len(aln.taxon_namespace)
-    # read the data file in as a list
-    ref_msa_fn = open(os.path.abspath('papara_alignment.phylip_trim'), "r")
-    ref_msa = ref_msa_fn.readlines()
-    ref_msa_fn.close()
-    query_msa = deepcopy(ref_msa)
+    if os.path.exists('papara_alignment.phylip_trim'):
+        len_aln = len(aln.taxon_namespace)
+        # read the data file in as a list
+        ref_msa_fn = open(os.path.abspath('papara_alignment.phylip_trim'), "r")
+        ref_msa = ref_msa_fn.readlines()
+        ref_msa_fn.close()
+        query_msa = deepcopy(ref_msa)
 
-    del query_msa[1:(len_aln+1)]
-    fout = open("new_seqs_papara.phylip", "w")
-    fout.writelines(query_msa)
-    fout.close()
+        del query_msa[1:(len_aln+1)]
+        fout = open("new_seqs_papara.phylip", "w")
+        fout.writelines(query_msa)
+        fout.close()
 
-    del ref_msa[len_aln+1:]
-    fout = open("old_seqs_papara.phylip", "w")
-    fout.writelines(ref_msa)
-    fout.close()
+        del ref_msa[len_aln+1:]
+        fout = open("old_seqs_papara.phylip", "w")
+        fout.writelines(ref_msa)
+        fout.close()
 
-    tmpaln = DnaCharacterMatrix.get(path='old_seqs_papara.phylip', schema='phylip')
-    tmpaln.write(path="old_seqs.fasta", schema='fasta')
-    tmpaln = DnaCharacterMatrix.get(path='new_seqs_papara.phylip', schema='phylip')
-    tmpaln.write(path="new_seqs.fasta", schema='fasta')
+        tmpaln = DnaCharacterMatrix.get(path='old_seqs_papara.phylip', schema='phylip')
+        tmpaln.write(path="old_seqs.fasta", schema='fasta')
+        tmpaln = DnaCharacterMatrix.get(path='new_seqs_papara.phylip', schema='phylip')
+        tmpaln.write(path="new_seqs.fasta", schema='fasta')
+    else:
+        sys.stderr.write('File (papara_alignment.phylip_trim) does not exists.\n')
 
 
 def make_mafft_aln(aln, workdir):
@@ -147,6 +150,7 @@ def replace_uid_with_name(file_path, table, matrix_type):
     :return:
     """
     # print(os.getcwd())
+    assert matrix_type in ["tree", "aln"], matrix_type
     name_list = []
     with open(file_path, "r") as label_new:
         labelled = label_new.read()
@@ -155,7 +159,9 @@ def replace_uid_with_name(file_path, table, matrix_type):
             for idx in present.index:
                 if 'concat_id' in present.columns:
                     id = present.loc[idx, 'concat_id']
-                    split_name = 'concat_{}'.format(int(id))
+                    print(id)
+                    if np.isnan(id) == False:
+                        split_name = 'concat_{}'.format(int(id))
                 else:
                     split_name = present.loc[idx, 'accession'].split('.')[0]
                 if split_name not in name_list:
@@ -216,8 +222,8 @@ def run_papara():
 
     :return:
     """
-    with suppress_stdout():
-        subprocess.check_call(["papara_static_x86_64", "-t", "papara_tre.tre", "-s", "aln_papara.phy",
+    #with suppress_stdout():
+    subprocess.check_call(["papara_static_x86_64", "-t", "papara_tre.tre", "-s", "aln_papara.phy",
                                #  "-j", "{}".format(self.config.num_threads),  # FIXME: only works when papara is compiled.
                                "-q", "new_seqs.fasta", "-n", 'phylip'], shell=False)
 

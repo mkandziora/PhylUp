@@ -300,8 +300,7 @@ class PhylogeneticUpdater:
             # next filter need infos in table
             if len(new_seqs) > 0:
                 new_seqs = self.add_new_seqs(new_seqs)
-
-        assert new_seqs.accession.is_unique
+                assert new_seqs['accession'].is_unique, new_seqs
         # filter for seq identity process
         if len(new_seqs) > 0:
             new_seqs = self.compare_filter(new_seqs)
@@ -364,7 +363,7 @@ class PhylogeneticUpdater:
         all_del = pd.DataFrame(columns=columns)
 
         remove_basics = [FilterUniqueAcc(self.config, self.table),
-                         # FilterBLASTThreshold(self.config),
+                         FilterBLASTThreshold(self.config),
                          FilterLength(self.config, aln),
                          FilterMRCA(self.config, mrca)
                          ]
@@ -445,8 +444,8 @@ class PhylogeneticUpdater:
 
                 if self.config.preferred_taxa == True:
                     if not os.path.exists(os.path.join(self.workdir, 'found_taxa.csv')):
-                        set_taxid = list(set(new_seqs['ncbi_txid'].values))
-                        set_taxname = list(set(new_seqs['ncbi_txn'].values))
+                        set_taxid = list(new_seqs['ncbi_txid'].values)
+                        set_taxname = list(new_seqs['ncbi_txn'].values)
 
                         with open(os.path.join(self.workdir, 'found_taxa.csv'), mode='wt') as f:
                             for i in range(0, len(set_taxid)):
@@ -537,22 +536,22 @@ class PhylogeneticUpdater:
                     # For each line, check if line contains the string
                     if tip_name in line:
                         found = True
-            assert found == True, (tip_name, 'Taxon name not found in alignment - make sure you use the right input aln'
-                                             ' - likely hierarchical updating issue.')
+            #assert found == True, (tip_name, 'Taxon name not found in alignment {} - make sure you use the right input aln'
+            #                                 ' - likely hierarchical updating issue.'.format(self.config.workdir))
 
-            with open(filepath) as fp:
-                seq = ''
-                while tip_name not in fp.readline():
-                    continue
-                line = fp.readline()
-                while (line != '') and ('>' not in line):
-                    seq = seq + line
-                    line = fp.readline()
-                seq = seq.replace('-', '').replace('\n', '')
-                new_seqs.at[idx, 'sseq'] = seq
-                if self.table['accession'].str.contains(tip_name).any():
-                    # seq_before = self.table.loc[self.table['accession'] == tip_name, 'sseq'].values[0]
-                    self.table.at[self.table['accession'] == tip_name, 'sseq'] = seq
+                        with open(filepath) as fp:
+                            seq = ''
+                            while tip_name not in fp.readline():
+                                continue
+                            line = fp.readline()
+                            while (line != '') and ('>' not in line):
+                                seq = seq + line
+                                line = fp.readline()
+                            seq = seq.replace('-', '').replace('\n', '')
+                            new_seqs.at[idx, 'sseq'] = seq
+                            if self.table['accession'].str.contains(tip_name).any():
+                                # seq_before = self.table.loc[self.table['accession'] == tip_name, 'sseq'].values[0]
+                                self.table.at[self.table['accession'] == tip_name, 'sseq'] = seq
                     # don't assert seq_before and after differ - must not be the case
                     # assert seq_before != seq, (seq_before, seq)
                     # assert seq_before != self.table.loc[self.table['accession'] == tip_name, 'sseq'].values[0], (
@@ -567,8 +566,8 @@ class PhylogeneticUpdater:
         #                         preserve_underscores=True,
         #                         taxon_namespace=self.aln.taxon_namespace)
         # self.update_tre()
-        msg = "Time finished: {}.\n".format(datetime.datetime.now())
-        write_msg_logfile(msg, self.config.workdir)
+        #msg = "Time finished: {}.\n".format(datetime.datetime.now())
+        #write_msg_logfile(msg, self.config.workdir)
 
     def call_input_cleaner(self):
         """
@@ -802,8 +801,8 @@ class FilterNumberOtu(Filter):
         del_tab = new_seqs[new_seqs['accession'].isin(not_selected)]
         self.del_table = del_tab
         if len(not_selected) > 0:
+            self.table.at[self.table['accession'].isin(not_selected) , 'status_note'] = 'too many seqs of same tax_id'
             self.table.at[self.table['accession'].isin(not_selected), 'status'] = -1
-            self.table.at[self.table['accession'].isin(not_selected), 'status_note'] = 'too many seqs of same tax_id'
         check_filter_numbers(not_selected, self.upd_new_seqs, new_seqs)
 
         msg = "Filter FilterNumberOtu reduced the new seqs from {} to {}.\n".format(len(new_seqs),
@@ -959,9 +958,12 @@ class FilterNumberOtu(Filter):
             blast.write_local_blast_files(self.config.workdir, seq_id, seq, db=True)
         blast.make_local_blastdb(self.config.workdir, db='filterrun', taxid=txid)
         filter_blast_seqs = blast.get_new_seqs(query_seq, txid, 'filterrun', self.config)
-        subfilter_blast_seqs = remove_mean_sd_nonfit(filter_blast_seqs)
-        filtered_seqs = self.select_number_missing(subfilter_blast_seqs, exist_dict)
-        filtered_acc = set(list(filtered_seqs['accession']))
+        if len(filter_blast_seqs) > 0:
+            subfilter_blast_seqs = remove_mean_sd_nonfit(filter_blast_seqs)
+
+            print(subfilter_blast_seqs)
+            filtered_seqs = self.select_number_missing(subfilter_blast_seqs, exist_dict)
+            filtered_acc = set(list(filtered_seqs['accession']))
         # print('filter wrapper done')
         return filtered_acc
 
@@ -983,6 +985,33 @@ class FilterNumberOtu(Filter):
         else:
             sys.stdout.write('Should not happen!')
             sys.exit(-2)
+        count = 0
+
+        if self.config.downtorank is not None and self.config.downtorank not in ['species', 'subspecies', 'variety']:
+            print(filtered_seqs['ncbi_txid'])
+            while len(filtered_seqs['ncbi_txid']) > len(set(filtered_seqs['ncbi_txid'])):
+                count += 1
+                diff = len(filtered_seqs['ncbi_txid']) - len(set(filtered_seqs['ncbi_txid']))
+                print(diff)
+                subfilter_blast_seqs = subfilter_blast_seqs[~subfilter_blast_seqs.ncbi_txid.isin(set(filtered_seqs['ncbi_txid']))]
+                print(subfilter_blast_seqs)
+                if len(subfilter_blast_seqs) > 0:
+                    select_different = subfilter_blast_seqs.sample(diff)
+                    #if not filtered_seqs['accession'].str.contains(select_different['accession']).any():
+                    bool_isin = select_different["accession"].isin(filtered_seqs["accession"])
+
+                    if len(select_different[bool_isin]) == 0:
+                        filtered_seqs = filtered_seqs[filtered_seqs.duplicated(['ncbi_txid'], keep='first')]
+                        filtered_seqs =  pd.concat([filtered_seqs, select_different], axis=0, ignore_index=True, sort=True)
+
+                    if count == 20:
+                        # filtered_seqs = filtered_seqs[filtered_seqs.duplicated(['ncbi_txid'], keep='first')]
+                        break
+                        #print(filtered_seqs[["accession", 'ncbi_txid']])
+                        #filtered_seqs = pd.concat([filtered_seqs, select_different], axis=0, ignore_index=True, sort=True)
+                else:
+                    break
+
         return filtered_seqs
 
 
@@ -995,14 +1024,22 @@ def remove_mean_sd_nonfit(filter_blast_seqs):
     """
     # remove non fitting entries - too far from blast query seq....
     mean_sd = calculate_mean_sd(filter_blast_seqs['bitscore'])
-    subfilter_blast_seqs = pd.DataFrame()
-    for idx in filter_blast_seqs.index:
-        seq_bitscore = filter_blast_seqs.loc[idx, 'bitscore']
-        if (seq_bitscore >= mean_sd['mean'] - mean_sd['sd']) & \
-                (seq_bitscore <= mean_sd['mean'] + mean_sd['sd']):
-            subfilter_blast_seqs = subfilter_blast_seqs.append(filter_blast_seqs.loc[idx])
-        # else:
-        #     print('filter thresh too large')
+
+    cond1 = (mean_sd['mean'] - mean_sd['sd'])
+    cond2 =  (mean_sd['mean'] + mean_sd['sd'])
+    filtered = filter_blast_seqs[filter_blast_seqs.bitscore  >= cond1]
+    filtered = filtered[filtered.bitscore  <= cond2]
+    subfilter_blast_seqs = filtered
+
+    # # removed for faster?
+    # subfilter_blast_seqs = pd.DataFrame()
+    # for idx in filter_blast_seqs.index:
+    #     seq_bitscore = filter_blast_seqs.loc[idx, 'bitscore']
+    #     if (seq_bitscore >= mean_sd['mean'] - mean_sd['sd']) & \
+    #             (seq_bitscore <= mean_sd['mean'] + mean_sd['sd']):
+    #         subfilter_blast_seqs = subfilter_blast_seqs.append(filter_blast_seqs.loc[idx])
+    #     # else:
+    #     #     print('filter thresh too large')
     return subfilter_blast_seqs
 
 
@@ -1151,7 +1188,6 @@ class FilterMRCA(Filter):
             self.initialize(self.config)
         to_del = pd.DataFrame()
         for tax_id in set(new_seqs['ncbi_txid'].astype(int)):
-            tax_id = int(tax_id)
             mrca_tx = self.ncbi_parser.match_id_to_mrca(tax_id, self.mrca)
             select_tf = new_seqs['ncbi_txid'].astype(int) == tax_id
             if type(self.mrca) == int:
@@ -1189,7 +1225,7 @@ class FilterMRCA(Filter):
         msg = "Filter FilterMRCA reduced the new seqs from {} to {}.\n".format(len(new_seqs), len(self.upd_new_seqs))
         write_msg_logfile(msg, self.config.workdir)
         if len(to_del) > 0:
-            to_del.to_csv(os.path.join(self.config.workdir, 'wrong_mrca.csv'), mode='a')
+            self.del_table.to_csv(os.path.join(self.config.workdir, 'wrong_mrca.csv'), mode='a')
 
 
 #todo: unused. is being filtered in blast
