@@ -62,7 +62,7 @@ class AlnUpdater(object):
         print('status')
         print(status_new)
         if status_new == None:
-            self.new_seq_table = self.table[self.table['status'] > 0]  # gets all new seqs (status>0.5)
+            self.new_seq_table = self.table[self.table['status'] >= 1]  # gets all new seqs (status>0.5) - gets here if not unpublished
         elif status_new == 0.5:
             self.new_seq_table = self.table[self.table['status'] > 0]  # gets all new seqs (status>0.5)
         else:
@@ -76,7 +76,7 @@ class AlnUpdater(object):
 
         :return: output files
         """
-        print('update data')
+        print('update aln data')
         print(len(self.new_seq_table.index))
         if len(self.new_seq_table) > 0:
             self.delete_short_seqs()
@@ -106,7 +106,7 @@ class AlnUpdater(object):
 
     def add_queryseqs_to_singleseq(self):
         """
-        If input is single sequence, add new seqs to it using mafft.
+        If input is single sequence, add new seqs to it using mafft. - irrespective of how many seqs. works also with more
 
         :return:
         """
@@ -345,26 +345,28 @@ class TreeUpdater(object):
         Just for placement, to use as starting tree.
         """
         print("place query seq")
-        phylogenetic_helpers.write_papara_trefile(self.tre, self.config.workdir)
+        if len(self.tre.taxon_namespace) > 2:
 
-        # prepare tree
-        self.tre.resolve_polytomies()
-        self.tre.deroot()
-        with open(os.path.join(self.config.workdir, "epa_tree.tre"), "w") as tre_file:
-            tre_file.write("{}".format(self.tre.as_string(schema='newick', suppress_rooting=True)))
+            phylogenetic_helpers.write_papara_trefile(self.tre, self.config.workdir)
 
-        with cd(self.config.workdir):
-            # todo: get model for epa-ng
-            with suppress_stdout():
-                subprocess.call(["epa-ng", "--ref-msa", "old_seqs.fasta", "--tree", "epa_tree.tre",
-                                 "--query",  "new_seqs.fasta", "--outdir", "./", "--model", 'GTR+G', '--redo'], shell=False)
-                # make newick tre
-                subprocess.call(["gappa", "examine", "graft", "--jplace-path", "epa_result.jplace",
-                                 "--allow-file-overwriting"], shell=False)
-            self.tre = Tree.get(path="epa_result.newick", schema="newick", preserve_underscores=True)
-            #self.tre.write(path="place_resolve.tre", schema="newick", unquoted_underscores=True, suppress_rooting=True)
-            self.tre.write(path="updt_tre.tre", schema="newick", unquoted_underscores=True, suppress_rooting=True)
-            # phylogenetic_helpers.evaluate_raxmlng_alignment()
+            # prepare tree
+            self.tre.resolve_polytomies()
+            self.tre.deroot()
+            with open(os.path.join(self.config.workdir, "epa_tree.tre"), "w") as tre_file:
+                tre_file.write("{}".format(self.tre.as_string(schema='newick', suppress_rooting=True)))
+
+            with cd(self.config.workdir):
+                # todo: get model for epa-ng
+                with suppress_stdout():
+                    subprocess.call(["epa-ng", "--ref-msa", "old_seqs.fasta", "--tree", "epa_tree.tre",
+                                     "--query",  "new_seqs.fasta", "--outdir", "./", "--model", 'GTR+G', '--redo'], shell=False)
+                    # make newick tre
+                    subprocess.call(["gappa", "examine", "graft", "--jplace-path", "epa_result.jplace",
+                                     "--allow-file-overwriting"], shell=False)
+                self.tre = Tree.get(path="epa_result.newick", schema="newick", preserve_underscores=True)
+                #self.tre.write(path="place_resolve.tre", schema="newick", unquoted_underscores=True, suppress_rooting=True)
+                self.tre.write(path="updt_tre.tre", schema="newick", unquoted_underscores=True, suppress_rooting=True)
+                # phylogenetic_helpers.evaluate_raxmlng_alignment()
 
     def update_tree(self, aln_fn, best_subst_model, num_threads):
         """Estimate tree, using correct substitution model and a starting tree.
@@ -401,13 +403,13 @@ class TreeUpdater(object):
                 else:
                     cmd1 = "raxml-ng-mpi --threads {} --model {} --msa {} --tree-constraint updt_tre.tre --seed {}" \
                            " --prefix fulltree".format(num_threads, best_subst_model, aln_fn, seed)
-                print(todo)
-                print(cmd1)
+                sys.stdout.write(todo)
+                sys.stdout.write(cmd1)
 
     def calculate_bootstrap_ng(self, best_subst_model, num_threads, aln_fn='updt_aln.fasta'):
         """Calculates bootstrap and consensus trees.
         """
-        print("calculate bootstrap")
+        sys.stdout.write("calculate bootstrap")
         with cd(self.config.workdir):
             # check if job was started with mpi: this checks if actual several cores and nodes were allocated
             ntasks = os.environ.get('SLURM_NTASKS_PER_NODE')
@@ -452,11 +454,11 @@ class TreeUpdater(object):
                 cmd3 = "raxml-ng-mpi --consense STRICT --tree fulltree.raxml.bootstraps --prefix consSTRICT"
                 cmd4 = "raxml-ng-mpi --consense MR --tree fulltree.raxml.bootstraps --prefix consMR"
 
-                print(todo)
-                print(cmd1)
-                print(cmd2)
-                print(cmd3)
-                print(cmd4)
+                sys.stdout.write(todo)
+                sys.stdout.write(cmd1)
+                sys.stdout.write(cmd2)
+                sys.stdout.write(cmd3)
+                sys.stdout.write(cmd4)
 
                 lfd = os.path.join(self.config.workdir, "logfile")
                 with open(lfd, "a") as log:
@@ -471,7 +473,7 @@ class TreeUpdater(object):
 
         :return: final data
         """
-        print("calculate final tree")
+        sys.stdout.write("calculate final tree")
         aln_fn = 'updt_aln.fasta'
 
         best_subst_model = phylogenetic_helpers.run_modeltest(aln_fn, self.config.workdir,
@@ -502,7 +504,7 @@ class InputCleaner(object):
     This is the input class, that cleans the data before updating the phylogeny.
     """
     def __init__(self, tre_fn, tre_schema, aln_fn, aln_schema, table, config_obj, mrca=None):
-        print('Clean the input data: {}, {}.'.format(tre_fn, aln_fn))
+        sys.stdout.write('Clean the input data: {}, {}.'.format(tre_fn, aln_fn))
         self.config = config_obj
         if not os.path.exists(self.config.workdir):
             os.makedirs(self.config.workdir)
@@ -545,7 +547,7 @@ class InputCleaner(object):
         :return:
         """
         mrca_name = self.ncbi_parser.get_name_from_id(list(mrca)[0])
-        print('Format mrca: {} - {}'.format(mrca, mrca_name))
+        sys.stdout.write('Format mrca: {} - {}'.format(mrca, mrca_name))
         if type(mrca) is int:
             valid = self.ncbi_parser.taxid_is_valid(mrca)
             mrca = {mrca}

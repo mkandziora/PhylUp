@@ -54,6 +54,9 @@ class PhylogeneticUpdater:
         self.tre_fn = tre
         self.tre_schema = tre_schema
         if not self.tre_fn == None:
+            if self.tre_schema == None:
+                self.tre_schema = 'newick'
+
             self.tre = Tree.get(path=os.path.abspath(self.tre_fn), schema=self.tre_schema,
                                     taxon_namespace=self.aln.taxon_namespace, preserve_underscores=True)
         self.ignore_acc_list = ignore_acc_list
@@ -122,7 +125,6 @@ class PhylogeneticUpdater:
         if mrca is None:
             sys.stdout.write('Get mrca as input was not provided.\n')
             aln_taxids = set(self.table['ncbi_txid'].tolist())
-
             self.mrca = set([ncbi_parser.get_mrca(taxid_set=aln_taxids)])
         elif len(mrca.split(',')) > 1:
             mrca_list = set()
@@ -197,10 +199,7 @@ class PhylogeneticUpdater:
         # sets back data for rerun with different tribe or so
         self.set_back_data_in_table()
         self.status += 1
-        print('status')
-        print(self.status)
         present_subset = self.table[self.table['status'] > -1]
-        print(present_subset)
         blast_subset = present_subset[present_subset['status'] >= self.status-1]
         new_seqs_local = pd.DataFrame(columns=['ncbi_txn', 'ncbi_txid', 'status', 'status_note', "date", 'accession',
                                                'pident', 'evalue', 'bitscore', 'sseq', 'title'])
@@ -210,14 +209,11 @@ class PhylogeneticUpdater:
         write_msg_logfile(msg, self.config.workdir)
         count = 0
         subsample_count = 1
-        print(blast_subset)
+
         for index in blast_subset.index:
             count += 1
-            print(count)
             if self.config.subsample > 1:
-                print('subsample')
                 if subsample_count < self.config.subsample:
-                    print('add count')
                     subsample_count += 1
                     continue
 
@@ -232,7 +228,7 @@ class PhylogeneticUpdater:
             new_seq_tax = blast.get_new_seqs(query_seq, tip_name, "Genbank", self.config)
             # new_seqs_local = new_seqs_local.append(new_seq_tax, ignore_index=True)
             new_seqs_local = pd.concat([new_seqs_local, new_seq_tax], ignore_index=True, sort=True)
-            print(len(new_seqs_local))
+
         assert len(new_seqs_local) > 0, new_seqs_local
         if self.ignore_acc_list is not None:
             assert type(self.ignore_acc_list) == list, (type(self.ignore_acc_list), self.ignore_acc_list)
@@ -301,8 +297,7 @@ class PhylogeneticUpdater:
             # next filter need infos in table
             if len(new_seqs) > 0:
                 new_seqs = self.add_new_seqs(new_seqs)
-
-        assert new_seqs.accession.is_unique
+                assert new_seqs['accession'].is_unique, new_seqs
         # filter for seq identity process
         if len(new_seqs) > 0:
             new_seqs = self.compare_filter(new_seqs)
@@ -341,6 +336,11 @@ class PhylogeneticUpdater:
                     (len(new_seqs), len(self.table[self.table['status'] == self.status]),
                      new_seqs['accession'], self.table[self.table['status'] == self.status]['accession'])
 
+            if len(new_seqs) > 0:
+                f = FilterPreferredTaxa(self.config, self.table, self.status)
+                f.filter(new_seqs, self.config.downtorank)
+                self.table = f.table
+                new_seqs = f.upd_new_seqs
             # filter for number otu
             if len(new_seqs) > 0:
                 f = FilterNumberOtu(self.config, self.table, self.status)
@@ -365,7 +365,7 @@ class PhylogeneticUpdater:
         all_del = pd.DataFrame(columns=columns)
 
         remove_basics = [FilterUniqueAcc(self.config, self.table),
-                         # FilterBLASTThreshold(self.config),
+                         FilterBLASTThreshold(self.config),
                          FilterLength(self.config, aln),
                          FilterMRCA(self.config, mrca)
                          ]
@@ -440,14 +440,14 @@ class PhylogeneticUpdater:
                     msg = "Blast against Genbank sequences.\n"
                     write_msg_logfile(msg, self.config.workdir)
                     new_seqs = self.extend()  # todo rename to find new seqs
-                    msg = "Time after BLAST: {}.\n".format(datetime.datetime.now())
+                    msg = "\nTime after BLAST: {}.\n".format(datetime.datetime.now())
                     write_msg_logfile(msg, self.config.workdir)
                     # self.update_aln()  # wrong location to do this
 
                 if self.config.preferred_taxa == True:
                     if not os.path.exists(os.path.join(self.workdir, 'found_taxa.csv')):
-                        set_taxid = list(set(new_seqs['ncbi_txid'].values))
-                        set_taxname = list(set(new_seqs['ncbi_txn'].values))
+                        set_taxid = list(new_seqs['ncbi_txid'].values)
+                        set_taxname = list(new_seqs['ncbi_txn'].values)
 
                         with open(os.path.join(self.workdir, 'found_taxa.csv'), mode='wt') as f:
                             for i in range(0, len(set_taxid)):
@@ -464,6 +464,7 @@ class PhylogeneticUpdater:
                 if len(new_seqs.index) > 0:
                     new_seqs = new_seqs[~new_seqs['accession'].isin(all_new_seqs['accession'])]  # ~ is the pd not in/!
                     all_new_seqs = pd.concat([all_new_seqs, new_seqs], ignore_index=True, sort=True)
+
                 print('Length of new seqs after filtering: {}'.format(len(new_seqs)))
                 retrieved_seqs = len(new_seqs)
                 msg = "Newly added seqs: {}.\n".format(len(new_seqs))
@@ -524,36 +525,37 @@ class PhylogeneticUpdater:
         :return:
         """
         debug('replace_complete_withusedseq')
-
+        #print(new_seqs.accession)
         # get shorter seqs from aln - also replace in table
         for idx in new_seqs.index:
             tip_name = str(new_seqs.loc[idx, 'accession'].split('.')[0])
             filepath = os.path.join(self.config.workdir, "updt_aln.fasta")
 
             # test added here to ensure users have correct data loaded
-            found = False
+            # found = False
             with open(filepath, 'r') as read_obj:
                 # Read all lines in the file one by one
                 for line in read_obj:
+                    #print(line)
                     # For each line, check if line contains the string
                     if tip_name in line:
-                        found = True
-            assert found == True, (tip_name, 'Taxon name not found in alignment - make sure you use the right input aln'
-                                             ' - likely hierarchical updating issue.')
+                        # found = True
+            #assert found == True, (tip_name, 'Taxon name not found in alignment {} - make sure you use the right input aln'
+            #                                 ' - likely hierarchical updating issue.'.format(self.config.workdir))
 
-            with open(filepath) as fp:
-                seq = ''
-                while tip_name not in fp.readline():
-                    continue
-                line = fp.readline()
-                while (line != '') and ('>' not in line):
-                    seq = seq + line
-                    line = fp.readline()
-                seq = seq.replace('-', '').replace('\n', '')
-                new_seqs.at[idx, 'sseq'] = seq
-                if self.table['accession'].str.contains(tip_name).any():
-                    # seq_before = self.table.loc[self.table['accession'] == tip_name, 'sseq'].values[0]
-                    self.table.at[self.table['accession'] == tip_name, 'sseq'] = seq
+                        with open(filepath) as fp:
+                            seq = ''
+                            while tip_name not in fp.readline():
+                                continue
+                            line = fp.readline()
+                            while (line != '') and ('>' not in line):
+                                seq = seq + line
+                                line = fp.readline()
+                            seq = seq.replace('-', '').replace('\n', '')
+                            new_seqs.at[idx, 'sseq'] = seq
+                            if self.table['accession'].str.contains(tip_name).any():
+                                # seq_before = self.table.loc[self.table['accession'] == tip_name, 'sseq'].values[0]
+                                self.table.at[self.table['accession'] == tip_name, 'sseq'] = seq
                     # don't assert seq_before and after differ - must not be the case
                     # assert seq_before != seq, (seq_before, seq)
                     # assert seq_before != self.table.loc[self.table['accession'] == tip_name, 'sseq'].values[0], (
@@ -568,8 +570,8 @@ class PhylogeneticUpdater:
         #                         preserve_underscores=True,
         #                         taxon_namespace=self.aln.taxon_namespace)
         # self.update_tre()
-        msg = "Time finished: {}.\n".format(datetime.datetime.now())
-        write_msg_logfile(msg, self.config.workdir)
+        #msg = "Time finished: {}.\n".format(datetime.datetime.now())
+        #write_msg_logfile(msg, self.config.workdir)
 
     def call_input_cleaner(self):
         """
@@ -668,6 +670,25 @@ class Filter(object):
             (len(self.del_table), len(self.upd_new_seqs), len(new_seqs), [x in newseqs_list for x in deltable_list],
              [x in newseqs_list for x in updnewseqs_list])
 
+    def set_downtorank(self, new_seqs, downtorank):
+        """
+        Method is used to get the corresponding rank if higher than lowest otu by ncbi.
+
+        :param new_seqs:
+        :param downtorank:
+        :return:
+        """
+        # debug("set_downtorank")
+        new_seqs.at[:, 'downtorank'] = 0
+        if self.ncbi_parser is None:
+            self.initialize(self.config)
+        for txid in set(new_seqs['ncbi_txid']):
+            downtorank_id = self.ncbi_parser.get_downtorank_id(txid, downtorank)
+            if downtorank_id == 0:  # added for seqs that have no corresponding rank defined - which results in id 0
+                downtorank_id = txid
+            new_seqs.at[new_seqs.ncbi_txid == txid, 'downtorank'] = downtorank_id
+        return new_seqs
+
 
 def assert_new_seqs_table(new_seqs, table, status):
     """
@@ -699,6 +720,175 @@ def calculate_mean_sd(bitscores):
     mean_hsp_bits = float(sum_bits / len_bits)
     mean_sd = {"mean": mean_hsp_bits, "sd": bit_sd}
     return mean_sd
+
+
+class FilterPreferredTaxa(Filter):
+    """
+    Filter new sequences to the number defined as threshold. Either via local blast or select longest
+    """
+    def __init__(self, config, table, status):
+        super().__init__(config)
+        self.table = table
+        check_df_index_unique(self.table)
+        self.status = status
+        assert len(self.upd_new_seqs) == 0, self.upd_new_seqs
+
+    def initialize(self, config):
+        self.ncbi_parser = ncbi_data_parser.Parser(names_file=config.ncbi_parser_names_fn,
+                                                   nodes_file=config.ncbi_parser_nodes_fn)
+
+    def filter(self, new_seqs, downtorank=None):
+        assert_new_seqs_table(new_seqs, self.table, self.status)
+        debug("filter FilterPreferredTaxa")
+
+        filtered_new_seqs = new_seqs
+        filtered_new_seqs['ncbi_txid'] = filtered_new_seqs['ncbi_txid'].astype(int)
+
+        del_table = pd.DataFrame()
+        all_preferred = pd.DataFrame()
+        # get all seqs and ids from aln and before for next filter
+        present = self.table[self.table['status'] > -1]
+
+        if downtorank is None:
+            tax_ids_newseqs = filtered_new_seqs['ncbi_txid']
+        else:
+            debug("downtorank")
+            filtered_new_seqs = self.set_downtorank(filtered_new_seqs, downtorank)  # todo: this is likely doubled now, since i chnages now ncbi id to rank and original_ncbi_id for the real one...# no, its not, its for the new seqs
+            tax_ids_newseqs = filtered_new_seqs.ncbi_txid
+
+        txid_list = list()
+        for txid in set(tax_ids_newseqs):
+            assert txid not in txid_list, (txid, txid_list)
+            txid_list.append(txid)
+            # generate taxon_subsets
+            newseqs_txid_df = filtered_new_seqs[tax_ids_newseqs == txid]
+            assert len(list(set(newseqs_txid_df.ncbi_txid))) == 1, set(newseqs_txid_df.ncbi_txid)
+
+            # filter for preferred taxa
+            subset_newseqs_txid_df = self.prefer_taxa_from_locus(newseqs_txid_df)
+            subset_newseqs_txid_df = self.prefer_different_OTU(subset_newseqs_txid_df, downtorank, self.status)
+            all_preferred = all_preferred.append(subset_newseqs_txid_df)
+
+        if not all_preferred.empty:
+            excluded_preferred = new_seqs[~new_seqs['accession'].isin(all_preferred.accession)]
+            del_table = del_table.append(excluded_preferred)
+        else:
+            excluded_preferred = filtered_new_seqs
+            del_table = del_table.append(excluded_preferred)
+        self.table.at[self.table['accession'].isin(excluded_preferred.accession), 'status'] = -1
+        self.table.at[self.table['accession'].isin(
+            excluded_preferred.accession), 'status_note'] = 'excluded - not preferred across loci'
+
+        if self.config.downtorank is not None:
+            if all_preferred.index == True:
+                assert all_preferred.ncbi_txid.is_unique == True, all_preferred.ncbi_txid
+
+        self.upd_new_seqs = all_preferred
+        self.del_table = del_table
+
+        check_filter_numbers(del_table, self.upd_new_seqs, new_seqs)
+
+        msg = "Filter FilterPreferredTaxa reduced the new seqs from {} to {}.\n".format(len(new_seqs),
+                                                                                    len(self.upd_new_seqs))
+        write_msg_logfile(msg, self.config.workdir)
+        # print(some)
+
+    def get_preferred_ids(self):
+        """
+        Get the ids from the preferred taxa. Can bei either file with taxon numbers or names, that are then translated
+        to ids.
+        :return: list with preferred taxon ncbi id's.
+
+        """
+        # print('get_preferred_ids')
+        assert self.config.preferred_taxa_fn != None, self.config.preferred_taxa_fn
+        with open(self.config.preferred_taxa_fn, 'r') as content:
+            preferred_taxa_ids = content.read().splitlines()
+            if preferred_taxa_ids[1].isnumeric():
+                for i in range(0, len(preferred_taxa_ids)):
+
+                    if '.' in preferred_taxa_ids[i]:
+                        int(preferred_taxa_ids[i].split('.')[0])
+                    else:
+                        preferred_taxa_ids[i] = int(preferred_taxa_ids[i])
+            else:
+                if self.ncbi_parser is None:
+                    self.initialize(self.config)
+                preferred_taxa_ids = list(map(self.ncbi_parser.get_id_from_name, preferred_taxa_ids))
+        return preferred_taxa_ids
+
+    def prefer_taxa_from_locus(self, ns_txid_df):
+        """ This function ensures to find the same OTU as in another run for a different locus."""
+        debug('preferred taxa?')
+        debug(self.config.preferred_taxa)
+        assert len(list(set(ns_txid_df.ncbi_txid))) == 1, set(ns_txid_df.ncbi_txid)
+        if self.config.preferred_taxa == True:
+            print('prefer_taxa_from_locus')
+            preferred_taxa_ids = self.get_preferred_ids()
+            assert len(list(set(ns_txid_df.ncbi_txid))) == 1, list(set(ns_txid_df.ncbi_txid))
+            tax_id_from_df = int(list(set(ns_txid_df.ncbi_txid))[0])
+            if tax_id_from_df in preferred_taxa_ids:
+                new_filtered_taxid_df = ns_txid_df
+            else:
+                if self.config.allow_parent == True:
+                    sys.stdout.write('check if parent - slow - consider if needed!')
+                    for tax_id in preferred_taxa_ids:
+                        # if tax_id_from_df is lower taxon from preferred ids:
+                        part_tax_id_from_df = self.ncbi_parser.match_id_to_mrca(tax_id_from_df, tax_id)
+                        # if part_tax_id_from_df != 0:
+                        if part_tax_id_from_df is True:
+                            new_filtered_taxid_df = ns_txid_df
+                        else:
+                            new_filtered_taxid_df = ns_txid_df[0:0]
+                else:
+                    new_filtered_taxid_df = ns_txid_df[0:0]
+        else:
+            new_filtered_taxid_df = ns_txid_df
+        debug(new_filtered_taxid_df)
+
+        return new_filtered_taxid_df
+
+    # todo: add downtorank minus 1 level filter
+    def prefer_different_OTU(self, ns_txid_df, downtorank, status):
+        """
+        In hierarchical updating prefer new lineage over existing one.
+
+        :param ns_txid_df: id of found taxa
+        :param downtorank: different according to which rank
+
+        :return:
+        """
+        debug("prefer_different_OTU")
+        if downtorank is not None:  #and downtorank not in ['species', 'subspecies', 'variety']:
+            if self.config.different_level is True:
+                present_subset = self.table[self.table['status'] > -1]
+                present_subset = present_subset[present_subset['status'] < status]
+                new_filtered_taxid_df = ns_txid_df[~ns_txid_df['ncbi_txid'].isin(present_subset.ncbi_txid)]
+            else:
+                new_filtered_taxid_df = ns_txid_df
+            if len(new_filtered_taxid_df.index) > 1:
+                new_filtered_taxid_df = self.drop_seq_by_length(new_filtered_taxid_df)
+        #else:
+            #new_filtered_taxid_df = ns_txid_df
+
+            return new_filtered_taxid_df
+
+    def drop_seq_by_length(self, filter_dict):
+        """
+        Select the longest of the sequences from a dataframe.
+
+        :param filter_dict:
+        :return: filtered sequences
+        """
+        assert len(list(set(filter_dict.ncbi_txid))) == 1, set(filter_dict.ncbi_txid)
+        debug("drop_seq_by_length")
+        if len(filter_dict.index) > 1:
+            debug("drop by length")
+            len_seqs_new = filter_dict['sseq'].apply(len)
+            select = filter_dict.loc[len_seqs_new.idxmax()]
+        else:
+            select = filter_dict
+        return select
 
 
 class FilterNumberOtu(Filter):
@@ -738,22 +928,15 @@ class FilterNumberOtu(Filter):
             tax_ids_newseqs = filtered_new_seqs['downtorank']
             txids_added = new_seqs_downto['downtorank']
 
-
-        debug('start loop')
+        # print('start loop')
         for txid in set(tax_ids_newseqs):
             # generate taxon_subsets
             newseqs_txid_df = filtered_new_seqs[tax_ids_newseqs == txid]
 
-            # filter for preferred taxa
-            newseqs_txid_df = self.prefer_taxa_from_locus(newseqs_txid_df)
 
             oldseqs_txid_df = added_before[txids_added == txid]
             oldseqs_txid_df = oldseqs_txid_df[oldseqs_txid_df['status'] >= 0]
-            if downtorank is not None and downtorank not in ['species', 'subspecies', 'variety']:
                 # figure out which lower rank are already available
-                avail_txid = oldseqs_txid_df['ncbi_txid'].tolist()
-                # filter ns_txid_df to remove lower ranks already available
-                newseqs_txid_df = newseqs_txid_df[~newseqs_txid_df['ncbi_txid'].isin(avail_txid)]
 
             # if we still want to add, loop through
             if len(oldseqs_txid_df) < self.config.threshold:
@@ -793,7 +976,7 @@ class FilterNumberOtu(Filter):
                 self.upd_new_seqs = pd.concat([self.upd_new_seqs, filtered], ignore_index=True, sort=True)
             elif len(oldseqs_txid_df) > self.config.threshold:
                 if not self.config.downtorank:
-                    # print('sample size to big')
+                    sys.stderr.write('sample size to big')
                     sys.exit(-3)
             else:
                 # print('sample size correct - nothing to add')
@@ -804,101 +987,13 @@ class FilterNumberOtu(Filter):
         del_tab = new_seqs[new_seqs['accession'].isin(not_selected)]
         self.del_table = del_tab
         if len(not_selected) > 0:
+            self.table.at[self.table['accession'].isin(not_selected) , 'status_note'] = 'too many seqs of same tax_id'
             self.table.at[self.table['accession'].isin(not_selected), 'status'] = -1
-            self.table.at[self.table['accession'].isin(not_selected), 'status_note'] = 'too many seqs of same tax_id'
         check_filter_numbers(not_selected, self.upd_new_seqs, new_seqs)
 
         msg = "Filter FilterNumberOtu reduced the new seqs from {} to {}.\n".format(len(new_seqs),
                                                                                     len(self.upd_new_seqs))
         write_msg_logfile(msg, self.config.workdir)
-
-    def get_preferred_ids(self):
-        """
-        Get the ids from the preferred taxa. Can bei either file with taxon numbers or names, that are then translated
-        to ids.
-        :return: list with preferred taxon ncbi id's.
-
-        """
-        # print('get_preferred_ids')
-        with open(self.config.preferred_taxa_fn, 'r') as content:
-            preferred_taxa_ids = content.read().splitlines()
-            if preferred_taxa_ids[1].isnumeric():
-                for i in range(0, len(preferred_taxa_ids)):
-
-                    if '.' in preferred_taxa_ids[i]:
-                        int(preferred_taxa_ids[i].split('.')[0])
-                    else:
-                        preferred_taxa_ids[i] = int(preferred_taxa_ids[i])
-            else:
-                if self.ncbi_parser is None:
-                    self.initialize(self.config)
-                preferred_taxa_ids = list(map(self.ncbi_parser.get_id_from_name, preferred_taxa_ids))
-        return preferred_taxa_ids
-
-    def prefer_taxa_from_locus(self, ns_txid_df):
-        """ This function ensures to find the same OTU as in another run for a different locus."""
-        debug('preferred taxa?')
-        debug(self.config.preferred_taxa)
-        if self.config.preferred_taxa == True:
-            print('prefer_taxa_from_locus')
-
-            preferred_taxa_ids = self.get_preferred_ids()
-            tax_id_from_df = int(list(set(ns_txid_df.ncbi_txid))[0])
-            if tax_id_from_df in preferred_taxa_ids:
-                new_filtered_taxid_df = ns_txid_df
-            else:
-                if self.config.allow_parent == True:
-                    sys.stdout.write('check if parent - slow - consider if needed!')
-                    for tax_id in preferred_taxa_ids:
-                        # if tax_id_from_df is lower taxon from preferred ids:
-                        part_tax_id_from_df = self.ncbi_parser.match_id_to_mrca(tax_id_from_df, tax_id)
-                        # if part_tax_id_from_df != 0:
-                        if part_tax_id_from_df is True:
-                            new_filtered_taxid_df = ns_txid_df
-                        else:
-                            new_filtered_taxid_df = ns_txid_df[0:0]
-                else:
-                    new_filtered_taxid_df = ns_txid_df[0:0]
-        else:
-            new_filtered_taxid_df = ns_txid_df
-        debug(new_filtered_taxid_df)
-        return new_filtered_taxid_df
-
-    # todo not yet used
-    def prefer_different_OTU(self, ns_txid_df):
-        """
-        In hierarchical updating prefer new lineage over existing one.
-
-        :param ns_txid_df: id of found taxa
-        :return:
-        """
-        if self.config.different_level is True:
-            present_subset = self.table[self.table['status'] > -1]
-            new_filtered_taxid_df = ns_txid_df[ns_txid_df['ncbi_txid'].isin(present_subset.ncbi_txid)]
-
-            # new_filtered_taxid_df = ns_txid_df[ns_txid_df.ncbi_txid not in present_subset.ncbi_txid]
-        else:
-            new_filtered_taxid_df = ns_txid_df
-        return new_filtered_taxid_df
-
-    def set_downtorank(self, new_seqs, downtorank):
-        """
-        Method is used to get the corresponding rank if higher than lowest otu by ncbi.
-
-        :param new_seqs:
-        :param downtorank:
-        :return:
-        """
-        # debug("set_downtorank")
-        new_seqs.at[:, 'downtorank'] = 0
-        if self.ncbi_parser is None:
-            self.initialize(self.config)
-        for txid in set(new_seqs['ncbi_txid']):
-            downtorank_id = self.ncbi_parser.get_downtorank_id(txid, downtorank)
-            if downtorank_id == 0:  # added for seqs that have no corresponding rank defined - which results in id 0
-                downtorank_id = txid
-            new_seqs.at[new_seqs.ncbi_txid == txid, 'downtorank'] = downtorank_id
-        return new_seqs
 
     def select_seq_by_length(self, filter_dict, exist_dict):
         """
@@ -961,10 +1056,15 @@ class FilterNumberOtu(Filter):
             blast.write_local_blast_files(self.config.workdir, seq_id, seq, db=True)
         blast.make_local_blastdb(self.config.workdir, db='filterrun', taxid=txid)
         filter_blast_seqs = blast.get_new_seqs(query_seq, txid, 'filterrun', self.config)
-        subfilter_blast_seqs = remove_mean_sd_nonfit(filter_blast_seqs)
-        filtered_seqs = self.select_number_missing(subfilter_blast_seqs, exist_dict)
-        filtered_acc = set(list(filtered_seqs['accession']))
+        if len(filter_blast_seqs) > 0:
+            subfilter_blast_seqs = remove_mean_sd_nonfit(filter_blast_seqs)
+
+            #print(subfilter_blast_seqs)
+            filtered_seqs = self.select_number_missing(subfilter_blast_seqs, exist_dict)
+            filtered_acc = set(list(filtered_seqs['accession']))
         # print('filter wrapper done')
+        else:
+            filtered_acc = filter_blast_seqs
         return filtered_acc
 
     def select_number_missing(self, subfilter_blast_seqs, table_otu_dict):
@@ -985,6 +1085,28 @@ class FilterNumberOtu(Filter):
         else:
             sys.stdout.write('Should not happen!')
             sys.exit(-2)
+        count = 0
+
+        if self.config.downtorank is not None and self.config.downtorank not in ['species', 'subspecies', 'variety']:
+            while len(filtered_seqs['ncbi_txid']) > len(set(filtered_seqs['ncbi_txid'])):
+                count += 1
+                diff = len(filtered_seqs['ncbi_txid']) - len(set(filtered_seqs['ncbi_txid']))
+                subfilter_blast_seqs = subfilter_blast_seqs[~subfilter_blast_seqs.ncbi_txid.isin(set(filtered_seqs['ncbi_txid']))]
+                if len(subfilter_blast_seqs) > 0:
+                    select_different = subfilter_blast_seqs.sample(diff)
+                    #if not filtered_seqs['accession'].str.contains(select_different['accession']).any():
+                    bool_isin = select_different["accession"].isin(filtered_seqs["accession"])
+
+                    if len(select_different[bool_isin]) == 0:
+                        filtered_seqs = filtered_seqs[filtered_seqs.duplicated(['ncbi_txid'], keep='first')]
+                        filtered_seqs =  pd.concat([filtered_seqs, select_different], axis=0, ignore_index=True, sort=True)
+
+                    if count == 20:
+                        # filtered_seqs = filtered_seqs[filtered_seqs.duplicated(['ncbi_txid'], keep='first')]
+                        break
+                else:
+                    break
+
         return filtered_seqs
 
 
@@ -997,14 +1119,22 @@ def remove_mean_sd_nonfit(filter_blast_seqs):
     """
     # remove non fitting entries - too far from blast query seq....
     mean_sd = calculate_mean_sd(filter_blast_seqs['bitscore'])
-    subfilter_blast_seqs = pd.DataFrame()
-    for idx in filter_blast_seqs.index:
-        seq_bitscore = filter_blast_seqs.loc[idx, 'bitscore']
-        if (seq_bitscore >= mean_sd['mean'] - mean_sd['sd']) & \
-                (seq_bitscore <= mean_sd['mean'] + mean_sd['sd']):
-            subfilter_blast_seqs = subfilter_blast_seqs.append(filter_blast_seqs.loc[idx])
-        # else:
-        #     print('filter thresh too large')
+
+    cond1 = (mean_sd['mean'] - mean_sd['sd'])
+    cond2 =  (mean_sd['mean'] + mean_sd['sd'])
+    filtered = filter_blast_seqs[filter_blast_seqs.bitscore  >= cond1]
+    filtered = filtered[filtered.bitscore  <= cond2]
+    subfilter_blast_seqs = filtered
+
+    # # removed for faster?
+    # subfilter_blast_seqs = pd.DataFrame()
+    # for idx in filter_blast_seqs.index:
+    #     seq_bitscore = filter_blast_seqs.loc[idx, 'bitscore']
+    #     if (seq_bitscore >= mean_sd['mean'] - mean_sd['sd']) & \
+    #             (seq_bitscore <= mean_sd['mean'] + mean_sd['sd']):
+    #         subfilter_blast_seqs = subfilter_blast_seqs.append(filter_blast_seqs.loc[idx])
+    #     # else:
+    #     #     print('filter thresh too large')
     return subfilter_blast_seqs
 
 
@@ -1086,7 +1216,7 @@ class FilterSeqIdent(Filter):
             txid_compare = existing_old.loc[idx, 'ncbi_txid']
             seq_compare = existing_old.loc[idx, 'sseq']
             # use those to compare to new seqs:
-            #if len(self.upd_new_seqs.sseq) > len(seq_compare):
+            # if len(self.upd_new_seqs.sseq) > len(seq_compare):
             #    print('1')
             same_new = self.upd_new_seqs[(self.upd_new_seqs.sseq.str.contains(seq_compare)) & (
                             self.upd_new_seqs['ncbi_txid'] == int(txid_compare))]
@@ -1153,7 +1283,6 @@ class FilterMRCA(Filter):
             self.initialize(self.config)
         to_del = pd.DataFrame()
         for tax_id in set(new_seqs['ncbi_txid'].astype(int)):
-            tax_id = int(tax_id)
             mrca_tx = self.ncbi_parser.match_id_to_mrca(tax_id, self.mrca)
             select_tf = new_seqs['ncbi_txid'].astype(int) == tax_id
             if type(self.mrca) == int:
@@ -1191,9 +1320,10 @@ class FilterMRCA(Filter):
         msg = "Filter FilterMRCA reduced the new seqs from {} to {}.\n".format(len(new_seqs), len(self.upd_new_seqs))
         write_msg_logfile(msg, self.config.workdir)
         if len(to_del) > 0:
-            to_del.to_csv(os.path.join(self.config.workdir, 'wrong_mrca.csv'), mode='a')
+            self.del_table.to_csv(os.path.join(self.config.workdir, 'wrong_mrca.csv'), mode='a')
 
-#todo: unused. is being filtered in blast
+
+#todo: unused. is being filtered in blast # actually used when later blast e-value is changed
 class FilterBLASTThreshold(Filter):
     """
     Removes sequences that do not pass the similarity filter (blast threshold).
@@ -1233,11 +1363,6 @@ class FilterUniqueAcc(Filter):
         debug('FilterUniqueAcc')
         # delete things in table
         new_seqs_unique = drop_shortest_among_duplicates(new_seqs)
-        #new_seqs_unique_old = new_seqs.drop_duplicates(subset=['accession'], keep='first')  #todo: keep longest - might affect length filter
-        #assert new_seqs_unique_old['sseq'].isin(new_seqs_unique['sseq']).all()
-        #assert new_seqs_unique_old['accession'].isin(new_seqs_unique['accession']).all()
-        #assert new_seqs_unique.sseq == new_seqs_unique_new.sseq
-
         drop = new_seqs.drop(new_seqs_unique.index.tolist())
 
         self.upd_new_seqs = new_seqs_unique

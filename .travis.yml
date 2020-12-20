@@ -27,6 +27,7 @@ before_install:
   - gcc -v && g++ -v && cmake --version
   # Run your build commands next
 
+  - pip install codecov
 
   # use raxml-ng from bioconda - there are compilation errors...
   - wget http://repo.continuum.io/miniconda/Miniconda-latest-Linux-x86_64.sh -O miniconda.sh

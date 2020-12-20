@@ -52,11 +52,11 @@ cmake -DUSE_MPI=ON ..
 make
 cd ..
 
-rm -r build
-mkdir build && cd build
-cmake ..
-make
-cd ..
+#rm -r build
+#mkdir build && cd build
+#cmake ..
+#make
+#cd ..
 
 cd bin
 echo export PATH="$PATH:$(pwd)" >> ~/.bashrc
