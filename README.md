@@ -1,5 +1,5 @@
 # PhylUp - updating of phylogenetic alignments with custom sampling
-![](./PhylUp_workflow.png)   
+![](./workflow_Dez2020.png)   
     
 ## Short introduction to the program:
 
