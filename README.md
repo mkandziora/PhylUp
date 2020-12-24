@@ -1,11 +1,10 @@
 [![Build Status](https://travis-ci.com/mkandziora/PhylUp.svg?token=tcUKPEqrpyvHbPasst5i&branch=master)](https://travis-ci.com/mkandziora/PhylUp)
 
  
-
 # PhylUp - updating of phylogenetic alignments with custom sampling
 
 A preprint is available on [biorxiv](https://www.biorxiv.org/content/10.1101/2020.12.21.394551v1). 
-=======
+
 ![](./workflow_Dez2020.png)   
     
 ## Short introduction
