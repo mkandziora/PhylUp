@@ -1,7 +1,13 @@
+[![Build Status](https://travis-ci.com/mkandziora/PhylUp.svg?token=tcUKPEqrpyvHbPasst5i&branch=master)](https://travis-ci.com/mkandziora/PhylUp)
+
+ 
+
 # PhylUp - updating of phylogenetic alignments with custom sampling
 ![](./PhylUp_workflow.png)   
+
+A preprint is available on [biorxiv](https://www.biorxiv.org/content/10.1101/2020.12.21.394551v1). 
     
-## Short introduction to the program:
+## Short introduction
 
 PhylUp is a command-line program written in python3 to automatically update alignments and phylogenies with a focus on different sampling strategies.
 As input it needs a alignment or a single sequence (and if available a phylogeny) and 
@@ -17,11 +23,11 @@ After the single-gene datasets are updated, the data can be concatenated.
 The tool decides randomly which sequences to combine if there are more than a single sequence for a taxon in one of the alignments.
 
 
-## Tutorial:
+## Tutorial
 
 To get started please view the Wiki for more details.
 
-## Examples:
+## Examples
 
 To update an alignment I provide different example files in `examples`:
   * The file `example_analysis.py` updates a small subset of an alignment provided in `data`.
