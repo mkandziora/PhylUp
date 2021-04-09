@@ -13,4 +13,4 @@ ncbi_data_parser.Parser(names_file=conf.ncbi_parser_names_fn,
 
 
 
-ncbi_data_parser._download_ncbi_parser(conf)
+db_updater._download_ncbi_parser(conf)
