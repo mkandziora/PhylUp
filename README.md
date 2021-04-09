@@ -32,7 +32,7 @@ To get started please view the Wiki for more details.
 To update an alignment I provide different example files in `examples`:
  * The file `example_analysis.py` updates a small subset of an alignment provided in `data`.
  * Filtering with different number of sequences for different taxonomic ranks is shown in ` example_different_levels_wrapper.py`.
- * How to concatenate different alignments and calculate the phylogeny is shown in `example_concat.py`.
+ * To concatenate different single-locus alignments, check out [phylogenetic_concatenation](https://github.com/mkandziora/phylogenetic_concatenation)
    
 
 
