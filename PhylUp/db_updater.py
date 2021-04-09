@@ -48,7 +48,7 @@ def _download_localblastdb(config):
                       "-P {}/".format(config.blastdb_path))
             with cd(config.blastdb_path):
                 print("update blast db")
-                os.system("update_blastdb nt")
+                os.system("update_blastdb.pl nt")
                 os.system("cat *.tar.gz | tar -xvzf - -i")
                 os.system("gunzip -cd taxdb.tar.gz | (tar xvf - )")
                 os.system("rm *.tar.gz*")
@@ -67,9 +67,9 @@ def _download_localblastdb(config):
             x = get_user_input()
             if x == "yes":
                 with cd(config.blastdb_path):
-                    os.system("update_blastdb nt")
+                    os.system("update_blastdb.pl nt")
                     os.system("cat *.tar.gz | tar -xvzf - -i")
-                    os.system("update_blastdb taxdb")
+                    os.system("update_blastdb.pl taxdb")
                     os.system("gunzip -cd taxdb.tar.gz | (tar xvf - )")
                     os.system("rm *.tar.gz*")
             elif x == "no":
