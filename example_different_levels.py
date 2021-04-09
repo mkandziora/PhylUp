@@ -19,7 +19,7 @@ test.run()
 
 # round 2 Senecioneae
 
-seqaln = "tests/output/different_level/updt_aln.fasta"
+seqaln = "tests/output/test_different_level/updt_aln.fasta"
 configfi = "data/localblast_Senecioneae.config"
 ignore_acc = ['JX895419.1']
 
@@ -31,7 +31,7 @@ test.run()
 
 # round 3 Asteroideae
 
-seqaln = "tests/output/different_level/updt_aln.fasta"
+seqaln = "tests/output/test_different_level/updt_aln.fasta"
 configfi = "data/localblast_Asteroideae.config"
 ignore_acc = ['JX895419.1']
 
