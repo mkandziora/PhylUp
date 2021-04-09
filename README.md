@@ -3,9 +3,10 @@
  
 
 # PhylUp - updating of phylogenetic alignments with custom sampling
-![](./PhylUp_workflow.png)   
 
 A preprint is available on [biorxiv](https://www.biorxiv.org/content/10.1101/2020.12.21.394551v1). 
+=======
+![](./workflow_Dez2020.png)   
     
 ## Short introduction
 
@@ -30,7 +31,7 @@ To get started please view the Wiki for more details.
 ## Examples
 
 To update an alignment I provide different example files in `examples`:
-  * The file `example_analysis.py` updates a small subset of an alignment provided in `data`.
+ * The file `example_analysis.py` updates a small subset of an alignment provided in `data`.
  * Filtering with different number of sequences for different taxonomic ranks is shown in ` example_different_levels_wrapper.py`.
  * How to concatenate different alignments and calculate the phylogeny is shown in `example_concat.py`.
    
