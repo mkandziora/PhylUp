@@ -12,7 +12,7 @@ import os
 from dendropy import Tree, DnaCharacterMatrix
 
 def test_alnupdater():
-    workdir = "tests/output/test_runs"  # working directory
+    workdir = "tests/output/test_alnupdt"  # working directory
     trfn = "data/tiny_test_example/test.tre"  # phylogeny
     schema_trf = "newick"  # format of phylogeny
     id_to_spn = "data/tiny_test_example/test_nicespl.csv"  # tab-delimited file where tip names correspond to ncbi names
@@ -36,11 +36,14 @@ def test_alnupdater():
     copy_tree('data/tmp_for_test/', tmp_folder)
     # shutil.copyfile('data/tiny_test_example/updt_aln.fasta', os.path.join(workdir, 'updt_aln.fasta'))
     # shutil.copyfile('data/tiny_test_example/updt_tre.tre', os.path.join(workdir, 'updt_tre.tre'))
+    shutil.copyfile('data/tiny_test_example/updt_aln.fasta', os.path.join(workdir, 'updt_aln.fasta'))
+    shutil.copyfile('data/tiny_test_example/updt_tre.tre', os.path.join(workdir, 'updt_tre.tre'))
 
+    ###################################
     test = phyl_up.PhylogeneticUpdater(id_to_spn, seqaln, mattype, trfn, schema_trf, conf, ignore_acc_list=None)
     # test.run()
-    tre = Tree.get(path=os.path.abspath(os.path.join(workdir, 'updt_tre.tre')), schema='newick',
-                  taxon_namespace=test.aln.taxon_namespace, preserve_underscores=True)
+    # tre = Tree.get(path=os.path.abspath(os.path.join(workdir, 'updt_tre.tre')), schema='newick',
+    #               taxon_namespace=test.aln.taxon_namespace, preserve_underscores=True)
 
 
     aln = DnaCharacterMatrix.get(path=os.path.abspath(os.path.join(workdir, 'updt_aln.fasta')),
@@ -57,5 +60,7 @@ def test_alnupdater():
     print(len(new_seqs.index))
     assert len(new_seqs.index) >= 171, len(new_seqs.index)
     aln_before = aln
-    aln_upd = phylogen_updater.AlnUpdater(test.config, aln, test.status, test.table, test.status, tre)
+    aln_upd = phylogen_updater.AlnUpdater(test.config, test.aln, test.status, test.table, test.status, test.tre)
     assert aln_before != aln_upd.aln
+
+    aln_upd.write_labelled('updt_aln.fasta')
