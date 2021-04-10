@@ -780,7 +780,7 @@ class FilterPreferredTaxa(Filter):
             excluded_preferred.accession), 'status_note'] = 'excluded - not preferred across loci'
 
         if self.config.downtorank is not None:
-            if all_preferred.index == True:
+            if all_preferred.index.any() == True:
                 assert all_preferred.ncbi_txid.is_unique == True, all_preferred.ncbi_txid
 
         self.upd_new_seqs = all_preferred
