@@ -1,4 +1,4 @@
-from PhylUp import wrapper
+from PhylUp import wrapper, phylogenetic_helpers
 from distutils.dir_util import copy_tree
 from dendropy import Tree, DnaCharacterMatrix
 import ncbiTAXONparser.ncbi_data_parser as ncbi_data_parser
@@ -9,6 +9,72 @@ from distutils.dir_util import copy_tree
 from PhylUp import phyl_up, config, blast
 
 
+
+def test_prefer():
+    workdir = "tests/output/test_run_preferred"
+    trfn = "data/tiny_test_example/test.tre"
+    schema_trf = "newick"
+    id_to_spn = "data/tiny_test_example/test_nicespl.csv"
+    seqaln = "data/tiny_test_example/test.fas"
+    mattype = "fasta"
+    configfi = "data/localblast_test.config"
+
+    tmp_folder = os.path.join(workdir, 'tmp')
+    if not os.path.exists(workdir):
+        os.mkdir(workdir)
+    if not os.path.exists(tmp_folder):
+        os.mkdir(tmp_folder)
+    # call(['cp', '-a', 'data/tmp_for_test/', tmp_folder])
+    copy_tree('data/tmp_for_test/', tmp_folder)
+
+    conf = config.ConfigObj(configfi, workdir, interactive=False)
+    conf.threshold = 2
+    conf.blast_folder = os.path.abspath("./data/blast_for_tests")
+    conf.preferred_taxa = True
+    conf.allow_parent = False
+
+    conf.downtorank = "species"
+    conf.preferred_taxa_fn = "data/tiny_test_example/preferred_taxa_test.txt"
+    test = phyl_up.PhylogeneticUpdater(id_to_spn, seqaln, mattype, trfn, schema_trf, conf)
+    new_seqs = test.extend()
+    aln = phylogenetic_helpers.read_in_aln(test.aln_fn, test.aln_schema)
+    taxids_original = set(test.table.ncbi_txid)
+    new_seqs = new_seqs[~new_seqs['accession'].isin(test.table['accession'])]  # ~ is the pd not in/!
+    new_seqs = test.basic_filters(aln, test.mrca, new_seqs)
+    # next filter need infos in table
+    new_seqs = test.add_new_seqs(new_seqs)
+
+    assert len(new_seqs.index) > 0, new_seqs.index
+    # print(new_seqs)
+    for i in range(0, len(new_seqs.ncbi_txid)):
+        try:
+            # print(i)
+            new_seqs.ncbi_txid[i] = int(new_seqs.ncbi_txid[i])
+        except:
+            print('wrong index')
+
+    # print(new_seqs.columns)
+    taxids_new_seqs = set(new_seqs.ncbi_txid.tolist())
+
+    found = False
+    for item in [462523, 1268580, 1268581, 1268589]:
+        if item in taxids_new_seqs:
+            found = True
+    assert found == True
+
+    f = phyl_up.FilterPreferredTaxa(test.config, test.table, test.status)
+    f.filter(new_seqs)
+    new_seqs = f.upd_new_seqs
+    assert len(new_seqs.index) > 0, new_seqs.index
+
+    taxids_after = set(new_seqs.ncbi_txid.tolist())
+
+    preferred_taxa = f.get_preferred_ids()
+    assert len(taxids_new_seqs) >= len(taxids_after), (len(taxids_new_seqs), len(taxids_after))
+    assert len(taxids_after) <= len(preferred_taxa), (len(taxids_after), len(taxids_after))
+    print(preferred_taxa)
+    for i in taxids_after:
+        assert i in preferred_taxa, (i, preferred_taxa)
 
 def fixtest_preferred():
     copy_tree('tests/output/test_runs/', 'tests/output/test_run_preferred/test_its')
