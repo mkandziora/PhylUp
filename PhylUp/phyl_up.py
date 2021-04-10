@@ -779,9 +779,9 @@ class FilterPreferredTaxa(Filter):
         self.table.at[self.table['accession'].isin(
             excluded_preferred.accession), 'status_note'] = 'excluded - not preferred across loci'
 
-        if self.config.downtorank is not None:
-            if all_preferred.index.any() == True:
-                assert all_preferred.ncbi_txid.is_unique == True, all_preferred.ncbi_txid
+        # if self.config.downtorank is not None:
+        #     if all_preferred.index.any() == True:
+        #         assert all_preferred.ncbi_txid.is_unique == True, all_preferred.ncbi_txid
 
         self.upd_new_seqs = all_preferred
         self.del_table = del_table
@@ -823,7 +823,7 @@ class FilterPreferredTaxa(Filter):
         debug(self.config.preferred_taxa)
         assert len(list(set(ns_txid_df.ncbi_txid))) == 1, set(ns_txid_df.ncbi_txid)
         if self.config.preferred_taxa == True:
-            print('prefer_taxa_from_locus')
+            # print('prefer_taxa_from_locus')
             preferred_taxa_ids = self.get_preferred_ids()
             assert len(list(set(ns_txid_df.ncbi_txid))) == 1, list(set(ns_txid_df.ncbi_txid))
             tax_id_from_df = int(list(set(ns_txid_df.ncbi_txid))[0])
@@ -868,10 +868,10 @@ class FilterPreferredTaxa(Filter):
                 new_filtered_taxid_df = ns_txid_df
             if len(new_filtered_taxid_df.index) > 1:
                 new_filtered_taxid_df = self.drop_seq_by_length(new_filtered_taxid_df)
-        #else:
-            #new_filtered_taxid_df = ns_txid_df
+        else:
+            new_filtered_taxid_df = ns_txid_df
 
-            return new_filtered_taxid_df
+        return new_filtered_taxid_df
 
     def drop_seq_by_length(self, filter_dict):
         """
@@ -910,7 +910,7 @@ class FilterNumberOtu(Filter):
         assert_new_seqs_table(new_seqs, self.table, self.status)
         debug("filter FilterNumberOtu")
 
-        filtered_new_seqs = new_seqs
+        filtered_new_seqs = new_seqs[new_seqs.ncbi_txid != 0]
 
         # get all seqs and ids from aln and before for next filter
         present = self.table[self.table['status'] > -1]
