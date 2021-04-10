@@ -161,7 +161,7 @@ script:
   - mkdir tests/output
   - mkdir tests/output/test_runs
   - cp data/data_for_tests/* tests/output/test_runs/
-  - pytest --cov tests/test_*
+  - pytest --cov=PhylUp tests/test_*
 #  - pytest tests/test_add_unpublished.py
 #  - pytest tests/test_ignore_acc.py
 #  - pytest tests/test_filter_length.py
