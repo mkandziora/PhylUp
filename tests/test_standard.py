@@ -65,7 +65,7 @@ def test_standard_run():
     new_seqs = test.call_filter(new_seqs, test.aln)
 
     print(len(new_seqs.index))
-    assert len(new_seqs.index) == 172, len(new_seqs.index)
+    assert len(new_seqs.index) >= 171, len(new_seqs.index)
 
     test.update_aln()
 
