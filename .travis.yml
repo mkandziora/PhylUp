@@ -114,7 +114,7 @@ before_install:
   - unzip master.zip
   - sudo apt-get install autotools-dev libtool flex bison cmake automake autoconf
   - cd epa-ng-master/
-  - make
+- pip install codecov  - make
   - cd bin
   - echo export PATH="$PATH:$(pwd)" >> ~/.bashrc
   - cd ..
@@ -150,6 +150,7 @@ install:
   - pip install --quiet .
   - pip install pytest-cov
   - pip install pytest-xdist
+  - pip install codecov
 
 
 # command to run tests
@@ -173,4 +174,5 @@ script:
 #  - pytest tests/test_run_blast_query.py
 
 after_success:
+  - codecov
   - curl -s https://codecov.io/bash | bash
