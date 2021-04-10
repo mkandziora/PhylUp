@@ -25,9 +25,9 @@ before_install:
   - export CXX=/usr/bin/g++-7
   # Check versions of gcc, g++ and cmake
   - gcc -v && g++ -v && cmake --version
+  
+  
   # Run your build commands next
-
-  - pip install codecov
 
   # use raxml-ng from bioconda - there are compilation errors...
   - wget http://repo.continuum.io/miniconda/Miniconda-latest-Linux-x86_64.sh -O miniconda.sh
@@ -114,7 +114,7 @@ before_install:
   - unzip master.zip
   - sudo apt-get install autotools-dev libtool flex bison cmake automake autoconf
   - cd epa-ng-master/
-- pip install codecov  - make
+  - make
   - cd bin
   - echo export PATH="$PATH:$(pwd)" >> ~/.bashrc
   - cd ..
