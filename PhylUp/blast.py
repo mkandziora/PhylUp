@@ -100,32 +100,31 @@ def get_taxid_from_acc(gb_acc, blastdb, workdir):
     return tax_id_l
 
 
-# todo: not used
-
-def get_taxid_from_acc_stdout(gb_acc, blastdb, workdir):
-    """
-    Use the blastdb to get the taxon id from a queried gb acc.
-
-    Sometimes there are more than a single id, as database has merged redundant seqs.
-
-    :param gb_acc: Genbank accession number
-    :param workdir: working directory
-    :param blastdb: path to blast db
-    :return: list of taxon ids associated with the GB id - there are multiple because of the merging of redundant data
-    """
-    # print('get_taxid_from_acc_stdout')
-    if not os.path.exists(os.path.join(workdir, "tmp")):
-        os.mkdir(os.path.join(workdir, "tmp"))
-    fn = os.path.join(workdir, "tmp/tmp_search.csv")
-    fn_open = open(fn, "w+")
-    fn_open.write("{}\n".format(gb_acc))
-    fn_open.close()
-    #cmd1 = "blastdbcmd -db {}/nt_v5 -entry_batch {} -outfmt %T -out -".format(blastdb, fn)
-    cmd1 = "blastdbcmd -db {} -entry_batch {} -outfmt %T -out -".format(blastdb, fn)
-    result = subprocess.check_output(cmd1, shell=True).decode(sys.stdout.encoding)  # todo maybe replace with .run
-    taxid_l = result.split('\n')
-    taxid_l = list(filter(None, taxid_l))
-    return taxid_l
+# # todo: not used
+# def get_taxid_from_acc_stdout(gb_acc, blastdb, workdir):
+#     """
+#     Use the blastdb to get the taxon id from a queried gb acc.
+#
+#     Sometimes there are more than a single id, as database has merged redundant seqs.
+#
+#     :param gb_acc: Genbank accession number
+#     :param workdir: working directory
+#     :param blastdb: path to blast db
+#     :return: list of taxon ids associated with the GB id - there are multiple because of the merging of redundant data
+#     """
+#     # print('get_taxid_from_acc_stdout')
+#     if not os.path.exists(os.path.join(workdir, "tmp")):
+#         os.mkdir(os.path.join(workdir, "tmp"))
+#     fn = os.path.join(workdir, "tmp/tmp_search.csv")
+#     fn_open = open(fn, "w+")
+#     fn_open.write("{}\n".format(gb_acc))
+#     fn_open.close()
+#     #cmd1 = "blastdbcmd -db {}/nt_v5 -entry_batch {} -outfmt %T -out -".format(blastdb, fn)
+#     cmd1 = "blastdbcmd -db {} -entry_batch {} -outfmt %T -out -".format(blastdb, fn)
+#     result = subprocess.check_output(cmd1, shell=True).decode(sys.stdout.encoding)  # todo maybe replace with .run
+#     taxid_l = result.split('\n')
+#     taxid_l = list(filter(None, taxid_l))
+#     return taxid_l
 
 
 def write_local_blast_files(workdir, seq_id, seq, db=False, fn=None):
@@ -220,92 +219,91 @@ def make_local_blastdb(workdir, db, taxid, path_to_db=None):
             with suppress_stdout():
                 os.system(cmd1)
 
-
-def get_full_seq_stdout(gb_acc, blast_seq, workdir, blastdb, db):
-    """
-    Get full sequence from gb_acc that was retrieved via blast.
-
-    Currently only used for local searches.
-    Genbank database sequences are retrieving them in batch mode, which is hopefully faster.
-
-    :param gb_acc: unique sequence identifier (often genbank accession number)
-    :param blast_seq: sequence retrived by blast
-    :param workdir: working directory
-    :param blastdb: location of file/db with full seq
-    :param db: type of db - local, filter, Genbank
-    :return: full sequence, the whole submitted sequence, not only the part that matched the blast query sequence
-    """
-    # print("get full seq stdout")
-    if db is not "Genbank":  # no need to make a db first (it already exists), we just open it and get full seq
-        seq_set = False
-        seq, seq_set = get_seq_from_file(gb_acc, blastdb, seq_set)
-        if seq_set is False:
-            seq, seq_set = get_seq_from_file(gb_acc, os.path.join(workdir, 'tmp/query_seq.fas'), seq_set)
-        assert seq_set is True
-    else:
-        # for the Genbank db query it runs using stdout
-        fn = os.path.join(workdir, "tmp/tmp_search.csv")
-        fn_open = open(fn, "w+")
-        fn_open.write("{}\n".format(gb_acc.split(".")[0]))
-        fn_open.close()
-        db_path = "{}".format(blastdb)
-        #cmd1 = "blastdbcmd -db {}/nt_v5  -entry_batch {} -outfmt %f -out -".format(db_path, fn)
-        cmd1 = "blastdbcmd -db {}  -entry_batch {} -outfmt %f -out -".format(db_path, fn)
-        result = subprocess.check_output(cmd1, shell=True).decode(sys.stdout.encoding)
-        seqn = result.split('\n')[1:]
-        seperator = ''
-        seq = seperator.join(seqn)
-        acc_str = result.split('\n')[0]
-        assert gb_acc in acc_str, (gb_acc, acc_str)
-        # print(gb_acc)
-    full_seq = check_directionality(blast_seq, seq)
-    return full_seq
-
-# todo get full seq tmp and stdout both not used, I still use the one using the file...
+# # todo not used - faster?
+# def get_full_seq_stdout(gb_acc, blast_seq, workdir, blastdb, db):
+#     """
+#     Get full sequence from gb_acc that was retrieved via blast.
+#
+#     Currently only used for local searches.
+#     Genbank database sequences are retrieving them in batch mode, which is hopefully faster.
+#
+#     :param gb_acc: unique sequence identifier (often genbank accession number)
+#     :param blast_seq: sequence retrived by blast
+#     :param workdir: working directory
+#     :param blastdb: location of file/db with full seq
+#     :param db: type of db - local, filter, Genbank
+#     :return: full sequence, the whole submitted sequence, not only the part that matched the blast query sequence
+#     """
+#     # print("get full seq stdout")
+#     if db is not "Genbank":  # no need to make a db first (it already exists), we just open it and get full seq
+#         seq_set = False
+#         seq, seq_set = get_seq_from_file(gb_acc, blastdb, seq_set)
+#         if seq_set is False:
+#             seq, seq_set = get_seq_from_file(gb_acc, os.path.join(workdir, 'tmp/query_seq.fas'), seq_set)
+#         assert seq_set is True
+#     else:
+#         # for the Genbank db query it runs using stdout
+#         fn = os.path.join(workdir, "tmp/tmp_search.csv")
+#         fn_open = open(fn, "w+")
+#         fn_open.write("{}\n".format(gb_acc.split(".")[0]))
+#         fn_open.close()
+#         db_path = "{}".format(blastdb)
+#         #cmd1 = "blastdbcmd -db {}/nt_v5  -entry_batch {} -outfmt %f -out -".format(db_path, fn)
+#         cmd1 = "blastdbcmd -db {}  -entry_batch {} -outfmt %f -out -".format(db_path, fn)
+#         result = subprocess.check_output(cmd1, shell=True).decode(sys.stdout.encoding)
+#         seqn = result.split('\n')[1:]
+#         seperator = ''
+#         seq = seperator.join(seqn)
+#         acc_str = result.split('\n')[0]
+#         assert gb_acc in acc_str, (gb_acc, acc_str)
+#         # print(gb_acc)
+#     full_seq = check_directionality(blast_seq, seq)
+#     return full_seq
 
 
-def get_full_seq_tmp(gb_acc, blast_seq, workdir, blastdb, db):
-    """
-    Get full sequence from gb_acc that was retrieved via blast.
-
-    Currently only used for local searches,
-
-    Genbank database sequences are retrieving them in batch mode, which is hopefully faster.
-
-    :param gb_acc: unique sequence identifier (often genbank accession number)
-    :param blast_seq: sequence retrived by blast
-    :param workdir: working directory
-    :param blastdb: location of file/db with full seq
-    :param db: type of db - local, filter, Genbank
-    :return: full sequence, the whole submitted sequence, not only the part that matched the blast query sequence
-    """
-    # print("get_full_seq_tmp")
-    if db is not "Genbank":  # no need to make a db first (it already exists), we just open it and get full seq
-        seq_set = False  # refactor: put seq_set var into function
-        seq, seq_set = get_seq_from_file(gb_acc, blastdb, seq_set)
-        if seq_set is False:
-            seq, seq_set = get_seq_from_file(gb_acc, os.path.join(workdir, 'tmp/query_seq.fas'), seq_set)
-        assert seq_set is True
-    else:
-        # for the Genbank db query it runs using stdout
-        fn = os.path.join(workdir, "tmp/tmp_search.csv")
-        fn_open = open(fn, "w+")
-        fn_open.write("{}\n".format(gb_acc.split(".")[0]))
-        fn_open.close()
-        db_path = "{}".format(blastdb)
-        with NamedTemporaryFile() as f:
-            subprocess.check_call(
-                ["blastdbcmd", "-db", "{}".format(db_path), "-entry_batch", "{}".format(fn), "-outfmt", "%f",
-                 "-out", "-"], stdout=f)
-            f.seek(0)
-            result = f.read().decode(sys.stdout.encoding)
-        seqn = result.split('\n')[1:]
-        seperator = ''
-        seq = seperator.join(seqn)
-        acc_str = result.split('\n')[0]
-        assert gb_acc in acc_str, (gb_acc, acc_str)
-    full_seq = check_directionality(blast_seq, seq)
-    return full_seq
+# # todo - not used - faster than any of the other methods?
+# def get_full_seq_tmp(gb_acc, blast_seq, workdir, blastdb, db):
+#     """
+#     Get full sequence from gb_acc that was retrieved via blast.
+#
+#     Currently only used for local searches,
+#
+#     Genbank database sequences are retrieving them in batch mode, which is hopefully faster.
+#
+#     :param gb_acc: unique sequence identifier (often genbank accession number)
+#     :param blast_seq: sequence retrived by blast
+#     :param workdir: working directory
+#     :param blastdb: location of file/db with full seq
+#     :param db: type of db - local, filter, Genbank
+#     :return: full sequence, the whole submitted sequence, not only the part that matched the blast query sequence
+#     """
+#     # print("get_full_seq_tmp")
+#     if db is not "Genbank":  # no need to make a db first (it already exists), we just open it and get full seq
+#         seq_set = False  # refactor: put seq_set var into function
+#         seq, seq_set = get_seq_from_file(gb_acc, blastdb, seq_set)
+#         if seq_set is False:
+#             seq, seq_set = get_seq_from_file(gb_acc, os.path.join(workdir, 'tmp/query_seq.fas'), seq_set)
+#         assert seq_set is True
+#     else:
+#         # for the Genbank db query it runs using stdout
+#         fn = os.path.join(workdir, "tmp/tmp_search.csv")
+#         fn_open = open(fn, "w+")
+#         fn_open.write("{}\n".format(gb_acc.split(".")[0]))
+#         fn_open.close()
+#         db_path = "{}".format(blastdb)
+#         with NamedTemporaryFile() as f:
+#             subprocess.check_call(
+#                 ["blastdbcmd", "-db", "{}".format(db_path), "-entry_batch", "{}".format(fn), "-outfmt", "%f",
+#                  "-out", "-"], stdout=f)
+#             f.seek(0)
+#             result = f.read().decode(sys.stdout.encoding)
+#         seqn = result.split('\n')[1:]
+#         seperator = ''
+#         seq = seperator.join(seqn)
+#         acc_str = result.split('\n')[0]
+#         assert gb_acc in acc_str, (gb_acc, acc_str)
+#     full_seq = check_directionality(blast_seq, seq)
+#     return full_seq
 
 
 def get_full_seq(gb_acc, blast_seq, workdir, blastdb, db):
