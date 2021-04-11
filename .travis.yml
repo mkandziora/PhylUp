@@ -101,9 +101,11 @@ before_install:
     #install papara
   - mkdir PaPaRa
   - cd PaPaRa
-  - wget https://sco.h-its.org/exelixis/resource/download/software/papara_nt-2.5-static_x86_64.tar.gz
+  #- wget https://sco.h-its.org/exelixis/resource/download/software/papara_nt-2.5-static_x86_64.tar.gz
+  - wget https://cme.h-its.org/exelixis/resource/download/software/papara_nt-2.5-static_x86_64.tar.gz
   - gunzip  -cd papara_nt-2.5-static_x86_64.tar.gz | (tar xvf - )
     #mv papara_static_x86_64 papara
+  - sh build_papara2_static.sh
   - echo export PATH="$PATH:$(pwd)" >> ~/.bashrc
   - cd ..
 
@@ -138,8 +140,11 @@ before_install:
   - wget https://github.com/ddarriba/modeltest/files/3790686/modeltest-ng-0.1.6.tar.gz
   - tar -xvf modeltest-ng-0.1.6.tar.gz
   - cd modeltest-ng-0.1.6/
+  - mkdir build && cd build
+  -  cmake ..
+  -  make
   - sudo apt-get install qt5-default
-  - ./build.sh
+  #- ./build.sh
   - cd ..
   - cd ..
 
