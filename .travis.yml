@@ -105,7 +105,7 @@ before_install:
   - wget https://cme.h-its.org/exelixis/resource/download/software/papara_nt-2.5-static_x86_64.tar.gz
   - gunzip  -cd papara_nt-2.5-static_x86_64.tar.gz | (tar xvf - )
     #mv papara_static_x86_64 papara
-  - sh build_papara2_static.sh
+  - chmod +x papara_static_x86_64
   - echo export PATH="$PATH:$(pwd)" >> ~/.bashrc
   - cd ..
 
