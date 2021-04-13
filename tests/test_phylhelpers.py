@@ -60,7 +60,7 @@ def test_truncate_papara_aln():
     aln = DnaCharacterMatrix.get(path=os.path.abspath(os.path.join(workdir, 'updt_aln.fasta')),
                                  schema='fasta')
 
-    aln_upd = phylogen_updater.AlnUpdater(test.config, aln, test.status, test.table, test.status, tre)
+    aln_upd = phylogen_updater.AlnUpdater(test.config, aln, test.table, test.status, tre)
     aln_upd.write_papara_queryseqs()
 
 

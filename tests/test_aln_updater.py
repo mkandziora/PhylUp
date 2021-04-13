@@ -60,7 +60,7 @@ def test_alnupdater():
     print(len(new_seqs.index))
     assert len(new_seqs.index) >= 171, len(new_seqs.index)
     aln_before = aln
-    aln_upd = phylogen_updater.AlnUpdater(test.config, test.aln, test.status, test.table, test.status, test.tre)
+    aln_upd = phylogen_updater.AlnUpdater(test.config, test.aln, test.table, test.status, test.tre)
     assert aln_before != aln_upd.aln
 
     aln_upd.write_labelled('updt_aln.fasta')

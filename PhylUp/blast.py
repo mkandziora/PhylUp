@@ -27,11 +27,11 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 import os
 import sys
 import datetime
-import subprocess
-from tempfile import NamedTemporaryFile
+# import subprocess
+# from tempfile import NamedTemporaryFile
 import pandas as pd
 from Bio.Seq import Seq
-#from Bio.Alphabet import generic_dna
+# from Bio.Alphabet import generic_dna
 
 import ncbiTAXONparser.ncbi_data_parser as ncbi_data_parser  # is the ncbi data parser class and associated functions
 from . import cd
@@ -39,10 +39,9 @@ from . import suppress_stdout
 from . import debug
 # import line_profiler
 
-"""
-blastdbcmd outfmt options:
-https://www.ncbi.nlm.nih.gov/books/NBK279684/table/appendices.T.blastdbcmd_application_opti/
-"""
+
+# blastdbcmd outfmt options:
+# https://www.ncbi.nlm.nih.gov/books/NBK279684/table/appendices.T.blastdbcmd_application_opti/
 
 def get_acc_from_blast(query_string):
     """
@@ -82,8 +81,7 @@ def get_taxid_from_acc(gb_acc, blastdb, workdir):
     fn_open.close()
     # cmd1 = "blastdbcmd -db {}/nt_v5 -entry_batch {} -outfmt %T -out {}/tmp/tax_id_{}.csv".format(blastdb, fn, workdir,
     #                                                                                             gb_acc)
-    cmd1 = "blastdbcmd -db {} -entry_batch {} -outfmt %T -out {}/tmp/tax_id_{}.csv".format(blastdb, fn, workdir,
-                                                                                                 gb_acc)
+    cmd1 = "blastdbcmd -db {} -entry_batch {} -outfmt %T -out {}/tmp/tax_id_{}.csv".format(blastdb, fn, workdir, gb_acc)
     fn_out = "{}/tmp/tax_id_{}.csv".format(workdir, gb_acc)
     if os.path.exists(fn_out):
         if not os.stat(fn_out).st_size > 0:
@@ -171,46 +169,10 @@ def make_local_blastdb(workdir, db, taxid, path_to_db=None):
     """
     # print("make_local_blastdb")
     if db == "unpublished" or db == 'own':
-        taxid_map = os.path.abspath(taxid)
-        print('Make local blast database from: {}'.format(path_to_db))
-        localfiles = os.listdir(path_to_db)
-
-        if db == 'unpublished':
-            path_db = os.path.join(workdir, 'tmp/unpublished_seq_db')
-        else:
-            path_db = os.path.join(path_to_db, 'db/own_seq_db')
-        if os.path.exists(path_db):
-            os.remove(path_db)
-        db_abspath = os.path.abspath(path_db)
-        fn = '{}_seq'.format(db)
-
-        for index, item in enumerate(localfiles):
-            item = str(item)
-            if item.startswith(".~"):  # remove those files from list
-                localfiles[index] = None
-
-        localfiles = list(filter(None, localfiles))
-        for filename in localfiles:
-            filepath = os.path.join(path_to_db, filename)
-            open_file = open(filepath)
-            content = open_file.readlines()
-            content = [x.strip() for x in content]
-            count = 0
-            gb_id_l = content[::2]
-            gb_id_l = list(filter(None, gb_id_l))
-            seq_l = content[1::2]
-            seq_l = list(filter(None, seq_l))
-            # note: a file with multiple seqs can be read in as well
-            assert len(gb_id_l) == len(seq_l), (len(gb_id_l), len(seq_l), gb_id_l, seq_l)
-
-            for i in range(0, len(gb_id_l)):
-                key = gb_id_l[i].replace(">", "")
-                count = count + 1
-                seq = seq_l[i]
-                write_local_blast_files(workdir, key, seq, db=True, fn=fn)
+        path_db = write_files_for_local_blastdb(db, path_to_db, workdir)
 
         with cd(path_to_db):
-            cmd1 = "makeblastdb -in {} -dbtype nucl -taxid_map {} -parse_seqids".format(db_abspath, taxid_map)
+            cmd1 = "makeblastdb -in {} -dbtype nucl -taxid_map {} -parse_seqids".format(path_db, os.path.abspath(taxid))
             with suppress_stdout():
                 os.system(cmd1)
     elif db == "filterrun":
@@ -218,6 +180,40 @@ def make_local_blastdb(workdir, db, taxid, path_to_db=None):
             cmd1 = "makeblastdb -in ./tmp/filter_seq_db -dbtype nucl -parse_seqids -taxid {}".format(int(taxid))
             with suppress_stdout():
                 os.system(cmd1)
+
+
+def write_files_for_local_blastdb(db, path_to_db, workdir):
+    print('Make local blast database from: {}'.format(path_to_db))
+    localfiles = os.listdir(path_to_db)
+    if db == 'unpublished':
+        path_db = os.path.abspath(os.path.join(workdir, 'tmp/unpublished_seq_db'))
+    else:
+        path_db = os.path.abspath(os.path.join(path_to_db, 'db/own_seq_db'))
+    if os.path.exists(path_db):
+        os.remove(path_db)
+    for index, item in enumerate(localfiles):
+        if str(item).startswith(".~"):  # remove those files from list
+            localfiles[index] = None
+    localfiles = list(filter(None, localfiles))
+    for filename in localfiles:
+        open_file = open(os.path.join(path_to_db, filename))
+        content = open_file.readlines()
+        content = [x.strip() for x in content]
+        gb_id_l = content[::2]
+        gb_id_l = list(filter(None, gb_id_l))
+        seq_l = content[1::2]
+        seq_l = list(filter(None, seq_l))
+        # note: a file with multiple seqs can be read in as well
+        assert len(gb_id_l) == len(seq_l), (len(gb_id_l), len(seq_l), gb_id_l, seq_l)
+
+        count = 0
+        for i in range(0, len(gb_id_l)):
+            key = gb_id_l[i].replace(">", "")
+            count = count + 1
+            seq = seq_l[i]
+            write_local_blast_files(workdir, key, seq, db=True, fn='{}_seq'.format(db))
+    return path_db
+
 
 # # todo not used - faster?
 # def get_full_seq_stdout(gb_acc, blast_seq, workdir, blastdb, db):
@@ -341,8 +337,10 @@ def get_full_seq(gb_acc, blast_seq, workdir, blastdb, db):
             fn_open.write("{}\n".format(gb_acc.split(".")[0]))
             fn_open.close()
             db_path = "{}".format(blastdb)
-            #cmd1 = "blastdbcmd -db {}/nt_v5  -entry_batch {} -outfmt %f -out {}/tmp/full_seq_{}.fasta".format(db_path, fn, workdir, gb_acc)
-            cmd1 = "blastdbcmd -db {} -entry_batch {} -outfmt %f -out {}/tmp/full_seq_{}.fasta".format(db_path, fn, workdir, gb_acc)
+            # cmd1 = "blastdbcmd -db {}/nt_v5  -entry_batch {} -outfmt %f " \
+            #        "-out {}/tmp/full_seq_{}.fasta".format(db_path, fn, workdir, gb_acc)
+            cmd1 = "blastdbcmd -db {} -entry_batch {} -outfmt %f " \
+                   "-out {}/tmp/full_seq_{}.fasta".format(db_path, fn, workdir, gb_acc)
             # print(cmd1)
             with suppress_stdout():
                 os.system(cmd1)
@@ -415,7 +413,7 @@ def check_directionality(blast_seq, seq):
         full_seq = dna_rcomp
     assert seq_replace in full_seq, (seq_replace, full_seq, seq)
     full_seq = str(full_seq)
-    assert type(full_seq) == str, (type(full_seq))
+    assert isinstance(full_seq, str), (type(full_seq))
     return full_seq
 
 
@@ -492,7 +490,7 @@ def run_blast_query(query_seq, taxon, db_name, config, mrca=None):
             blastcmd = "blastn -query " + input_fn + " -db {} -out ".format(os.path.abspath(config.blastdb)) + \
                        query_output_fn + " {} -num_threads {}".format(outfmt, config.num_threads) + \
                        " -max_target_seqs {} -max_hsps {}".format(config.hitlist_size, config.hitlist_size)
-            systemcmd = "{} | tee ./{}/blast_stderr, shell = False".format(blastcmd, config.workdir)
+            # systemcmd = "{} | tee ./{}/blast_stderr, shell = False".format(blastcmd, config.workdir)
                         # "-evalue {} - taxids {}".format(config.evalue, mrca)
             # needs to run from within the folder:
             with suppress_stdout():
@@ -553,9 +551,8 @@ def read_blast_query_pandas(blast_fn, config, db_name):
                     data.loc[idx, 'ncbi_txid'] = map_id
         else:
             data['ncbi_txid'].isnull().values = 0
-        after=len(data)
-        assert after == before, (before, after)
 
+        assert len(data) == before, (before, len(data))
 
     if db_name == "filterrun":
         if len(data) == 0:
@@ -565,12 +562,14 @@ def read_blast_query_pandas(blast_fn, config, db_name):
     redundant = data[data['accession'].str.contains(';')]
     non_redundant_redundant = get_non_redundant_data(config, redundant)  # new data frame with split value columns
     non_redundant = data[data['accession'].str.contains(';') == False]
-    non_redundant['accession'] = non_redundant['accession'].apply(get_acc_from_blast)  # todo: throws pandas warning about sort, but if added, its breaking
+    # todo: next line throws pandas warning about sort, but if added, its breaking
+    non_redundant['accession'] = non_redundant['accession'].apply(get_acc_from_blast)
     assert len(redundant) + len(non_redundant) == len(data)
+
     new_seqs = pd.concat([non_redundant_redundant, non_redundant], sort=True, ignore_index=True)
 
-
-    assert new_seqs['ncbi_txid'].isnull().values.any() == False, ('Not all new seqs have a taxon id. Often related to error in input of unpublished.')
+    assert new_seqs['ncbi_txid'].isnull().values.any() == False, \
+        ('Not all new seqs have a taxon id. Often related to error in user-input of unpublished.')
     new_seqs['sseq'] = new_seqs['sseq'].str.replace("-", "")
     new_seqs['date'] = datetime.datetime.strptime('01/01/00', '%d/%m/%y')
     # todo this could be made faster by running it on the redundant/non_redundant data first
@@ -627,8 +626,7 @@ def get_non_redundant_data(config, redundant):
 
         all_taxids_set = set(all_taxids)
         found_taxids = set()
-        t = acc_column.loc[idx]
-        shortened = t.dropna()
+        shortened = acc_column.loc[idx].dropna()
         ncbi_parser = ncbi_data_parser.Parser(names_file=config.ncbi_parser_names_fn,
                                               nodes_file=config.ncbi_parser_nodes_fn)
 
@@ -641,11 +639,13 @@ def get_non_redundant_data(config, redundant):
                 if tax_id in found_taxids:
                     continue  # this goes back to beginning of for loop
                 gb_acc = get_acc_from_blast(shortened.loc[i])
-                spn = ncbi_parser.get_name_from_id(tax_id)  # todo could be done later before creating table - for efficiency do later
                 split_df = redundant.loc[[idx]]
+
+                # todo could be done later before creating table - for efficiency do later
                 split_df['accession'] = gb_acc
                 split_df['ncbi_txid'] = tax_id
-                split_df['ncbi_txn'] = spn
+                split_df['ncbi_txn'] = ncbi_parser.get_name_from_id(tax_id)
+
                 # non_redundant_redundant = non_redundant_redundant.append(split_df, ignore_index=True, sort=True)
                 non_redundant_redundant = pd.concat([non_redundant_redundant, split_df], ignore_index=True, sort=True)
                 found_taxids.add(tax_id)
@@ -653,7 +653,8 @@ def get_non_redundant_data(config, redundant):
 
     if len(redundant) > 0:
         assert len(non_redundant_redundant) >= len(redundant), \
-            (len(non_redundant_redundant), len(redundant), non_redundant_redundant['accession'], redundant['accession;gi'])
+            (len(non_redundant_redundant), len(redundant),
+             non_redundant_redundant['accession'], redundant['accession;gi'])
     return non_redundant_redundant
 
 
@@ -674,9 +675,11 @@ def wrapper_get_fullseq(config, new_blast_seq_dict, db):
         blastdb = os.path.join(config.workdir, 'tmp/filter_seq_db')
     for idx in new_blast_seq_dict.index:
         gb_acc = new_blast_seq_dict.loc[idx, "accession"]
-        if len(gb_acc.split(".")) >= 2 or db == 'unpublished':  # Do not add sequences that are not in Genbank accession format, e.g. PDB
+
+        # Do not add sequences that are not in Genbank accession format, e.g. PDB
+        if len(gb_acc.split(".")) >= 2 or db == 'unpublished':
             # replace sequence
             full_seq = get_full_seq(gb_acc, new_blast_seq_dict.loc[idx, "sseq"], config.workdir, blastdb, db)
-            # new_blast_seq_dict.loc[idx, "sseq"] = full_seq
-            new_blast_seq_dict.at[idx, "sseq"] = full_seq  # note: set_value is much faster than .loc method, but deprecated, try at
+            # note: set_value is much faster than .loc method, but deprecated, try at
+            new_blast_seq_dict.at[idx, "sseq"] = full_seq
     return new_blast_seq_dict

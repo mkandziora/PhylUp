@@ -8,8 +8,8 @@ conf = config.ConfigObj(configfi, workdir, interactive=True)
 
 db_updater._download_localblastdb(conf)
 
-ncbi_data_parser.Parser(names_file=config.ncbi_parser_names_fn,
-                        nodes_file=config.ncbi_parser_nodes_fn)
+ncbi_data_parser.Parser(names_file=conf.ncbi_parser_names_fn,
+                        nodes_file=conf.ncbi_parser_nodes_fn)
 
 
 
