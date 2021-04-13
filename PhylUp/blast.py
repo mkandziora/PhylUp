@@ -170,9 +170,9 @@ def make_local_blastdb(workdir, db, taxid, path_to_db=None):
     # print("make_local_blastdb")
     if db == "unpublished" or db == 'own':
         path_db = write_files_for_local_blastdb(db, path_to_db, workdir)
-
+        tax_id_abspath = os.path.abspath(taxid)
         with cd(path_to_db):
-            cmd1 = "makeblastdb -in {} -dbtype nucl -taxid_map {} -parse_seqids".format(path_db, os.path.abspath(taxid))
+            cmd1 = "makeblastdb -in {} -dbtype nucl -taxid_map {} -parse_seqids".format(path_db, tax_id_abspath)
             with suppress_stdout():
                 os.system(cmd1)
     elif db == "filterrun":
@@ -186,11 +186,12 @@ def write_files_for_local_blastdb(db, path_to_db, workdir):
     print('Make local blast database from: {}'.format(path_to_db))
     localfiles = os.listdir(path_to_db)
     if db == 'unpublished':
-        path_db = os.path.abspath(os.path.join(workdir, 'tmp/unpublished_seq_db'))
+        path_db = os.path.join(workdir, 'tmp/unpublished_seq_db')
     else:
-        path_db = os.path.abspath(os.path.join(path_to_db, 'db/own_seq_db'))
+        path_db = os.path.join(path_to_db, 'db/own_seq_db')
     if os.path.exists(path_db):
         os.remove(path_db)
+    db_abspath = os.path.abspath(path_db)
     for index, item in enumerate(localfiles):
         if str(item).startswith(".~"):  # remove those files from list
             localfiles[index] = None
@@ -212,7 +213,7 @@ def write_files_for_local_blastdb(db, path_to_db, workdir):
             count = count + 1
             seq = seq_l[i]
             write_local_blast_files(workdir, key, seq, db=True, fn='{}_seq'.format(db))
-    return path_db
+    return db_abspath
 
 
 # # todo not used - faster?
