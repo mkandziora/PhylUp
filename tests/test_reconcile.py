@@ -38,7 +38,7 @@ def test_reconcile():
     print('###################### RUN 2 ######################')
 
     test = phyl_up.PhylogeneticUpdater(id_to_spn, seqalnmiss, mattype, trfn, schema_trf, conf)
-    cleaner = phylogen_updater.InputCleaner(trfn, schema_trf, seqaln, mattype, test.table, test.config) # test.mrca
+    cleaner = phylogen_updater.InputCleaner(trfn, schema_trf, seqalnmiss, mattype, test.table, test.config) # test.mrca
 
     len_aln_missaln = (len(cleaner.aln))
 

@@ -545,6 +545,8 @@ class InputCleaner(object):
         :param mrca:
         :return:
         """
+        assert type(mrca) in [int, list, set] or mrca is None, ("mrca is not an integer, list, set"
+                                                                " or None: {}".format(mrca))
         mrca_name = self.ncbi_parser.get_name_from_id(list(mrca)[0])
         sys.stdout.write('Format mrca: {} - {}'.format(mrca, mrca_name))
         if isinstance(mrca, int):
