@@ -98,7 +98,7 @@ def _download_ncbi_parser(config):
                              "Restart and type 'yes'. \n")
             sys.exit(-10)
     else:
-        x = 'no'
+        # x = 'no'
         download_date = os.path.getmtime(config.ncbi_parser_nodes_fn)
         download_date = datetime.datetime.fromtimestamp(download_date)
         today = datetime.datetime.now()
@@ -118,8 +118,8 @@ def _download_ncbi_parser(config):
                 print("You did not agree to update data from ncbi. Old database files will be used.")
             else:
                 print("You did not type yes or no!")
-    if x == 'yes':
-        ncbi_data_parser.make_lineage_table()
+    # if x == 'yes':
+    #     ncbi_data_parser.make_lineage_table()
 
 
 def _download_edirect():

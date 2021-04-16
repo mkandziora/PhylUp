@@ -4,7 +4,7 @@ import ncbiTAXONparser.ncbi_data_parser as ncbi_data_parser
 configfi = "data/localblast.config"
 workdir = 'test/output/updt_db'
 
-conf = config.ConfigObj(configfi, workdir, interactive=True)
+conf = config.ConfigObj(configfi, workdir, interactive=False)
 
 db_updater._download_localblastdb(conf)
 
