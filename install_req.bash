@@ -57,7 +57,7 @@ make
 cd ..
 
 cd bin
-echo "export PATH=$PWD:\$PATH" >> ~/.bashrctest
+echo "export PATH=$PWD:\$PATH" >> ~/.bashrc
 
 cd ..
 cd ..
