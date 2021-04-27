@@ -29,7 +29,7 @@ import sys
 import configparser
 import datetime
 
-from . import db_updater
+#from . import db_updater
 from . import debug
 import ncbiTAXONparser.ncbi_data_parser as ncbi_data_parser
 from . import blast, phylogenetic_helpers
@@ -37,14 +37,14 @@ from . import blast, phylogenetic_helpers
 
 # TODOdone: make global blast folders that can be shared across runs
 
-
+# TODO remove interactive option
 class ConfigObj(object):
     def __init__(self, configfi, workdir, interactive=True):
         """
         Build a configuration class.
 
         During the initializing process the following self objects are generated:
-            * self.workdir**: working directory
+            * **self.workdir**: working directory
             * **self.num_threads**: number of cores to be used during a run
             * **self.mrca_input**: input of mrca
 
@@ -55,7 +55,7 @@ class ConfigObj(object):
             * **self.blast_all**: T/F; in the subsequent Genbank blast, blast all sequences (input+unpublished)
                                     or only unpublished. = config["unpublished"]['blast_all']
 
-            * self.blastdb: this defines the path to the local blast database
+            * **self.blastdb**: this defines the path to the local blast database
             * **self.e_value_thresh**: the defined threshold for the e-value during Blast searches, check out:
                 https://blast.ncbi.nlm.nih.gov/Blast.cgi?CMD=Web&PAGE_TYPE=BlastDocs&DOC_TYPE=FAQ
             * **self.hitlist_size**: the maximum number of sequences retrieved by a single blast search
@@ -63,8 +63,8 @@ class ConfigObj(object):
                                                 in the unpublished database
             * **self.fix_blast**: T/F; use same blast folder across runs
 
-            * self.ncbi_parser_nodes_fn: path to 'nodes.dmp' file, that contains the hierarchical information
-            * self.ncbi_parser_names_fn: path to 'names.dmp' file, that contains the different ID's
+            * **self.ncbi_parser_nodes_fn**: path to 'nodes.dmp' file, that contains the hierarchical information
+            * **self.ncbi_parser_names_fn**: path to 'names.dmp' file, that contains the different ID's
 
             * **self.minlen**: Defines how much shorter new seq can be compared to input
             * **self.maxlen**: max length for values to add to aln
@@ -78,7 +78,7 @@ class ConfigObj(object):
 
             * **self.backbone**: T/F; calculate complete tree or add to backbone
             * **self.update_tree**: T/F; update tree (T) or just update alignment
-            * **self.modeltest_criteria** BIC, AIC or AICc
+            * **self.modeltest_criteria**: BIC, AIC or AICc
 
             * **interactive**: T/F; checks if databases need to be updated
             * **self.logfile**: file location where some information during the run is logged
@@ -179,7 +179,7 @@ class ConfigObj(object):
         self.hitlist_size = int(self.hitlist_size)
         self.hitlist_size_unpublished = config["blast"]["hitlist_size_unpublished"]
         assert self.hitlist_size_unpublished.split('.')[0].isdigit(), ("Hitlist size  unpublished is not defined as "
-                                                           "a number: {}.\n".format(self.hitlist_size))
+                                                                       "a number: {}.\n".format(self.hitlist_size))
         self.hitlist_size_unpublished = int(self.hitlist_size_unpublished)
 
         self.fix_blast = config["blast"]["fix_blast_result_folder"]
@@ -205,7 +205,6 @@ class ConfigObj(object):
         assert 1 < self.maxlen, ("Max len is not larger than 1: {}.\n".format(self.maxlen))
         self.trim_perc = float(config["phylup"]["trim_perc"])
         assert 0 < self.trim_perc < 1, ("Percentage for trimming is not between 0 and 1: {}.\n".format(self.trim_perc))
-
 
         # internal alignment setting
         self.added_seqs_aln = False

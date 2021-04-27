@@ -132,7 +132,7 @@ class AlnUpdater(object):
 
         try:
             os.chdir(self.config.workdir)
-            #with cd(self.config.workdir):
+            # with cd(self.config.workdir):
             print('run papara')
             phylogenetic_helpers.run_papara()
             path = os.path.join(os.getcwd(), "papara_alignment.phylip".format())
@@ -150,8 +150,8 @@ class AlnUpdater(object):
             print('Papara failed - using MAFFT now')
             aln_old = self.aln
             self.add_queryseqs_to_singleseq()
-        #aln_old = self.aln
-        #aln_path = os.path.join(self.config.workdir, "papara_alignment.phylip")
+        # aln_old = self.aln
+        # aln_path = os.path.join(self.config.workdir, "papara_alignment.phylip")
         with cd(self.config.workdir):
             phylogenetic_helpers.truncate_papara_aln(aln_old)
         phylogenetic_helpers.write_aln(self.aln, self.config.workdir)
@@ -210,7 +210,7 @@ class AlnUpdater(object):
         :param taxon_label: taxon_label from dendropy object - aln or phy
         :return:
         """
-        if self.tre != None:
+        if self.tre is not None:
             # not sure why this function exist. None of them actually remove a tip.
             # tax2 = self.tre.taxon_namespace.get_taxon(taxon_label)
             # self.tre.prune_taxa([tax2])
@@ -324,7 +324,7 @@ class TreeUpdater(object):
         """
         print("update phylogeny")
 
-        # this exists as from single seq there are no seqs to place and no old_seqs.fasta file as no alignment was available
+        # this exists as from single seq there are no old seqs to place (no old_seqs.fasta) as no alignment is available
         if os.path.exists(os.path.join(self.config.workdir, "old_seqs.fasta")):
             self.place_query_seqs_epa()
             self.check_tre_in_aln()
@@ -433,7 +433,7 @@ class TreeUpdater(object):
         sys.stdout.write("calculate bootstrap \n")
         with cd(self.config.workdir):
             # check if job was started with mpi: this checks if actual several cores and nodes were allocated
-            ntasks = os.environ.get('SLURM_JOB_CPUS_PER_NODE') # or ntasks = os.environ.get('SLURM_NTASKS_PER_NODE')
+            ntasks = os.environ.get('SLURM_JOB_CPUS_PER_NODE')  # or ntasks = os.environ.get('SLURM_NTASKS_PER_NODE')
             nnodes = os.environ.get("SLURM_JOB_NUM_NODES")
             seed = str(random.randint(1, 21))
             mpi = False
@@ -450,13 +450,13 @@ class TreeUpdater(object):
                     # except:
                     subprocess.call(["raxml-ng-mpi", '--all', "--msa", "{}".format(aln_fn), '--model', best_subst_model,
                                      '--bs-trees', 'autoMRE', '--seed', seed, "--threads", "{}".format(num_threads),
-                                     "--prefix", "fulltree"], shell=False) # 'tbe', #
+                                     "--prefix", "fulltree"], shell=False)  # 'tbe', #
                 else:
                     debug('else')
 
                     subprocess.call(["raxml-ng-mpi", '--all', "--msa", "{}".format(aln_fn), '--model', best_subst_model,
                                      'autoMRE', '--seed', seed, "--threads", "{}".format(num_threads),
-                                     "--prefix", "fulltree"], shell=False) # 'tbe', #
+                                     "--prefix", "fulltree"], shell=False)  # 'tbe', #
                 # subprocess.call(["raxml-ng-mpi", '--support', '--tree', 'fulltree.raxml.bestTree', '--bs-trees',
                 #                 'fulltree.raxml.bootstraps', "--prefix", 'support'])
                 subprocess.call(["raxml-ng-mpi", '--consense', 'MRE', '--tree', 'fulltree.raxml.bootstraps',
@@ -591,7 +591,7 @@ class InputCleaner(object):
         else:
             sys.stderr.write("Method 'format_mrca_set' does not behave as expected")
             sys.exit(-3)
-        #assert type(mrca) in {list, set, int}, ("your ingroup_mrca '%s' is not an integer/list/set." % mrca)
+        # assert type(mrca) in {list, set, int}, ("your ingroup_mrca '%s' is not an integer/list/set." % mrca)
         return mrca
 
     def delete_missing(self):
@@ -633,7 +633,7 @@ class InputCleaner(object):
             self.table.at[true_false, 'status_note'] = "deleted, was missing in aln or tre"
         assert self.aln.taxon_namespace == self.tre.taxon_namespace
 
-    #todo: does nothing
+    # todo: does nothing? needed?
     def clean_inputname(self):
         """It rewrites tip names if they start with a number at the beginning of the name.
         Python adds an 'n' to the name.
@@ -655,13 +655,13 @@ class InputCleaner(object):
                 if match:
                     newname = tax.label[2:]
                     newname = newname[:-1]
-                # for idx in self.table.index:
-                    # original = self.table.loc[idx, "accession"].split('.')[0]
-                    # if original == tax.label or original == newname:
-                        # tax.label = self.table.loc[idx, "accession"].split('.')[0]
-                        # found_label = 1
-                # if found_label == 0: # and self.table.loc[idx, "ncbi_txid"]:
-                #    sys.stderr.write("could not match tip label {} any ncbi taxon name\n".format(tax.label))
+                for idx in self.table.index:
+                    original = self.table.loc[idx, "accession"].split('.')[0]
+                    if original == tax.label or original == newname:
+                        tax.label = self.table.loc[idx, "accession"].split('.')[0]
+                        found_label = 1
+                if found_label == 0: # and self.table.loc[idx, "ncbi_txid"]:
+                   sys.stderr.write("could not match tip label {} any ncbi taxon name\n".format(tax.label))
 
     def write_clean_aln(self, aln_fn, aln_schema):
         """
@@ -718,7 +718,7 @@ class InputCleaner(object):
         :param tre_schema: schema of tree
         :return:
         """
-        #if tre_fn is not None:
+        # if tre_fn is not None:
         with open(tre_fn, "r") as fin:
             filedata = fin.read()
         # Write the file out again

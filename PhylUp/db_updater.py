@@ -27,10 +27,11 @@ import os
 import sys
 import datetime
 from . import get_user_input, cd
-#from . import ncbi_data_parser
-import ncbiTAXONparser.ncbi_data_parser as ncbi_data_parser
+# from . import ncbi_data_parser
+# import ncbiTAXONparser.ncbi_data_parser as ncbi_data_parser
 
 # Get the different needed databases.
+
 
 def _download_localblastdb(config):
     """Check if files are present and if they are uptodate.

@@ -162,7 +162,7 @@ def replace_uid_with_name(file_path, table, matrix_type):
                 if 'concat_id' in present.columns:
                     concat_id = present.loc[idx, 'concat_id']
                     print(concat_id)
-                    if np.isnan(concat_id) == False:
+                    if np.isnan(concat_id) is False:
                         split_name = 'concat_{}'.format(int(concat_id))
                 else:
                     split_name = present.loc[idx, 'accession'].split('.')[0]
@@ -240,10 +240,11 @@ def run_papara():
 
     :return:
     """
-    #with suppress_stdout():
+    # with suppress_stdout():
     # todo add "-j", "{}".format(self.config.num_threads) - only works when papara is compiled.
     subprocess.check_call(["papara_static_x86_64", "-t", "papara_tre.tre", "-s", "aln_papara.phy",
                            "-q", "new_seqs.fasta", "-n", 'phylip'], shell=False)
+
 
 def run_modeltest(aln_fn, workdir, model, partition=None):
     """
@@ -341,7 +342,6 @@ def build_table_from_file(id_to_spn, config, downtorank=None):
         table = pd.read_csv(os.path.join(config.workdir, 'spn_input_ncbiid.txt'), names=columns, sep=' ', header=0)
 
     else:
-        debug(id_to_spn)
         table = get_txid_for_name_from_file(id_to_spn, ncbi_parser)  # builds name id link
         table.to_csv(os.path.join(config.workdir, 'spn_input_ncbiid.txt'), sep=' ', header=True, index=False)
     table = table.drop_duplicates(subset='accession', keep='first')  # drop duplicated entries from file
@@ -353,11 +353,11 @@ def build_table_from_file(id_to_spn, config, downtorank=None):
     table['sseq'] = None
     table['status'] = table['status'].astype(int)
     table['ncbi_txid'] = table['ncbi_txid'].astype(int)
-    #if downtorank is not None:
-        #table['original_ncbi_txid'] = table['ncbi_txid'].astype(int)
-        #table['ncbi_txid'] = np.vectorize(ncbi_parser.get_downtorank_id)(table['original_ncbi_txid'])
-        #table['ncbi_txid'] = np.vectorize(ncbi_parser.get_downtorank_id)(table['original_ncbi_txid'], downtorank)
-    #else:
+    # if downtorank is not None:
+        # table['original_ncbi_txid'] = table['ncbi_txid'].astype(int)
+        # table['ncbi_txid'] = np.vectorize(ncbi_parser.get_downtorank_id)(table['original_ncbi_txid'])
+        # table['ncbi_txid'] = np.vectorize(ncbi_parser.get_downtorank_id)(table['original_ncbi_txid'], downtorank)
+    # else:
     #    table['ncbi_txid'] = table['ncbi_txid'].astype(int)
     return table
 
@@ -427,7 +427,6 @@ def add_seq_to_table(aln, table):
             table.at[table['accession'] == taxon.label, 'sseq'] = seq
             queried_taxa.append(taxon.label)
         assert taxon.label in queried_taxa, (taxon.label, queried_taxa, 'often missing in spn translation table')
-
     table['sseq'].replace('', np.nan, inplace=True)
     table.dropna(subset=['sseq'], inplace=True)
     return table
@@ -449,16 +448,16 @@ def make_preferred_taxon_list(other_runs, fn, overlap_complete=True):
     key_list = list(preferred_taxa_all.keys())
     for i in range(0, len(key_list)-1):
         set_1 = preferred_taxa_all[key_list[i]]
-        set2 = preferred_taxa_all[key_list[i+1]]
-        overlap2 = set_1.intersection(set2)
-        if overlap_complete == True:
+        set_2 = preferred_taxa_all[key_list[i+1]]
+        overlap2 = set_1.intersection(set_2)
+        if overlap_complete is True:
             print('complete')
             if i == 0:
                 overlap_all = overlap2
             else:
                 set_1 = overlap_all
-                set2 = overlap2
-                overlap_all = set_1.intersection(set2)
+                set_2 = overlap2
+                overlap_all = set_1.intersection(set_2)
         else:
             overlap_all = overlap_all + overlap2
 
