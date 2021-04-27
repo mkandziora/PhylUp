@@ -333,7 +333,7 @@ class PhylogeneticUpdater:
                     (len(new_seqs), len(self.table[self.table['status'] == self.status]),
                      new_seqs['accession'], self.table[self.table['status'] == self.status]['accession'])
 
-            if len(new_seqs) > 0:
+            if len(new_seqs) > 0 and self.config.preferred_taxa == True:
                 f = FilterPreferredTaxa(self.config, self.table, self.status)
                 f.filter(new_seqs, self.config.downtorank)
                 self.table = f.table
@@ -788,10 +788,6 @@ class FilterPreferredTaxa(Filter):
         self.table.at[self.table['accession'].isin(excluded_preferred.accession), 'status'] = -1
         self.table.at[self.table['accession'].isin(
             excluded_preferred.accession), 'status_note'] = 'excluded - not preferred across loci'
-
-        # if self.config.downtorank is not None:
-        #     if all_preferred.index.any() == True:
-        #         assert all_preferred.ncbi_txid.is_unique == True, all_preferred.ncbi_txid
 
         self.upd_new_seqs = all_preferred
         self.del_table = del_table
