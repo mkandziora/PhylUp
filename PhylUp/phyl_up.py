@@ -495,7 +495,7 @@ class PhylogeneticUpdater:
         :param status_end:
         :return: new_seqs
         """
-        sys.stdout.write('Blast round number {}. Max. rounds set to {}.\n'.format(self.status, status_end))
+        sys.stdout.write('\nBlast round number {}. Max. rounds set to {}.\n'.format(self.status, status_end))
         assert self.status <= status_end, (self.status, status_end)
         msg = "Time before blast: {}.\n".format(datetime.datetime.now())
         write_msg_logfile(msg, self.config.workdir)

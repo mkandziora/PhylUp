@@ -128,14 +128,30 @@ class AlnUpdater(object):
         phylogenetic_helpers.write_papara_alnfile(self.aln, self.config.workdir)
         if self.tre is not None:
             phylogenetic_helpers.write_papara_trefile(self.tre, self.config.workdir)
-        with cd(self.config.workdir):
+        cwd = os.getcwd()
+
+        try:
+            os.chdir(self.config.workdir)
+            #with cd(self.config.workdir):
             print('run papara')
             phylogenetic_helpers.run_papara()
             path = os.path.join(os.getcwd(), "papara_alignment.phylip".format())
             assert os.path.exists(path), "{} does not exists".format(path)
-        aln_old = self.aln
-        self.aln = DnaCharacterMatrix.get(path=os.path.join(self.config.workdir, "papara_alignment.phylip"), schema='phylip')
-        self.aln = self.trim(os.path.join(self.config.workdir, 'papara_alignment.phylip'), 'phylip')
+            os.chdir(cwd)
+            aln_old = self.aln
+            aln_path = os.path.join(self.config.workdir, "papara_alignment.phylip")
+            self.aln = DnaCharacterMatrix.get(path=aln_path, schema='phylip')
+            self.aln = self.trim(os.path.join(self.config.workdir, 'papara_alignment.phylip'), 'phylip')
+
+            print('papara done and files loaded')
+
+        except subprocess.CalledProcessError:
+            os.chdir(cwd)
+            print('Papara failed - using MAFFT now')
+            aln_old = self.aln
+            self.add_queryseqs_to_singleseq()
+        #aln_old = self.aln
+        #aln_path = os.path.join(self.config.workdir, "papara_alignment.phylip")
         with cd(self.config.workdir):
             phylogenetic_helpers.truncate_papara_aln(aln_old)
         phylogenetic_helpers.write_aln(self.aln, self.config.workdir)
@@ -307,8 +323,11 @@ class TreeUpdater(object):
         :return:
         """
         print("update phylogeny")
-        self.place_query_seqs_epa()
-        self.check_tre_in_aln()
+
+        # this exists as from single seq there are no seqs to place and no old_seqs.fasta file as no alignment was available
+        if os.path.exists(os.path.join(self.config.workdir, "old_seqs.fasta")):
+            self.place_query_seqs_epa()
+            self.check_tre_in_aln()
 
         if self.config.update_tree is True:
             self.calculate_final_tree()  # comment out for development speed up
@@ -411,7 +430,7 @@ class TreeUpdater(object):
         :param aln_fn:
         :return:
         """
-        sys.stdout.write("calculate bootstrap")
+        sys.stdout.write("calculate bootstrap \n")
         with cd(self.config.workdir):
             # check if job was started with mpi: this checks if actual several cores and nodes were allocated
             ntasks = os.environ.get('SLURM_JOB_CPUS_PER_NODE') # or ntasks = os.environ.get('SLURM_NTASKS_PER_NODE')
@@ -433,7 +452,8 @@ class TreeUpdater(object):
                                      '--bs-trees', 'autoMRE', '--seed', seed, "--threads", "{}".format(num_threads),
                                      "--prefix", "fulltree"], shell=False) # 'tbe', #
                 else:
-                    print('else')
+                    debug('else')
+
                     subprocess.call(["raxml-ng-mpi", '--all', "--msa", "{}".format(aln_fn), '--model', best_subst_model,
                                      'autoMRE', '--seed', seed, "--threads", "{}".format(num_threads),
                                      "--prefix", "fulltree"], shell=False) # 'tbe', #
