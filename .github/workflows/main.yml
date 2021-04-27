@@ -15,6 +15,12 @@ jobs:
         with:
           python-version: '3.7'
           architecture: 'x64'
+      - uses: conda-incubator/setup-miniconda@v2
+          with:
+            installer-url: https://github.com/conda-forge/miniforge/releases/download/4.8.3-2/Miniforge-pypy3-4.8.3-2-Linux-x86_64.sh
+            allow-softlinks: true
+            show-channel-urls: true
+            use-only-tar-bz2: true
       #- uses: mkandziora/PhylUp@dev
       - name: Install dependencies
         run: |
@@ -22,11 +28,14 @@ jobs:
               pip install pytest pytest-cov pytest-xdist codecov
               pip install -r requirements.txt
               python setup.py install
+              conda install -c bioconda blast
       - name: download data
         run: |
             wget 'https://ftp.ncbi.nlm.nih.gov/pub/taxonomy/taxdump.tar.gz'
             gunzip  -cd taxdump.tar.gz | (tar xvf - names.dmp nodes.dmp)
             mv *.dmp ./data/
+            mkdir tests/output
+            mkdir tests/output/test_runs
       - name: Test with pytest
         run: |
             pytest --cov=PhylUp tests/test_*
