@@ -445,7 +445,7 @@ class PhylogeneticUpdater:
                 write_msg_logfile(msg, self.config.workdir)
                 self.table.to_csv(os.path.join(self.workdir, 'table.updated'), index=False)
 
-                if self.config.perpetual is False:
+                if self.config.perpetual is False and status_end != 0:
                     self.config.unpublished = False
 
             if self.config.preferred_taxa:
