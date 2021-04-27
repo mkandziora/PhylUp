@@ -1,7 +1,6 @@
 [![Build Status](https://travis-ci.com/mkandziora/PhylUp.svg?token=tcUKPEqrpyvHbPasst5i&branch=master)](https://travis-ci.com/mkandziora/PhylUp)
 
  
-
 # PhylUp - generating phylogenetic alignments with custom sampling across taxonomic ranks
 
 
