@@ -3,7 +3,8 @@ PhylUp: phylogenetic alignment building with custom taxon sampling
 Copyright (C) 2020  Martha Kandziora
 martha.kandziora@mailbox.org
 
-Package to automatically update alignments and phylogenies using local sequences or a local Genbank database
+Package to automatically update alignments and phylogenies
+using local sequences or a local Genbank database
 while controlling for the number of sequences per OTU.
 
 This program is free software: you can redistribute it and/or modify
@@ -26,16 +27,17 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 import os
 import subprocess
 import sys
-import pandas as pd
-import numpy as np
+
 from copy import deepcopy
 from dendropy import DnaCharacterMatrix, Tree
 
+import pandas as pd
+import numpy as np
 import ncbiTAXONparser.ncbi_data_parser as ncbi_data_parser
 
 from . import cd
 from . import debug
-from . import suppress_stdout
+# from . import suppress_stdout
 
 
 def truncate_papara_aln(aln):
@@ -158,43 +160,59 @@ def replace_uid_with_name(file_path, table, matrix_type):
             present = table[table['status'] >= 0]
             for idx in present.index:
                 if 'concat_id' in present.columns:
-                    id = present.loc[idx, 'concat_id']
-                    print(id)
-                    if np.isnan(id) == False:
-                        split_name = 'concat_{}'.format(int(id))
+                    concat_id = present.loc[idx, 'concat_id']
+                    print(concat_id)
+                    if np.isnan(concat_id) == False:
+                        split_name = 'concat_{}'.format(int(concat_id))
                 else:
                     split_name = present.loc[idx, 'accession'].split('.')[0]
                 if split_name not in name_list:
                     if split_name in labelled:
-                        spn = present.loc[idx, 'ncbi_txn'].replace(" ", "_").replace("-", "_").replace("'", "")
                         if matrix_type == 'tree':
-                            labelled = replace_in_tree(idx, labelled, present, split_name, spn)
+                            labelled = replace_in_tree(idx, labelled, present, split_name)
                         else:
-                            labelled = replace_in_aln(idx, labelled, present, split_name, spn)
+                            labelled = replace_in_aln(idx, labelled, present, split_name)
                 name_list.append(split_name)
 
             fout.write(labelled)
 
 
-def replace_in_tree(idx, labelled, present, split_name, spn):
+def replace_in_tree(idx, labelled, present, split_name):
+    """
+    Replace accessions by species names in tree file.
+    :param idx: position in pandas dataframe
+    :param labelled: string which is used for replacing
+    :param present: pandas dataframe with information
+    :param split_name: name to replace
+    :return: labelled
+    """
+    spn = present.loc[idx, 'ncbi_txn'].replace(" ", "_").replace("-", "_").replace("'", "")
+
     try:
         labelled = labelled.replace("{}:".format(split_name), "{}_{}:".format(spn, split_name))
     except AttributeError:
         labelled = labelled.replace("{}:".format(split_name),
-                                    "{}_{}:".format(present.loc[idx, 'ncbi_txid'],
-                                                    split_name))
+                                    "{}_{}:".format(present.loc[idx, 'ncbi_txid'], split_name))
     return labelled
 
 
-def replace_in_aln(idx, labelled, present, split_name, spn):
+def replace_in_aln(idx, labelled, present, split_name):
+    """
+    Replace accessions by species names in alignment file.
+
+    :param idx: position in pandas dataframe
+    :param labelled: string which is used for replacing
+    :param present: pandas dataframe with information
+    :param split_name: name to replace
+    :return:  labelled
+    """
+    spn = present.loc[idx, 'ncbi_txn'].replace(" ", "_").replace("-", "_").replace("'", "")
 
     try:
-        labelled = labelled.replace(">{}\n".format(split_name),
-                                    ">{}_{}\n".format(spn, split_name))
+        labelled = labelled.replace(">{}\n".format(split_name), ">{}_{}\n".format(spn, split_name))
     except AttributeError:
         labelled = labelled.replace(">{}\n".format(split_name),
-                                    ">{}_{}\n".format(present.loc[idx, 'ncbi_txid'],
-                                                    split_name))
+                                    ">{}_{}\n".format(present.loc[idx, 'ncbi_txid'], split_name))
     return labelled
 
 
@@ -213,7 +231,7 @@ def check_align(aln):
     for tax in aln:
         if len(aln[tax]) != seqlen:
             sys.stderr.write("Alignment is not aligned: {} vs {} .\n".format(len(aln[tax]), seqlen))
-            return
+            sys.exit(-3)
     return seqlen
 
 def run_papara():
@@ -223,9 +241,9 @@ def run_papara():
     :return:
     """
     #with suppress_stdout():
+    # todo add "-j", "{}".format(self.config.num_threads) - only works when papara is compiled.
     subprocess.check_call(["papara_static_x86_64", "-t", "papara_tre.tre", "-s", "aln_papara.phy",
-                               #  "-j", "{}".format(self.config.num_threads),  # FIXME: only works when papara is compiled.
-                               "-q", "new_seqs.fasta", "-n", 'phylip'], shell=False)
+                           "-q", "new_seqs.fasta", "-n", 'phylip'], shell=False)
 
 def run_modeltest(aln_fn, workdir, model, partition=None):
     """
@@ -245,7 +263,7 @@ def run_modeltest(aln_fn, workdir, model, partition=None):
         if os.path.exists('{}.ckp'.format(aln_fn)):
             os.remove('{}.ckp'.format(aln_fn))
         if partition is None:
-            subprocess.run(['modeltest-ng', '-i', aln_fn,  '--force'], shell=False)
+            subprocess.run(['modeltest-ng', '-i', aln_fn, '--force'], shell=False)
         else:
             subprocess.run(['modeltest-ng', '-i', aln_fn, '--partition', partition, '--force'], shell=False)
 
@@ -301,7 +319,8 @@ def estimate_number_threads_raxml(workdir, aln_fn, model):
         for line in datafile:
             if 'Recommended number of threads / MPI processes:' in line:
                 num_threads = line.split(': ')[1][0]
-                return num_threads
+                break
+    return num_threads
 
 
 def build_table_from_file(id_to_spn, config, downtorank=None):
@@ -319,7 +338,7 @@ def build_table_from_file(id_to_spn, config, downtorank=None):
     sys.stdout.write("Build table with information about sequences and taxa.\n")
     if os.path.exists(os.path.join(config.workdir, 'spn_input_ncbiid.txt')):
         columns = ['accession', 'ncbi_txn', 'ncbi_txid']
-        table = pd.read_csv(os.path.join(config.workdir, 'spn_input_ncbiid.txt'), names=columns,  sep=' ', header=0 )
+        table = pd.read_csv(os.path.join(config.workdir, 'spn_input_ncbiid.txt'), names=columns, sep=' ', header=0)
 
     else:
         debug(id_to_spn)
@@ -386,7 +405,7 @@ def get_txid_for_name_from_file(tipname_id_fn, ncbi_parser):
     :return:
     """
     columns = ['accession', 'ncbi_txn']
-    name_id = pd.read_csv(tipname_id_fn, names=columns,  sep=",", header=None)
+    name_id = pd.read_csv(tipname_id_fn, names=columns, sep=",", header=None)
     name_id['ncbi_txid'] = name_id['ncbi_txn'].apply(ncbi_parser.get_id_from_name)
     assert name_id['ncbi_txid'].isnull().values.any() == False, ('not all ncbi taxon ids assigned.',
                                                                  name_id['ncbi_txid'].isnull().values.any())

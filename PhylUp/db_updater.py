@@ -122,6 +122,6 @@ def _download_ncbi_parser(config):
     #     ncbi_data_parser.make_lineage_table()
 
 
-def _download_edirect():
-    os.system("sh -c '$(curl -fsSL ftp://ftp.ncbi.nlm.nih.gov/entrez/entrezdirect/install-edirect.sh)'")
-    os.system("source ./install-edirect.sh")
+# def _download_edirect():
+#     os.system("sh -c '$(curl -fsSL ftp://ftp.ncbi.nlm.nih.gov/entrez/entrezdirect/install-edirect.sh)'")
+#     os.system("source ./install-edirect.sh")

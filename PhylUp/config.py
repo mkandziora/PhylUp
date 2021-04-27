@@ -284,25 +284,27 @@ class ConfigObj(object):
         # internal settings
         self.logfile = os.path.join(self.workdir, "logfile")
 
-    def make_db_from_taxid(self, taxid):
-        """
-        Generates a smaller Genbank database, that only contains sequences that are part of the mrca.
 
-        :param taxid:
-        :return:
-        """
-        ncbi_parser = ncbi_data_parser.Parser(names_file=self.ncbi_parser_names_fn,
-                                              nodes_file=self.ncbi_parser_nodes_fn)
-        if type(taxid) == list:
-            mrca_id = ncbi_parser.get_mrca(taxid)
-            taxid = mrca_id
-
-        taxon_list = ncbi_parser.get_lower_from_id(taxid)
-        taxonlist_fn = os.path.join(self.blastdb, "{}_idlist.txt".format(taxid))
-        with open(taxonlist_fn) as fn:
-            fn.write("\n".join(str(item) for item in taxon_list))
-
-        cmd1 = "makeblastdb -dbtype nucl -parse_seqids -taxid_map {} " \
-               "-out {}_db -title {}".format(taxonlist_fn, taxid, taxid)
-        os.system(cmd1)
-        return taxid
+    # # currently unused - takes quite long to make the new db
+    # def make_db_from_taxid(self, taxid):
+    #     """
+    #     Generates a smaller Genbank database, that only contains sequences that are part of the mrca.
+    #
+    #     :param taxid:
+    #     :return:
+    #     """
+    #     ncbi_parser = ncbi_data_parser.Parser(names_file=self.ncbi_parser_names_fn,
+    #                                           nodes_file=self.ncbi_parser_nodes_fn)
+    #     if type(taxid) == list:
+    #         mrca_id = ncbi_parser.get_mrca(taxid)
+    #         taxid = mrca_id
+    #
+    #     taxon_list = ncbi_parser.get_lower_from_id(taxid)
+    #     taxonlist_fn = os.path.join(self.blastdb, "{}_idlist.txt".format(taxid))
+    #     with open(taxonlist_fn) as fn:
+    #         fn.write("\n".join(str(item) for item in taxon_list))
+    #
+    #     cmd1 = "makeblastdb -dbtype nucl -parse_seqids -taxid_map {} " \
+    #            "-out {}_db -title {}".format(taxonlist_fn, taxid, taxid)
+    #     os.system(cmd1)
+    #     return taxid

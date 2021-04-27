@@ -104,7 +104,9 @@ def license_print():
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
     """)
 
-
+# ##########################################################################
+# # logging unused currently
+#
 # global logger
 # http://docs.python.org/library/logging.html
 # LOG = logging.getLogger("")
@@ -112,41 +114,41 @@ def license_print():
 #                    format='%(levelname)s [%(asctime)s]: %(message)s')
 
 
-def setup_logger(name, log_file, level=logging.INFO, writemode="w"):
-    """setups as many loggers as you want.
-    """
-    formatter = logging.basicConfig(filemode="w+", format='%(levelname)s [%(asctime)s]: %(message)s')
+# def setup_logger(name, log_file, level=logging.INFO, writemode="w"):
+#     """setups as many loggers as you want.
+#     """
+#     formatter = logging.basicConfig(filemode="w+", format='%(levelname)s [%(asctime)s]: %(message)s')
+#
+#     log_fn = "{}".format(log_file)
+#     handler = logging.FileHandler(log_fn)
+#     handler.setFormatter(formatter)
+#
+#     logger = logging.getLogger(name)
+#     logger.setLevel(level)
+#     logger.addHandler(handler)
+#
+#     return logger
+#
+# # setup different loggers
+# log_dict = {}
+# log_dict2 = {}
+#
 
-    log_fn = "{}".format(log_file)
-    handler = logging.FileHandler(log_fn)
-    handler.setFormatter(formatter)
-
-    logger = logging.getLogger(name)
-    logger.setLevel(level)
-    logger.addHandler(handler)
-
-    return logger
-
-# setup different loggers
-log_dict = {}
-log_dict2 = {}
-
-
-def log_info(text, wd):
-    """
-    setup info logger"""
-    if wd not in log_dict:
-        dlog = setup_logger("info_log", '{}/info.log'.format(wd), level=logging.INFO, writemode="w+")
-        dlog.propagate = True  # logs to file and console
-        log_dict[wd] = dlog
-    log_dict[wd].info(text)
-
-
-def log_debug(text, wd):
-    """
-    setup debug logger"""
-    if wd not in log_dict2:
-        dlog = setup_logger("debug_log", '{}/debug.log'.format(wd), level=logging.DEBUG, writemode="w+")
-        dlog.propagate = False  # logs to file only
-        log_dict2[wd] = dlog
-    log_dict2[wd].debug(text)
+# def log_info(text, wd):
+#     """
+#     setup info logger"""
+#     if wd not in log_dict:
+#         dlog = setup_logger("info_log", '{}/info.log'.format(wd), level=logging.INFO, writemode="w+")
+#         dlog.propagate = True  # logs to file and console
+#         log_dict[wd] = dlog
+#     log_dict[wd].info(text)
+#
+#
+# def log_debug(text, wd):
+#     """
+#     setup debug logger"""
+#     if wd not in log_dict2:
+#         dlog = setup_logger("debug_log", '{}/debug.log'.format(wd), level=logging.DEBUG, writemode="w+")
+#         dlog.propagate = False  # logs to file only
+#         log_dict2[wd] = dlog
+#     log_dict2[wd].debug(text)

@@ -29,9 +29,9 @@ import sys
 import subprocess
 import random
 import shutil
-import numpy as np
 from dendropy import Tree, DnaCharacterMatrix
 
+import numpy as np
 import ncbiTAXONparser.ncbi_data_parser as ncbi_data_parser  # it is the ncbi data parser class and associated functions
 
 from . import cd
@@ -45,29 +45,27 @@ class AlnUpdater(object):
     """
     Class to update aln with newly retrieved sequences.
     """
-    def __init__(self, config, aln, status, table, status_new=None, tre=None):
+    def __init__(self, config, aln, table, status_new=None, tre=None):
         """
         :param tre: dendropy tree object
         :param aln: dendropy alignment object
-        :param status: status, how many cycles since start...
         :param table: pd df table with all the information about the seqs, old and new
         :param config: config object
         """
         self.aln = aln
-        self.status = status
         self.table = table
-        self.tre_fn = "updt_aln.fasta.tree"
         self.tre = tre
         self.config = config
-        print('status')
-        print(status_new)
-        if status_new == None:
-            self.new_seq_table = self.table[self.table['status'] >= 1]  # gets all new seqs (status>0.5) - gets here if not unpublished
+        self.newseqs_file = "new_seqs.fasta"
+        self.tre_fn = "updt_aln.fasta.tree"
+
+        if status_new is None:
+            # gets here if not unpublished
+            self.new_seq_table = self.table[self.table['status'] >= 1]  # gets all new seqs (status>0.5) -
         elif status_new == 0.5:
             self.new_seq_table = self.table[self.table['status'] > 0]  # gets all new seqs (status>0.5)
         else:
             self.new_seq_table = self.table[self.table['status'] >= status_new]  # gets all new seqs (status>0.5)
-        self.newseqs_file = "new_seqs.fasta"
         self.update_data()
 
     def update_data(self):
@@ -83,8 +81,8 @@ class AlnUpdater(object):
             self.write_papara_queryseqs()
             if len(self.aln) > 1:
                 if self.tre is None:  # generate random tree, e.g. from modeltest
-                    best_subst_model = phylogenetic_helpers.run_modeltest('updt_aln.fasta', self.config.workdir,
-                                                                          self.config.modeltest_criteria)
+                    phylogenetic_helpers.run_modeltest('updt_aln.fasta', self.config.workdir,
+                                                       self.config.modeltest_criteria)
                     self.tre = Tree.get(path=os.path.join(self.config.workdir, self.tre_fn),
                                         schema="newick", preserve_underscores=True)
                     phylogenetic_helpers.write_papara_trefile(self.tre, self.config.workdir)
@@ -94,8 +92,8 @@ class AlnUpdater(object):
                 self.add_query_seqs_to_aln()
             else:
                 self.add_queryseqs_to_singleseq()
-                best_subst_model = phylogenetic_helpers.run_modeltest('updt_aln.fasta', self.config.workdir,
-                                                                      self.config.modeltest_criteria)
+                phylogenetic_helpers.run_modeltest('updt_aln.fasta', self.config.workdir,
+                                                   self.config.modeltest_criteria)
                 self.tre = Tree.get(path=os.path.join(self.config.workdir, 'updt_aln.fasta.tree'),
                                     schema="newick", preserve_underscores=True)
             phylogenetic_helpers.write_aln(self.aln, self.config.workdir)
@@ -106,7 +104,7 @@ class AlnUpdater(object):
 
     def add_queryseqs_to_singleseq(self):
         """
-        If input is single sequence, add new seqs to it using mafft. - irrespective of how many seqs. works also with more
+        Add query sequences to alignment using mafft.
 
         :return:
         """
@@ -130,14 +128,30 @@ class AlnUpdater(object):
         phylogenetic_helpers.write_papara_alnfile(self.aln, self.config.workdir)
         if self.tre is not None:
             phylogenetic_helpers.write_papara_trefile(self.tre, self.config.workdir)
-        with cd(self.config.workdir):
+        cwd = os.getcwd()
+
+        try:
+            os.chdir(self.config.workdir)
+            #with cd(self.config.workdir):
             print('run papara')
             phylogenetic_helpers.run_papara()
             path = os.path.join(os.getcwd(), "papara_alignment.phylip".format())
             assert os.path.exists(path), "{} does not exists".format(path)
-        aln_old = self.aln
-        self.aln = DnaCharacterMatrix.get(path=os.path.join(self.config.workdir, "papara_alignment.phylip"), schema='phylip')
-        self.aln = self.trim(os.path.join(self.config.workdir, 'papara_alignment.phylip'), 'phylip')
+            os.chdir(cwd)
+            aln_old = self.aln
+            aln_path = os.path.join(self.config.workdir, "papara_alignment.phylip")
+            self.aln = DnaCharacterMatrix.get(path=aln_path, schema='phylip')
+            self.aln = self.trim(os.path.join(self.config.workdir, 'papara_alignment.phylip'), 'phylip')
+
+            print('papara done and files loaded')
+
+        except subprocess.CalledProcessError:
+            os.chdir(cwd)
+            print('Papara failed - using MAFFT now')
+            aln_old = self.aln
+            self.add_queryseqs_to_singleseq()
+        #aln_old = self.aln
+        #aln_path = os.path.join(self.config.workdir, "papara_alignment.phylip")
         with cd(self.config.workdir):
             phylogenetic_helpers.truncate_papara_aln(aln_old)
         phylogenetic_helpers.write_aln(self.aln, self.config.workdir)
@@ -309,8 +323,11 @@ class TreeUpdater(object):
         :return:
         """
         print("update phylogeny")
-        self.place_query_seqs_epa()
-        self.check_tre_in_aln()
+
+        # this exists as from single seq there are no seqs to place and no old_seqs.fasta file as no alignment was available
+        if os.path.exists(os.path.join(self.config.workdir, "old_seqs.fasta")):
+            self.place_query_seqs_epa()
+            self.check_tre_in_aln()
 
         if self.config.update_tree is True:
             self.calculate_final_tree()  # comment out for development speed up
@@ -338,7 +355,7 @@ class TreeUpdater(object):
         aln_ids = set(taxon.label for taxon in self.aln)
         treed_taxa = set(leaf.taxon.label for leaf in self.tre.leaf_nodes())
         assert treed_taxa.issubset(aln_ids), (len(treed_taxa), len(aln_ids))
-        # assert aln_ids.issubset(treed_taxa),  (len(treed_taxa), len(aln_ids))
+        # assert aln_ids.issubset(treed_taxa), (len(treed_taxa), len(aln_ids))
 
     def place_query_seqs_epa(self):
         """ Runs epa-ng on the tree, and the combined alignment including the new query seqs.
@@ -358,13 +375,12 @@ class TreeUpdater(object):
             with cd(self.config.workdir):
                 # todo: get model for epa-ng
                 with suppress_stdout():
-                    subprocess.call(["epa-ng", "--ref-msa", "old_seqs.fasta", "--tree", "epa_tree.tre",
-                                     "--query",  "new_seqs.fasta", "--outdir", "./", "--model", 'GTR+G', '--redo'], shell=False)
+                    subprocess.call(["epa-ng", "--ref-msa", "old_seqs.fasta", "--tree", "epa_tree.tre", "--query",
+                                     "new_seqs.fasta", "--outdir", "./", "--model", 'GTR+G', '--redo'], shell=False)
                     # make newick tre
                     subprocess.call(["gappa", "examine", "graft", "--jplace-path", "epa_result.jplace",
                                      "--allow-file-overwriting"], shell=False)
                 self.tre = Tree.get(path="epa_result.newick", schema="newick", preserve_underscores=True)
-                #self.tre.write(path="place_resolve.tre", schema="newick", unquoted_underscores=True, suppress_rooting=True)
                 self.tre.write(path="updt_tre.tre", schema="newick", unquoted_underscores=True, suppress_rooting=True)
                 # phylogenetic_helpers.evaluate_raxmlng_alignment()
 
@@ -408,36 +424,39 @@ class TreeUpdater(object):
 
     def calculate_bootstrap_ng(self, best_subst_model, num_threads, aln_fn='updt_aln.fasta'):
         """Calculates bootstrap and consensus trees.
+
+        :param best_subst_model:
+        :param num_threads:
+        :param aln_fn:
+        :return:
         """
-        sys.stdout.write("calculate bootstrap")
+        sys.stdout.write("calculate bootstrap \n")
         with cd(self.config.workdir):
             # check if job was started with mpi: this checks if actual several cores and nodes were allocated
-            ntasks = os.environ.get('SLURM_NTASKS_PER_NODE')
-            ntasks = os.environ.get('SLURM_JOB_CPUS_PER_NODE')
+            ntasks = os.environ.get('SLURM_JOB_CPUS_PER_NODE') # or ntasks = os.environ.get('SLURM_NTASKS_PER_NODE')
             nnodes = os.environ.get("SLURM_JOB_NUM_NODES")
             seed = str(random.randint(1, 21))
             mpi = False
             if self.config.update_tree is True:
                 if nnodes is not None and ntasks is not None:
                     mpi = True
-                    env_var = int(nnodes) * int(ntasks)
                 if mpi:  # todo add "mpiexec", "-n", "{}".format(env_var)
                     # try:
                     #     print("run with mpi")
+                    #     env_var = int(nnodes) * int(ntasks)
                     #     subprocess.call(["mpiexec", "-n", "{}".format(env_var), "raxml-ng-mpi", '--all', "--msa",
                     #                      "{}".format(aln_fn), '--model', "GTR+G", '--bs-trees', 'autoMRE',
                     #                      '--seed', seed, "--threads", "{}".format(str(self.config.num_threads)),
                     # except:
                     subprocess.call(["raxml-ng-mpi", '--all', "--msa", "{}".format(aln_fn), '--model', best_subst_model,
-                                     '--bs-trees',  # 'tbe',  #
-                                     'autoMRE', '--seed', seed, "--threads", "{}".format(num_threads),
-                                     "--prefix", "fulltree"], shell=False)
+                                     '--bs-trees', 'autoMRE', '--seed', seed, "--threads", "{}".format(num_threads),
+                                     "--prefix", "fulltree"], shell=False) # 'tbe', #
                 else:
-                    print('else')
+                    debug('else')
+
                     subprocess.call(["raxml-ng-mpi", '--all', "--msa", "{}".format(aln_fn), '--model', best_subst_model,
-                                     '--bs-trees',  # 'fbp,tbe',
                                      'autoMRE', '--seed', seed, "--threads", "{}".format(num_threads),
-                                     "--prefix", "fulltree"], shell=False)
+                                     "--prefix", "fulltree"], shell=False) # 'tbe', #
                 # subprocess.call(["raxml-ng-mpi", '--support', '--tree', 'fulltree.raxml.bestTree', '--bs-trees',
                 #                 'fulltree.raxml.bootstraps', "--prefix", 'support'])
                 subprocess.call(["raxml-ng-mpi", '--consense', 'MRE', '--tree', 'fulltree.raxml.bootstraps',
@@ -503,7 +522,7 @@ class InputCleaner(object):
     """
     This is the input class, that cleans the data before updating the phylogeny.
     """
-    def __init__(self, tre_fn, tre_schema, aln_fn, aln_schema, table, config_obj, mrca=None):
+    def __init__(self, tre_fn, tre_schema, aln_fn, aln_schema, table, config_obj):  # removed mrca
         sys.stdout.write('Clean the input data: {}, {}.'.format(tre_fn, aln_fn))
         self.config = config_obj
         if not os.path.exists(self.config.workdir):
@@ -511,14 +530,14 @@ class InputCleaner(object):
         # ncbi parser contains information about spn, tax_id, and ranks
         self.ncbi_parser = ncbi_data_parser.Parser(names_file=config_obj.ncbi_parser_names_fn,
                                                    nodes_file=config_obj.ncbi_parser_nodes_fn)
-        # set mrca id
-        assert type(mrca) in [int, list, set] or mrca is None, ("mrca is not an integer, list, set"
-                                                                " or None: {}".format(mrca))
-        self.mrca = self.format_mrca_set(mrca)
+        # # set mrca id
+        # assert type(mrca) in [int, list, set] or mrca is None, ("mrca is not an integer, list, set"
+        #                                                         " or None: {}".format(mrca))
+        # self.mrca = self.format_mrca_set(mrca)
 
         self.table = table
         self.aln = self.write_clean_aln(aln_fn, aln_schema)
-        assert type(self.aln) == DnaCharacterMatrix
+        assert isinstance(self.aln, DnaCharacterMatrix), (type(self.aln))
 
         if tre_fn is not None:
             if tre_schema is None:
@@ -546,9 +565,11 @@ class InputCleaner(object):
         :param mrca:
         :return:
         """
+        assert type(mrca) in [int, list, set] or mrca is None, ("mrca is not an integer, list, set"
+                                                                " or None: {}".format(mrca))
         mrca_name = self.ncbi_parser.get_name_from_id(list(mrca)[0])
         sys.stdout.write('Format mrca: {} - {}'.format(mrca, mrca_name))
-        if type(mrca) is int:
+        if isinstance(mrca, int):
             valid = self.ncbi_parser.taxid_is_valid(mrca)
             mrca = {mrca}
             if not valid:
@@ -569,7 +590,8 @@ class InputCleaner(object):
             mrca = {self.ncbi_parser.get_mrca(taxid_set=aln_taxids)}
         else:
             sys.stderr.write("Method 'format_mrca_set' does not behave as expected")
-        assert type(mrca) in {list, set, int}, ("your ingroup_mrca '%s' is not an integer/list/set." % mrca)
+            sys.exit(-3)
+        #assert type(mrca) in {list, set, int}, ("your ingroup_mrca '%s' is not an integer/list/set." % mrca)
         return mrca
 
     def delete_missing(self):
@@ -696,18 +718,18 @@ class InputCleaner(object):
         :param tre_schema: schema of tree
         :return:
         """
-        if tre_fn is not None:
-            with open(tre_fn, "r") as fin:
-                filedata = fin.read()
-            # Write the file out again
-            with open(os.path.join(self.config.workdir, "orig_tre.tre"), "w") as tre_file:
-                tre_file.write(filedata)
-            filedata = filedata.replace(" ", "_")
+        #if tre_fn is not None:
+        with open(tre_fn, "r") as fin:
+            filedata = fin.read()
+        # Write the file out again
+        with open(os.path.join(self.config.workdir, "orig_tre.tre"), "w") as tre_file:
+            tre_file.write(filedata)
+        filedata = filedata.replace(" ", "_")
 
-            upd_tre_fn = os.path.join(self.config.workdir, "updt_tre.tre")
-            with open(upd_tre_fn, "w") as tre_file:
-                tre_file.write(filedata)
-            # use replaced tre as input
-            tre = Tree.get(path=upd_tre_fn, schema=tre_schema, taxon_namespace=self.aln.taxon_namespace,
-                           preserve_underscores=True)
-            return tre
+        upd_tre_fn = os.path.join(self.config.workdir, "updt_tre.tre")
+        with open(upd_tre_fn, "w") as tre_file:
+            tre_file.write(filedata)
+        # use replaced tre as input
+        tre = Tree.get(path=upd_tre_fn, schema=tre_schema, taxon_namespace=self.aln.taxon_namespace,
+                       preserve_underscores=True)
+        return tre

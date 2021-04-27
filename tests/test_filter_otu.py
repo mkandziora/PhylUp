@@ -91,8 +91,7 @@ def test_filter_otu_no_rank():
 
     before = len(new_seqs)
     print(before)
-    new_seqs_org = new_seqs
-    before_table = deepcopy(test.table)
+
 
     f = phyl_up.FilterNumberOtu(conf, test.table, test.status)
     #assert len(test.table[test.table['status'] == test.status]) == 0, test.table[test.table['status'] == test.status]
@@ -106,26 +105,33 @@ def test_filter_otu_no_rank():
     assert before > after
     assert del_tab > 0
 
-    # with downtorank
-    new_seqs = new_seqs_org
+def test_filter_otu_rank():
+    test = pytest.test
+    print(test.table)
+    new_seqs = pytest.new_seqs
+    assert len(new_seqs) > 0, len(new_seqs)
+
+    conf = pytest.conf
+
+    before_table = deepcopy(test.table)
+
     before_dtr = len(new_seqs)
 
     f = phyl_up.FilterNumberOtu(conf, before_table, test.status)
-    f.filter(new_seqs_org, 'genus')
+    f.filter(new_seqs, 'genus')
     new_seqs = f.upd_new_seqs
 
     del_tab_dtr = len(f.del_table)
     after_dtr = len(new_seqs)
 
-    print(before, after, del_tab)
+
     print(before_dtr, after_dtr, del_tab_dtr)
 
     print(new_seqs[['ncbi_txn', 'accession', 'ncbi_txid']])
     assert before_dtr > after_dtr
     assert del_tab_dtr > 0
 
-    assert after > after_dtr
-    assert del_tab < del_tab_dtr
+
 
 
 def test_get_preferred_taxa():
@@ -134,28 +140,17 @@ def test_get_preferred_taxa():
 
     taxids_before = test.table.ncbi_txid.tolist()
 
-
-    f = phyl_up.FilterNumberOtu(test.config, test.table, test.status)
+    f = phyl_up.FilterPreferredTaxa(test.config, test.table, test.status)
     # assert len(test.table[test.table['status'] == test.status]) == 0, test.table[test.table['status'] == test.status]
     f.filter(new_seqs)
     new_seqs = f.upd_new_seqs
 
     taxids_after = new_seqs.ncbi_txid.tolist()
+    preferred_taxa = f.get_preferred_ids()
 
-    assert taxids_before not in taxids_after
+    assert taxids_before > taxids_after
 
-def test_prefer_different_OTU():
-    test = pytest.test
-    new_seqs = pytest.new_seqs
+    for taxid in taxids_after:
+        assert taxid in preferred_taxa
 
-    taxids_before = test.table.ncbi_txid.tolist()
-
-    f = phyl_up.FilterNumberOtu(test.config, test.table, test.status)
-    # assert len(test.table[test.table['status'] == test.status]) == 0, test.table[test.table['status'] == test.status]
-    f.filter(new_seqs)
-    new_seqs = f.upd_new_seqs
-
-    taxids_after = new_seqs.ncbi_txid.tolist()
-
-    assert taxids_before not in taxids_after
 
