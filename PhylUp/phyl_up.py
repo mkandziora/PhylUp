@@ -333,7 +333,7 @@ class PhylogeneticUpdater:
                     (len(new_seqs), len(self.table[self.table['status'] == self.status]),
                      new_seqs['accession'], self.table[self.table['status'] == self.status]['accession'])
 
-            if len(new_seqs) > 0:
+            if len(new_seqs) > 0 and self.config.preferred_taxa == True:
                 f = FilterPreferredTaxa(self.config, self.table, self.status)
                 f.filter(new_seqs, self.config.downtorank)
                 self.table = f.table
