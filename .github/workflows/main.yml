@@ -54,14 +54,14 @@ jobs:
             mkdir tests/output/test_runs
       - name: Test with pytest
         run: |
-            pytest --cov=PhylUp tests/test_*
+            pytest --cov=PhylUp tests/test_phylogen_updater*
 
 #      - name: upload coverage
 #        run: |
 #            codecov
 #            curl -s https://codecov.io/bash | bash
 
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v1
+#      - name: Upload coverage to Codecov
+#        uses: codecov/codecov-action@v1
 
 

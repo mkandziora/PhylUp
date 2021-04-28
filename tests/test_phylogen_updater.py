@@ -25,19 +25,19 @@ def test_remove_short_fromaln():
     conf.blast_folder = os.path.abspath("./data/blast_for_tests")
     conf.minlen = 0.9
 
-    aln0 = phylogenetic_helpers.read_in_aln(seqaln, mattype).taxon_namespace
+    aln0 = deepcopy(phylogenetic_helpers.read_in_aln(seqaln, mattype).taxon_namespace)
     test = phyl_up.PhylogeneticUpdater(id_to_spn, seqaln, mattype, trfn, schema_trf, conf)
     phylogenetic_helpers.write_aln(test.aln, test.config.workdir)
     alnbefore = deepcopy(test.aln.taxon_namespace)
 
     aln_upd = phylogen_updater.AlnUpdater(conf, test.aln, test.table, 2, None)
+    alnafter = deepcopy(aln_upd.aln.taxon_namespace)
 
-    #aln_upd.delete_short_seqs()
     print(aln0)
     print(alnbefore)
     print(aln_upd.aln.taxon_namespace)
     assert len(alnbefore) == len(aln0), (len(alnbefore), len(aln0))
-    assert  len(alnbefore) != len(aln_upd.aln.taxon_namespace), ( len(alnbefore),  len(aln_upd.aln.taxon_namespace))
+    assert len(alnbefore) != len(alnafter), ( len(alnbefore),  len(alnafter))
 
 
 
