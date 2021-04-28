@@ -37,6 +37,14 @@ jobs:
               echo PATH="$PATH:$(pwd)" >> $GITHUB_PATH
               cd ..
               cd ..
+
+              mkdir PaPaRa
+              cd PaPaRa
+              wget https://cme.h-its.org/exelixis/resource/download/software/papara_nt-2.5-static_x86_64.tar.gz
+              gunzip  -cd papara_nt-2.5-static_x86_64.tar.gz | (tar xvf - )
+              chmod +x papara_static_x86_64
+              echo PATH="$PATH:$(pwd)" >> $GITHUB_PATH
+              cd ..
       - name: download data
         run: |
             wget 'https://ftp.ncbi.nlm.nih.gov/pub/taxonomy/taxdump.tar.gz'
