@@ -12,7 +12,7 @@ import os
 from dendropy import Tree, DnaCharacterMatrix
 
 
-def test_standard_run():
+def xtest_standard_run():
 
     workdir = "tests/output/test_runs"  # working directory
     trfn = "data/tiny_test_example/test.tre"  # phylogeny
@@ -44,9 +44,10 @@ def test_standard_run():
     test = phyl_up.PhylogeneticUpdater(id_to_spn, seqaln, mattype, trfn, schema_trf, conf, ignore_acc_list=None)
     test.run()
 
-def xtest_standard_run():
 
-    workdir = "tests/output/test_runs"  # working directory
+def test_standard_run():
+
+    workdir = "tests/output/test_standardrun"  # working directory
     trfn = "data/tiny_test_example/test.tre"  # phylogeny
     schema_trf = "newick"  # format of phylogeny
     id_to_spn = "data/tiny_test_example/test_nicespl.csv"  # tab-delimited file where tip names correspond to ncbi names
@@ -92,14 +93,14 @@ def xtest_standard_run():
     test.call_input_cleaner()
     # assert len(table) > 1, (len(table), table)  # not the case if single seq is used as input
 
-    new_seqs = test.extend()  # todo rename to find new seqs
+    new_seqs = test.wrapper_for_extend(1)  # todo rename to find new seqs
 
     new_seqs = test.call_filter(new_seqs, test.aln)
 
     print(len(new_seqs.index))
     assert len(new_seqs.index) >= 171, len(new_seqs.index)
-
     test.update_aln()
+    test.replace_complete_withusedseq(new_seqs)
 
     if test.tre is None:
         test.tre_fn = os.path.abspath(os.path.join(test.config.workdir, "updt_aln.fasta.tree"))
