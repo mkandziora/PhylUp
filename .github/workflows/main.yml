@@ -1,4 +1,4 @@
-name: PhylUp integration
+name: PhylUp build and tests
 
 on:
   push:
@@ -54,12 +54,14 @@ jobs:
             mkdir tests/output/test_runs
       - name: Test with pytest
         run: |
-            pytest --cov=PhylUp tests/test_phylhelpers.py
-            pytest --cov=PhylUp tests/test_reconcile.py
-            pytest --cov=PhylUp tests/test_standard.py
+            pytest --cov=PhylUp tests/test_*
 
-      - name: upload coverage
-        run: |
-            codecov
-            curl -s https://codecov.io/bash | bash
+#      - name: upload coverage
+#        run: |
+#            codecov
+#            curl -s https://codecov.io/bash | bash
+
+      - name: Upload coverage to Codecov
+          uses: codecov/codecov-action@v1
+
 

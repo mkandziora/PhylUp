@@ -1,6 +1,5 @@
-[![Build Status](https://travis-ci.com/mkandziora/PhylUp.svg?token=tcUKPEqrpyvHbPasst5i&branch=master)](https://travis-ci.com/mkandziora/PhylUp)
-
- 
+[![codecov](https://codecov.io/gh/mkandziora/PhylUp/branch/master/graph/badge.svg)](https://codecov.io/gh/mkandziora/PhylUp)
+![Build Status](https://github.com/mkandziora/PhylUp/actions/workflows/main.yml/badge.svg)
 # PhylUp - generating phylogenetic alignments with custom sampling across taxonomic ranks
 
 
