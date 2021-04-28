@@ -3,8 +3,9 @@ PhylUp: phylogenetic alignment building with custom taxon sampling
 Copyright (C) 2020  Martha Kandziora
 martha.kandziora@mailbox.org
 
-Package to automatically update alignments and phylogenies using local sequences or a local Genbank database
-while controlling for the number of sequences per OTU.
+Package to automatically generate alignments (or update alignments and phylogenies)
+using local sequences or a local Genbank database
+while controlling for the number of sequences per OTU and taxonomic rank.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -76,8 +77,10 @@ class AlnUpdater(object):
         """
         print('update aln data')
         print(len(self.new_seq_table.index))
+        self.delete_short_seqs()
+
         if len(self.new_seq_table) > 0:
-            self.delete_short_seqs()
+
             self.write_papara_queryseqs()
             if len(self.aln) > 1:
                 if self.tre is None:  # generate random tree, e.g. from modeltest
@@ -96,10 +99,11 @@ class AlnUpdater(object):
                                                    self.config.modeltest_criteria)
                 self.tre = Tree.get(path=os.path.join(self.config.workdir, 'updt_aln.fasta.tree'),
                                     schema="newick", preserve_underscores=True)
-            phylogenetic_helpers.write_aln(self.aln, self.config.workdir)
             phylogenetic_helpers.write_tre(self.tre, self.config.workdir)
-            # self.aln = self.trim(os.path.abspath(os.path.join(self.config.workdir, 'papara_alignment.phylip')),
-            #                      format_aln='phylip')
+        phylogenetic_helpers.write_aln(self.aln, self.config.workdir)
+
+        # self.aln = self.trim(os.path.abspath(os.path.join(self.config.workdir, 'papara_alignment.phylip')),
+        #                      format_aln='phylip')
         self.write_labelled('updt_aln.fasta')
 
     def add_queryseqs_to_singleseq(self):
@@ -108,6 +112,7 @@ class AlnUpdater(object):
 
         :return:
         """
+        print('add query seq to single')
         phylogenetic_helpers.make_mafft_aln(self.aln, self.config.workdir)
         cmd_mafft = 'mafft --genafpair --leavegappyregion --maxiterate 16 --thread {} --reorder ' \
                     '{}/mafft.fasta > {}/mafft_align.fasta'.format(self.config.num_threads, self.config.workdir,
@@ -459,6 +464,7 @@ class TreeUpdater(object):
                                      "--prefix", "fulltree"], shell=False)  # 'tbe', #
                 # subprocess.call(["raxml-ng-mpi", '--support', '--tree', 'fulltree.raxml.bestTree', '--bs-trees',
                 #                 'fulltree.raxml.bootstraps', "--prefix", 'support'])
+                print('make consensus')
                 subprocess.call(["raxml-ng-mpi", '--consense', 'MRE', '--tree', 'fulltree.raxml.bootstraps',
                                  "--prefix", 'consMRE'], shell=False)
                 subprocess.call(["raxml-ng-mpi", '--consense', 'STRICT', '--tree', 'fulltree.raxml.bootstraps',
