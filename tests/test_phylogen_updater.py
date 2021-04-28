@@ -31,6 +31,7 @@ def test_remove_short_fromaln():
     phylogenetic_helpers.write_aln(test.aln, test.config.workdir)
 
     aln_upd = phylogen_updater.AlnUpdater(conf, test.aln, test.table, 2, None)
+    phylogenetic_helpers.write_aln(aln_upd.aln, test.config.workdir)
 
     alnafter = deepcopy(aln_upd.aln.taxon_namespace)
 
@@ -39,7 +40,7 @@ def test_remove_short_fromaln():
     print(alnafter)
 
     assert len(alnbefore) == len(aln0), (len(alnbefore), len(aln0))
-    assert len(alnbefore) != len(alnafter), ( len(alnbefore),  len(alnafter))
+    assert len(alnbefore) != len(alnafter), (len(alnbefore), len(alnafter))
 
 
 

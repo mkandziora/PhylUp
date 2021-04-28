@@ -1,5 +1,6 @@
 import os
 from distutils.dir_util import copy_tree
+from dendropy import Tree, DnaCharacterMatrix
 
 from PhylUp import phyl_up, config, phylogen_updater
 
@@ -60,3 +61,48 @@ def test_reconcile():
     assert len_aln == len_tre
 
     assert tre_asstring != tre_asstring_misstre
+
+
+    print('###################### RUN 4 ######################')
+
+    seqaln = "data/tiny_test_example/test_emptyseq.fas"
+    trfn = "data/tiny_test_example/test.tre"
+
+    aln = DnaCharacterMatrix.get(path=os.path.abspath(seqaln),
+                                 schema='fasta')
+    tre = Tree.get(path=trfn, schema="newick", preserve_underscores=True)
+    len_aln_before = (len(aln))
+    print(len(tre.taxon_namespace))
+    len_tre_before = (len(tre.taxon_namespace))
+
+    test = phyl_up.PhylogeneticUpdater(id_to_spn, seqaln, mattype, trfn, schema_trf, conf)
+    test.config.update_tree == True
+    cleaner = phylogen_updater.InputCleaner(treefilemiss, schema_trf, seqaln, mattype, test.table,
+                                            test.config)  # test.mrca
+
+    len_aln_after = (len(cleaner.aln))
+    len_tre_after = (len(cleaner.tre.taxon_namespace))
+
+    print(len_aln, len_aln_missaln, len_aln_misstre)
+    assert len_aln_after < len_aln_before
+    assert len_tre_after < len_tre_before
+
+
+    print('###################### RUN 5 ######################')
+
+    seqaln = "data/tiny_test_example/test_emptyseq.fas"
+    trfn = "data/tiny_test_example/test.tre"
+
+    aln = DnaCharacterMatrix.get(path=os.path.abspath(seqaln),
+                                 schema='fasta')
+    tre = Tree.get(path=trfn, schema="newick", preserve_underscores=True)
+
+    conf.backbone = True
+    test = phyl_up.PhylogeneticUpdater(id_to_spn, seqaln, mattype, trfn, schema_trf, conf)
+    test.config.update_tree == True
+    cleaner = phylogen_updater.InputCleaner(treefilemiss, schema_trf, seqaln, mattype, test.table,
+                                            test.config)  # test.mrca
+
+    assert os.path.exists(os.path.join(workdir, 'backbone.tre'))
+
+

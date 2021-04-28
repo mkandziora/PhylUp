@@ -106,3 +106,37 @@ def xtest_run_modeltest():
 def test_read_tree():
     trfn = "data/tiny_test_example/test.tre"  # phylogeny
     phylogenetic_helpers.read_in_tree(trfn)
+
+
+def test_writemafft():
+    workdir = "tests/output/test_phylhelper"  # working directory
+    seqaln = "data/tiny_test_example/test.fas"  # alignment
+    mattype = "fasta"  # format of alignment
+    aln = DnaCharacterMatrix.get(path=os.path.abspath(seqaln),
+                                 schema='fasta')
+    phylogenetic_helpers.make_mafft_aln(aln, workdir)
+
+    assert os.path.exists(os.path.join(workdir, "mafft.fasta"))
+
+
+def test_rewrite():
+    workdir = "tests/output/test_phylhelper"  # working directory
+    seqaln = "data/tiny_test_example/test.fas"  # alignment
+    mattype = "fasta"  # format of alignment
+    configfi = "data/localblast_test.config"
+    id_to_spn = "data/tiny_test_example/test_nicespl.csv"
+    trfn = "data/tiny_test_example/test.tre"  # phylogeny
+    schema_trf = "newick"  # format of phylogeny
+
+
+    conf = config.ConfigObj(configfi, workdir, interactive=False)
+    test = phyl_up.PhylogeneticUpdater(id_to_spn, seqaln, mattype, trfn, schema_trf, conf)
+
+    shutil.copyfile(seqaln, os.path.join(workdir, 'updt_aln.fasta'))
+    shutil.copyfile(trfn, os.path.join(workdir, 'updt_tre.tre'))
+
+    phylogenetic_helpers.replace_uid_with_name( os.path.join(workdir, 'updt_aln.fasta'), test.table, 'aln')
+    phylogenetic_helpers.replace_uid_with_name(os.path.join(workdir, 'updt_tre.tre'), test.table, 'tree')
+
+    assert os.path.exists(os.path.join(workdir, 'updt_aln.fasta_relabel'))
+    assert os.path.exists(os.path.join(workdir, 'updt_tre.tre_relabel'))
