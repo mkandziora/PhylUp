@@ -54,8 +54,6 @@ jobs:
             mkdir tests/output/test_runs
       - name: Test with pytest
         run: |
-            pytest --cov=PhylUp tests/test_aln_updater.py
-            pytest --cov=PhylUp tests/test_filter_otu.py
             pytest --cov=PhylUp tests/test_phylhelpers.py
             pytest --cov=PhylUp tests/test_reconcile.py
             pytest --cov=PhylUp tests/test_standard.py

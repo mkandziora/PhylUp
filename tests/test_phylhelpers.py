@@ -87,15 +87,8 @@ def test_truncate_papara_aln():
     assert lenaln > lenaln_after
 
 
-def test_run_modeltest():
+def xtest_run_modeltest():
     workdir = "tests/output/test_phylhelper"  # working directory
-    seqaln = "data/tiny_test_example/test.fas"  # alignment
-    mattype = "fasta"  # format of alignment
-    trfn = "data/tiny_test_example/test.tre"  # phylogeny
-    schema_trf = "newick"  # format of phylogeny
-    id_to_spn = "data/tiny_test_example/test_nicespl.csv"  # tab-delimited file where tip names correspond to ncbi names
-    configfi = "data/localblast_test.config"
-
     phylogenetic_helpers.run_modeltest('updt_aln.fasta', workdir, 'AIC')
     #phylogenetic_helpers.find_best_model(seqaln, 'AICc', None)
 
@@ -111,8 +104,5 @@ def test_run_modeltest():
 #     phylogenetic_helpers.find_best_model(seqaln, 'AICc', None)
 
 def test_read_tree():
-    workdir = "tests/output/test_phylhelper"  # working directory
-    seqaln = "data/tiny_test_example/test.fas"  # alignment
-    mattype = "fasta"  # format of alignment
     trfn = "data/tiny_test_example/test.tre"  # phylogeny
     phylogenetic_helpers.read_in_tree(trfn)
