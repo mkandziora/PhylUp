@@ -47,7 +47,7 @@ def test_reconcile():
 
     test = phyl_up.PhylogeneticUpdater(id_to_spn, seqaln, mattype, treefilemiss, schema_trf, conf)
     test.config.update_tree == True
-    cleaner = phylogen_updater.InputCleaner(trfn, schema_trf, seqaln, mattype, test.table, test.config) # test.mrca
+    cleaner = phylogen_updater.InputCleaner(treefilemiss, schema_trf, seqaln, mattype, test.table, test.config) # test.mrca
 
     len_aln_misstre = (len(cleaner.aln))
     tre_asstring_misstre = cleaner.tre.as_string(schema='newick')
