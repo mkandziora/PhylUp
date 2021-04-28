@@ -5,7 +5,7 @@ from PhylUp import phyl_up, config, phylogenetic_helpers, phylogen_updater
 from copy import deepcopy
 
 def test_remove_short_fromaln():
-    workdir = "tests/output/test_runs_length"
+    workdir = "tests/output/test_filterbylength"
     trfn = "data/tiny_test_example/test.tre"
     schema_trf = "newick"
     id_to_spn = "data/tiny_test_example/test_nicespl.csv"
@@ -27,8 +27,7 @@ def test_remove_short_fromaln():
 
     aln0 = phylogenetic_helpers.read_in_aln(seqaln, mattype).taxon_namespace
     test = phyl_up.PhylogeneticUpdater(id_to_spn, seqaln, mattype, trfn, schema_trf, conf)
-
-
+    phylogenetic_helpers.write_aln(test.aln, test.config.workdir)
     alnbefore = deepcopy(test.aln.taxon_namespace)
 
     aln_upd = phylogen_updater.AlnUpdater(conf, test.aln, test.table, 2, None)
@@ -37,8 +36,8 @@ def test_remove_short_fromaln():
     print(aln0)
     print(alnbefore)
     print(aln_upd.aln.taxon_namespace)
-    assert alnbefore == aln0, (alnbefore, aln0)
-    assert alnbefore != aln_upd.aln.taxon_namespace, (alnbefore,  aln_upd.aln.taxon_namespace)
+    assert len(alnbefore) == len(aln0), (len(alnbefore), len(aln0))
+    assert  len(alnbefore) != len(aln_upd.aln.taxon_namespace), ( len(alnbefore),  len(aln_upd.aln.taxon_namespace))
 
 
 
