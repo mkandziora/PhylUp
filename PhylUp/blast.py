@@ -3,8 +3,9 @@ PhylUp: phylogenetic alignment building with custom taxon sampling
 Copyright (C) 2020  Martha Kandziora
 martha.kandziora@mailbox.org
 
-Package to automatically update alignments and phylogenies using local sequences or a local Genbank database
-while controlling for the number of sequences per OTU.
+Package to automatically generate alignments (or update alignments and phylogenies)
+using local sequences or a local Genbank database
+while controlling for the number of sequences per OTU and taxonomic rank.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -18,7 +19,6 @@ GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
-
 
 """
 
