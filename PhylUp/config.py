@@ -159,7 +159,7 @@ class ConfigObj(object):
             self.blastdb = '{}/nt'.format(self.blastdb_path)
         elif self.blast_type == 'own':
             tax_id_map = config['blast']['taxid_map']
-            name_txid = phylogenetic_helpers.get_txid_for_name_from_file(self.tax_id_map, ncbi_parser)
+            name_txid = phylogenetic_helpers.get_txid_for_name_from_file(tax_id_map, ncbi_parser)
             if not os.path.exists(os.path.join(self.blastdb_path, 'db')):
                 os.mkdir(os.path.join(self.blastdb_path, 'db'))
             name_txid[['accession', 'ncbi_txid']].to_csv(
