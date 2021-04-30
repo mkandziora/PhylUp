@@ -7,6 +7,7 @@ Package to automatically generate alignments (or update alignments and phylogeni
 using local sequences or a local Genbank database
 while controlling for the number of sequences per OTU and taxonomic rank.
 
+
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
 the Free Software Foundation, either version 3 of the License, or
@@ -29,7 +30,8 @@ import os
 
 def run_multiple(data, confs, end, overlap_folder=None, first_locus=False):
     """
-    Main function to intitiate PhylUp.
+    Main function to initiate PhylUp.
+
     :param data: a dictionary containing a dictionary with the input per locus
     :param confs: a list containing the path to the different configuration file(s)
     :param end: a number defining how many blast rounds shall be done. Put 0 for a single run
