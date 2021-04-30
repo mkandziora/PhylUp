@@ -7,6 +7,9 @@ Package to automatically generate alignments (or update alignments and phylogeni
 using local sequences or a local Genbank database
 while controlling for the number of sequences per OTU and taxonomic rank.
 
+This is the blast submodule consisting of functions only that are doing the blast querys
+and the processing into the format needed by PhylUp.
+
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
 the Free Software Foundation, either version 3 of the License, or

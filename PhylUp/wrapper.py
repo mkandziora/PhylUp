@@ -28,6 +28,17 @@ import os
 
 
 def run_multiple(data, confs, end, overlap_folder=None, first_locus=False):
+    """
+    Main function to intitiate PhylUp.
+    :param data: a dictionary containing a dictionary with the input per locus
+    :param confs: a list containing the path to the different configuration file(s)
+    :param end: a number defining how many blast rounds shall be done. Put 0 for a single run
+    :param overlap_folder: provide a folder name, where data across loci is stored;
+            only needed if multiple loci are being updated
+    :param first_locus: Provide name of main locus (same as used in data),
+           if preferred taxa shall be focus on samples from that locus
+           (usually put the locus with most samples available here)
+    """
     count = 0
     for conffi in confs:
         if len(confs) > 1:

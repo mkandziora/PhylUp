@@ -7,6 +7,8 @@ Package to automatically generate alignments (or update alignments and phylogeni
 using local sequences or a local Genbank database
 while controlling for the number of sequences per OTU and taxonomic rank.
 
+It consists of the PhylUp main class and the different filtering classes. The key part of the program.
+
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
 the Free Software Foundation, either version 3 of the License, or
@@ -46,8 +48,23 @@ from . import suppress_warnings, debug
 class PhylogeneticUpdater:
     """
     Main class managing the expansion of alignment with sequences from sequence databases.
+    This class calls all other submodules in order to build and expand alignments and calculate a Maximum likelihood
+    phylogeny.
     """
     def __init__(self, id_to_spn, aln, aln_schema, tre, tre_schema, config, ignore_acc_list=None):
+        """
+        :param id_to_spn: file that contains the sample names and an accepted ncbi name.
+            Ncbi names are needed for the filtering. If the species name is unknown by ncbi or not accepted,
+            please provide a name of one taxonomic rank upwards (e.g. genus name).
+        :param aln: path to alignment file
+        :param aln_schema: format of alignment file (e.g. 'fasta, 'nexus')
+        :param tre: path to phylogeny, if no phylogeny is available put None
+        :param tre_schema: format of phylogeny
+        :param config: configuration object - must be established before calling PhylUp,
+                by calling: config.ConfigObj(configfi, workdir)
+        :param ignore_acc_list: if certain Genbank accession numbers should be ignored,
+                provide them here as python list (e.g.[acc.1, acc.2])
+        """
         self.config = config
         self.workdir = self.config.workdir
         self.status = 0  # -1 = deleted, positive values = round, 0 = present at beginning
@@ -80,7 +97,7 @@ class PhylogeneticUpdater:
 
         Needed for different_level == True
 
-        :return:
+        :return: Nothing is returned. Files are being moved and self.table.status is updated if condition is met.
         """
         if self.config.different_level is True and self.status < 1:
             # try:
@@ -110,9 +127,7 @@ class PhylogeneticUpdater:
     def set_mrca(self, mrca):
         """
         Set the mrca in the class for various input: None, one ncbi id, list of ncbi_ids.
-
-        Note: list finds mrca of all ids, including ids that were not mentioned.
-        Thus, not helpful for non-monophyletic groups!
+        If None, mcra will be defined automatically from the input sequences.
 
         :param mrca: input mrca
         :return: sets self.mrca
@@ -189,7 +204,7 @@ class PhylogeneticUpdater:
         """
         Gets new sequences from those existing once which have not yet been blasted before.
 
-        :return:
+        :return:pandas dataframe with the newly retrieved sequences from blast before filtering
         """
         # create list of indice of subset list
         sys.stdout.write("Find new sequences using the BLAST database.\n")
@@ -237,7 +252,7 @@ class PhylogeneticUpdater:
         Removes accession numbers specified in the analysis file that shall not be added.
 
         :param new_seqs:  pandas dataframe with the new sequences retrieved earlier
-        :return:
+        :return: new_seqs without sequences that are defined in ignore_acc_list
         """
         drop_boolean = np.where((new_seqs.accession.isin(self.ignore_acc_list)), True, False)
         new_seqs = new_seqs[drop_boolean != True]
@@ -279,7 +294,7 @@ class PhylogeneticUpdater:
 
         :param new_seqs: pandas dataframe with the new sequences retrieved earlier
         :param aln: alignment as dendropy object
-        :return:
+        :return: new_seqs after all filtering steps
         """
         msg = "Round of filters: {}\n".format(self.status)
         write_msg_logfile(msg, self.config.workdir)
@@ -307,7 +322,7 @@ class PhylogeneticUpdater:
         Function calls filters, that alter entries in the table.
 
         :param new_seqs: pandas dataframe with the new sequences retrieved/not filtered from earlier
-        :return:
+        :return: new_seqs after FilterSeqIdent, FilterPreferredTaxa, FilterNumberOtu
         """
         debug('compare filter')
         if len(new_seqs) > 0:
@@ -528,7 +543,7 @@ class PhylogeneticUpdater:
         Note, that therefore the new seqs have to be placed into the alignment first.
 
         :param new_seqs:
-        :return:
+        :return: None, updates self objects
         """
         debug('replace_complete_withusedseq')
         # print(new_seqs.accession)
@@ -582,6 +597,7 @@ class PhylogeneticUpdater:
     def call_input_cleaner(self):
         """
         Calls InputCleaner class and updates input data.
+
         :return:
         """
         # debug(self.mrca)
@@ -647,6 +663,9 @@ class Filter(object):
     Super class for the different Filter classes.
     """
     def __init__(self, config):
+        """
+        :param config: configuration module from where the settings for the filtering are being taken
+        """
         self.config = config
         columns = ['ncbi_txn', 'ncbi_txid', 'status', 'status_note', "date",
                    'accession', 'pident', 'evalue', 'bitscore', 'sseq', 'title']
@@ -732,9 +751,14 @@ def calculate_mean_sd(bitscores):
 
 class FilterPreferredTaxa(Filter):
     """
-    Filter new sequences to the number defined as threshold. Either via local blast or select longest
+    Filter new sequences to the number defined as threshold. Either via local blast or select longest.
     """
     def __init__(self, config, table, status):
+        """
+        :param config: configuration module from where the settings for the filtering are being taken
+        :param table: self.table object from PhylogeneticUpdater class
+        :param status: self.status from PhylogeneticUpdater class
+    """
         super().__init__(config)
         self.table = table
         check_df_index_unique(self.table)
@@ -906,9 +930,14 @@ def drop_seq_by_length(filter_dict):
 
 class FilterNumberOtu(Filter):
     """
-    Filter new sequences to the number defined as threshold. Either via local blast or select longest
+    Filter new sequences to the number defined as threshold. Either via local blast or select longest.
     """
     def __init__(self, config, table, status):
+        """
+        :param config: configuration module from where the settings for the filtering are being taken
+        :param table: self.table object from PhylogeneticUpdater class
+        :param status: self.status from PhylogeneticUpdater class
+        """
         super().__init__(config)
         self.table = table
         check_df_index_unique(self.table)
@@ -1170,6 +1199,11 @@ class FilterSeqIdent(Filter):
     Filters new sequences that are identical (seq and taxon id) to something already in the data.
     """
     def __init__(self, config, table, status):
+        """
+        :param config: configuration module from where the settings for the filtering are being taken
+        :param table: self.table object from PhylogeneticUpdater class
+        :param status: self.status from PhylogeneticUpdater class
+        """
         super().__init__(config)
         self.status = status
         self.table = table
@@ -1302,6 +1336,10 @@ class FilterMRCA(Filter):
     Filters sequences that are not part of the defined mrca.
     """
     def __init__(self, config, mrca):
+        """
+        :param config: configuration module from where the settings for the filtering are being taken
+        :param mrca: self.mrca from PhylogeneticUpdater class
+        """
         super().__init__(config)
         self.mrca = mrca
 
@@ -1362,6 +1400,9 @@ class FilterBLASTThreshold(Filter):
     Removes sequences that do not pass the similarity filter (blast threshold).
     """
     def __init__(self, config):
+        """
+        :param config: configuration module from where the settings for the filtering are being taken
+        """
         super().__init__(config)
 
     def filter(self, new_seqs):
@@ -1395,6 +1436,10 @@ class FilterUniqueAcc(Filter):
     Removes sequences that were already there (have same accession number.)
     """
     def __init__(self, config, table):
+        """
+        :param config: configuration module from where the settings for the filtering are being taken
+        :param table: self.table object from PhylogeneticUpdater class
+        """
         super().__init__(config)
         self.table = table
 
@@ -1453,6 +1498,10 @@ class FilterLength(Filter):
     Removes sequences that are too short or too long.
     """
     def __init__(self, config, aln):
+        """
+        :param config: configuration module from where the settings for the filtering are being taken
+        :param aln: self.aln object from PhylogeneticUpdater class
+        """
         super().__init__(config)
         self.aln = aln
 

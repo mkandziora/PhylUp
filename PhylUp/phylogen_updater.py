@@ -7,6 +7,9 @@ Package to automatically generate alignments (or update alignments and phylogeni
 using local sequences or a local Genbank database
 while controlling for the number of sequences per OTU and taxonomic rank.
 
+These modules handle the cleaning of the input data, the updating of the alignment using external programs as well as
+the updating of the phylogeny using external programs.
+
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
 the Free Software Foundation, either version 3 of the License, or
@@ -528,6 +531,15 @@ class InputCleaner(object):
     This is the input class, that cleans the data before updating the phylogeny.
     """
     def __init__(self, tre_fn, tre_schema, aln_fn, aln_schema, table, config_obj):  # removed mrca
+        """
+
+        :param tre_fn: path to phylogeny
+        :param tre_schema: format of phylogeny
+        :param aln_fn: path to alignment
+        :param aln_schema: format of alignment
+        :param table: self.table from PhylogenticUpdater
+        :param config_obj: configuration object
+        """
         sys.stdout.write('Clean the input data: {}, {}.'.format(tre_fn, aln_fn))
         self.config = config_obj
         if not os.path.exists(self.config.workdir):

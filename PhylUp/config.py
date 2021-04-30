@@ -7,6 +7,8 @@ Package to automatically generate alignments (or update alignments and phylogeni
 using local sequences or a local Genbank database
 while controlling for the number of sequences per OTU and taxonomic rank.
 
+This is the configuration submodule reading in the information from the configuration file and processing it for PhylUp.
+
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
 the Free Software Foundation, either version 3 of the License, or
@@ -39,9 +41,8 @@ from . import blast, phylogenetic_helpers
 
 # TODO remove interactive option
 class ConfigObj(object):
-    def __init__(self, configfi, workdir, interactive=True):
-        """
-        Build a configuration class.
+    """
+    Build a configuration class.
 
         During the initializing process the following self objects are generated:
             * **self.workdir**: working directory
@@ -82,7 +83,9 @@ class ConfigObj(object):
 
             * **interactive**: T/F; checks if databases need to be updated
             * **self.logfile**: file location where some information during the run is logged
-
+    """
+    def __init__(self, configfi, workdir, interactive=True):
+        """
         :param configfi: a configuration file in a specific format. The file needs to have a heading of the format:
                         [blast] and then somewhere below that heading as string, e.g. e_value_thresh = value
         :param workdir: the working directory
