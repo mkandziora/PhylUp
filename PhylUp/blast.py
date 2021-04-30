@@ -3,8 +3,12 @@ PhylUp: phylogenetic alignment building with custom taxon sampling
 Copyright (C) 2020  Martha Kandziora
 martha.kandziora@mailbox.org
 
-Package to automatically update alignments and phylogenies using local sequences or a local Genbank database
-while controlling for the number of sequences per OTU.
+Package to automatically generate alignments (or update alignments and phylogenies)
+using local sequences or a local Genbank database
+while controlling for the number of sequences per OTU and taxonomic rank.
+
+This is the blast submodule consisting of functions only that are doing the blast querys
+and the processing into the format needed by PhylUp.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -18,7 +22,6 @@ GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
-
 
 """
 
@@ -345,8 +348,8 @@ def get_full_seq(gb_acc, blast_seq, workdir, blastdb, db):
             # print(cmd1)
             with suppress_stdout():
                 os.system(cmd1)
-            #DEVNULL = open(os.devnull, 'wb')
-            #subprocess.call(cmd1, shell=False, stderr=DEVNULL)
+            # DEVNULL = open(os.devnull, 'wb')
+            # subprocess.call(cmd1, shell=False, stderr=DEVNULL)
             assert os.stat(full_seq_fn).st_size > 0, ('file {} has no content'.format(full_seq_fn))
         # read in file to get full seqseq
         fn_seq = os.path.join(workdir, "tmp/full_seq_{}.fasta".format(gb_acc))
@@ -397,7 +400,6 @@ def check_directionality(blast_seq, seq):
     """
     assert blast_seq is not "", blast_seq
     assert seq is not "", seq
-    #orig = Seq(seq, generic_dna)  # generic_dna and Alphabet will be deprecated soon. I've not yet found a solution.
     orig = Seq(seq)  # generic_dna and Alphabet will be deprecated soon. I've not yet found a solution.
     dna_comp = orig.complement()
     dna_rcomp = orig.reverse_complement()
@@ -448,7 +450,7 @@ def run_blast_query(query_seq, taxon, db_name, config, mrca=None):
     :return: runs local blast query and writes it to file
     """
     # print("run_blast_query")
-    #errf = open("./{}/blast_stderr".format(config.workdir), 'a')
+    # errf = open("./{}/blast_stderr".format(config.workdir), 'a')
 
     assert taxon not in [None, 'nan', 'NA', 'na']
     taxon = str(taxon)
@@ -485,7 +487,7 @@ def run_blast_query(query_seq, taxon, db_name, config, mrca=None):
         with cd(os.path.abspath(config.blastdb_path)):
             # TODO MK: blast+ v. 2.8 code - then we can limit search to taxids: -taxids self.mrca_ncbi
             #  !no mrca information here avail! - needs also some form of taxonomy db - unsure which
-            #blastcmd = "blastn -query " + input_fn + " -db {}/nt_v5 -out ".format(os.path.abspath(config.blastdb)) + \
+            # blastcmd = "blastn -query " + input_fn + " -db {}/nt_v5 -out ".format(os.path.abspath(config.blastdb)) + \
             #           query_output_fn + " {} -num_threads {}".format(outfmt, config.num_threads) + \
             #           " -max_target_seqs {} -max_hsps {}".format(config.hitlist_size, config.hitlist_size)
             blastcmd = "blastn -query " + input_fn + " -db {} -out ".format(os.path.abspath(config.blastdb)) + \
@@ -496,11 +498,11 @@ def run_blast_query(query_seq, taxon, db_name, config, mrca=None):
             # needs to run from within the folder:
             with suppress_stdout():
                 if not os.path.isfile(query_output_fn):
-                    #subprocess.call(blastcmd, shell=False, stderr=DEVNULL)
+                    # subprocess.call(blastcmd, shell=False, stderr=DEVNULL)
                     os.system(blastcmd)
                     # print(blastcmd)
                 elif not os.stat(query_output_fn).st_size > 0:
-                    #subprocess.call(blastcmd, shell=False, stderr=DEVNULL)
+                    # subprocess.call(blastcmd, shell=False, stderr=DEVNULL)
                     os.system(blastcmd)
 
     else:
@@ -508,10 +510,11 @@ def run_blast_query(query_seq, taxon, db_name, config, mrca=None):
         with cd(os.path.join(config.workdir, "tmp")):
             blastcmd = "blastn -query {} -db {} -out ".format(input_fn, db) + query_output_fn + \
                        " {} -num_threads {}".format(outfmt, config.num_threads) + \
-                       " -max_target_seqs {} -max_hsps {}".format(config.hitlist_size_unpublished, config.hitlist_size_unpublished)
+                       " -max_target_seqs {} -max_hsps {}".format(config.hitlist_size_unpublished,
+                                                                  config.hitlist_size_unpublished)
             with suppress_stdout():
                 os.system(blastcmd)
-            #subprocess.call(blastcmd, shell=False, stderr=DEVNULL)
+            # subprocess.call(blastcmd, shell=False, stderr=DEVNULL)
             # todo: produces blastn taxdb warning, taxids here not needed and not part of taxdb anyways as local search.
             #  I keep it to make it coherent for reading in results.
 
@@ -574,7 +577,7 @@ def read_blast_query_pandas(blast_fn, config, db_name):
     new_seqs['sseq'] = new_seqs['sseq'].str.replace("-", "")
     new_seqs['date'] = datetime.datetime.strptime('01/01/00', '%d/%m/%y')
     # todo this could be made faster by running it on the redundant/non_redundant data first
-    #new_seqs = wrapper_get_fullseq(config, new_seqs, db_name)
+    # new_seqs = wrapper_get_fullseq(config, new_seqs, db_name)
     return new_seqs
 
 
@@ -606,7 +609,8 @@ def get_non_redundant_data(config, redundant):
     non_redundant_redundant = pd.DataFrame(columns=colnames)
     queried_acc = set()  # used to test if gb_acc was added before  aka query_dict in physcraper
 
-    acc_column = redundant["accession"].str.split(";", n=-1, expand=True)  # todo: try to expand in row instead of column
+    acc_column = redundant["accession"].str.split(";", n=-1, expand=True)
+    # todo: try to expand in row instead of column
     # todo: think about making a single df first where unique acc corresponds to taxid and same index val
     #  as in redundant, then use that whole df to make new non_redundant_redundant df. - discussion moritz
     for idx in acc_column.index:

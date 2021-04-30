@@ -154,3 +154,27 @@ def test_get_preferred_taxa():
         assert taxid in preferred_taxa
 
 
+def test_filter_usinglength():
+    test = pytest.test
+    print(test.table)
+    new_seqs = pytest.new_seqs
+    assert len(new_seqs) > 0, len(new_seqs)
+
+    conf = pytest.conf
+    conf.filtertype = 'length'
+
+    before = len(new_seqs)
+    print(before)
+
+
+    f = phyl_up.FilterNumberOtu(conf, test.table, test.status)
+    #assert len(test.table[test.table['status'] == test.status]) == 0, test.table[test.table['status'] == test.status]
+    f.filter(new_seqs)
+    new_seqs = f.upd_new_seqs
+
+    del_tab = len(f.del_table)
+    after = len(new_seqs)
+
+
+    assert before > after
+    assert del_tab > 0

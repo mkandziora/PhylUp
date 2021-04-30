@@ -1,0 +1,67 @@
+name: PhylUp build and tests
+
+on:
+  push:
+    branches:
+      - main
+      - dev
+
+jobs:
+  run_python:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-python@v2
+        with:
+          python-version: '3.7'
+          architecture: 'x64'
+#      - uses: conda-incubator/setup-miniconda@v2
+#        with:
+#          installer-url: https://github.com/conda-forge/miniforge/releases/download/4.8.3-2/Miniforge-pypy3-4.8.3-2-Linux-x86_64.sh
+#          allow-softlinks: true
+#          show-channel-urls: true
+#          use-only-tar-bz2: true
+          #conda install -c bioconda blast
+
+      #- uses: mkandziora/PhylUp@dev
+      - name: Install dependencies
+        run: |
+              python -m pip install --upgrade pip
+              pip install pytest pytest-cov pytest-xdist codecov
+              pip install -r requirements.txt
+              python setup.py install
+
+              wget ftp://ftp.ncbi.nlm.nih.gov/blast/executables/blast+/2.9.0/ncbi-blast-2.9.0+-x64-linux.tar.gz
+              tar -xvf ncbi-blast-2.9.0+-x64-linux.tar.gz
+              cd ncbi-blast-2.9.0+/bin/
+              echo PATH="$PATH:$(pwd)" >> $GITHUB_PATH
+              cd ..
+              cd ..
+
+              mkdir PaPaRa
+              cd PaPaRa
+              wget https://cme.h-its.org/exelixis/resource/download/software/papara_nt-2.5-static_x86_64.tar.gz
+              gunzip  -cd papara_nt-2.5-static_x86_64.tar.gz | (tar xvf - )
+              chmod +x papara_static_x86_64
+              echo PATH="$PATH:$(pwd)" >> $GITHUB_PATH
+              cd ..
+      - name: download data
+        run: |
+            wget 'https://ftp.ncbi.nlm.nih.gov/pub/taxonomy/taxdump.tar.gz'
+            gunzip  -cd taxdump.tar.gz | (tar xvf - names.dmp nodes.dmp)
+            mv *.dmp ./data/
+            mkdir tests/output
+            mkdir tests/output/test_runs
+      - name: Test with pytest
+        run: |
+            pytest --cov=PhylUp tests/test_*
+
+#      - name: upload coverage
+#        run: |
+#            codecov
+#            curl -s https://codecov.io/bash | bash
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v1
+
+

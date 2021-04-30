@@ -3,8 +3,11 @@ PhylUp: phylogenetic alignment building with custom taxon sampling
 Copyright (C) 2020  Martha Kandziora
 martha.kandziora@mailbox.org
 
-Package to automatically update alignments and phylogenies using local sequences or a local Genbank database
-while controlling for the number of sequences per OTU.
+Package to automatically generate alignments (or update alignments and phylogenies)
+using local sequences or a local Genbank database
+while controlling for the number of sequences per OTU and taxonomic rank.
+
+This is the configuration submodule reading in the information from the configuration file and processing it for PhylUp.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -19,7 +22,6 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-
 """
 
 # user settings class
@@ -29,7 +31,7 @@ import sys
 import configparser
 import datetime
 
-from . import db_updater
+#from . import db_updater
 from . import debug
 import ncbiTAXONparser.ncbi_data_parser as ncbi_data_parser
 from . import blast, phylogenetic_helpers
@@ -37,14 +39,13 @@ from . import blast, phylogenetic_helpers
 
 # TODOdone: make global blast folders that can be shared across runs
 
-
+# TODO remove interactive option
 class ConfigObj(object):
-    def __init__(self, configfi, workdir, interactive=True):
-        """
-        Build a configuration class.
+    """
+    Build a configuration class.
 
         During the initializing process the following self objects are generated:
-            * self.workdir**: working directory
+            * **self.workdir**: working directory
             * **self.num_threads**: number of cores to be used during a run
             * **self.mrca_input**: input of mrca
 
@@ -55,7 +56,7 @@ class ConfigObj(object):
             * **self.blast_all**: T/F; in the subsequent Genbank blast, blast all sequences (input+unpublished)
                                     or only unpublished. = config["unpublished"]['blast_all']
 
-            * self.blastdb: this defines the path to the local blast database
+            * **self.blastdb**: this defines the path to the local blast database
             * **self.e_value_thresh**: the defined threshold for the e-value during Blast searches, check out:
                 https://blast.ncbi.nlm.nih.gov/Blast.cgi?CMD=Web&PAGE_TYPE=BlastDocs&DOC_TYPE=FAQ
             * **self.hitlist_size**: the maximum number of sequences retrieved by a single blast search
@@ -63,8 +64,8 @@ class ConfigObj(object):
                                                 in the unpublished database
             * **self.fix_blast**: T/F; use same blast folder across runs
 
-            * self.ncbi_parser_nodes_fn: path to 'nodes.dmp' file, that contains the hierarchical information
-            * self.ncbi_parser_names_fn: path to 'names.dmp' file, that contains the different ID's
+            * **self.ncbi_parser_nodes_fn**: path to 'nodes.dmp' file, that contains the hierarchical information
+            * **self.ncbi_parser_names_fn**: path to 'names.dmp' file, that contains the different ID's
 
             * **self.minlen**: Defines how much shorter new seq can be compared to input
             * **self.maxlen**: max length for values to add to aln
@@ -78,11 +79,13 @@ class ConfigObj(object):
 
             * **self.backbone**: T/F; calculate complete tree or add to backbone
             * **self.update_tree**: T/F; update tree (T) or just update alignment
-            * **self.modeltest_criteria** BIC, AIC or AICc
+            * **self.modeltest_criteria**: BIC, AIC or AICc
 
             * **interactive**: T/F; checks if databases need to be updated
             * **self.logfile**: file location where some information during the run is logged
-
+    """
+    def __init__(self, configfi, workdir, interactive=True):
+        """
         :param configfi: a configuration file in a specific format. The file needs to have a heading of the format:
                         [blast] and then somewhere below that heading as string, e.g. e_value_thresh = value
         :param workdir: the working directory
@@ -159,7 +162,7 @@ class ConfigObj(object):
             self.blastdb = '{}/nt'.format(self.blastdb_path)
         elif self.blast_type == 'own':
             tax_id_map = config['blast']['taxid_map']
-            name_txid = phylogenetic_helpers.get_txid_for_name_from_file(self.tax_id_map, ncbi_parser)
+            name_txid = phylogenetic_helpers.get_txid_for_name_from_file(tax_id_map, ncbi_parser)
             if not os.path.exists(os.path.join(self.blastdb_path, 'db')):
                 os.mkdir(os.path.join(self.blastdb_path, 'db'))
             name_txid[['accession', 'ncbi_txid']].to_csv(
@@ -179,7 +182,7 @@ class ConfigObj(object):
         self.hitlist_size = int(self.hitlist_size)
         self.hitlist_size_unpublished = config["blast"]["hitlist_size_unpublished"]
         assert self.hitlist_size_unpublished.split('.')[0].isdigit(), ("Hitlist size  unpublished is not defined as "
-                                                           "a number: {}.\n".format(self.hitlist_size))
+                                                                       "a number: {}.\n".format(self.hitlist_size))
         self.hitlist_size_unpublished = int(self.hitlist_size_unpublished)
 
         self.fix_blast = config["blast"]["fix_blast_result_folder"]
@@ -205,7 +208,6 @@ class ConfigObj(object):
         assert 1 < self.maxlen, ("Max len is not larger than 1: {}.\n".format(self.maxlen))
         self.trim_perc = float(config["phylup"]["trim_perc"])
         assert 0 < self.trim_perc < 1, ("Percentage for trimming is not between 0 and 1: {}.\n".format(self.trim_perc))
-
 
         # internal alignment setting
         self.added_seqs_aln = False

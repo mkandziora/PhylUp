@@ -3,8 +3,11 @@ PhylUp: phylogenetic alignment building with custom taxon sampling
 Copyright (C) 2020  Martha Kandziora
 martha.kandziora@mailbox.org
 
-Package to automatically update alignments and phylogenies using local sequences or a local Genbank database
-while controlling for the number of sequences per OTU.
+Package to automatically generate alignments (or update alignments and phylogenies)
+using local sequences or a local Genbank database
+while controlling for the number of sequences per OTU and taxonomic rank.
+
+It consists of the PhylUp main class and the different filtering classes. The key part of the program.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -18,7 +21,6 @@ GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
-
 
 """
 
@@ -46,8 +48,23 @@ from . import suppress_warnings, debug
 class PhylogeneticUpdater:
     """
     Main class managing the expansion of alignment with sequences from sequence databases.
+    This class calls all other submodules in order to build and expand alignments and calculate a Maximum likelihood
+    phylogeny.
     """
     def __init__(self, id_to_spn, aln, aln_schema, tre, tre_schema, config, ignore_acc_list=None):
+        """
+        :param id_to_spn: file that contains the sample names and an accepted ncbi name.
+            Ncbi names are needed for the filtering. If the species name is unknown by ncbi or not accepted,
+            please provide a name of one taxonomic rank upwards (e.g. genus name).
+        :param aln: path to alignment file
+        :param aln_schema: format of alignment file (e.g. 'fasta, 'nexus')
+        :param tre: path to phylogeny, if no phylogeny is available put None
+        :param tre_schema: format of phylogeny
+        :param config: configuration object - must be established before calling PhylUp,
+                by calling: config.ConfigObj(configfi, workdir)
+        :param ignore_acc_list: if certain Genbank accession numbers should be ignored,
+                provide them here as python list (e.g.[acc.1, acc.2])
+        """
         self.config = config
         self.workdir = self.config.workdir
         self.status = 0  # -1 = deleted, positive values = round, 0 = present at beginning
@@ -56,7 +73,7 @@ class PhylogeneticUpdater:
         self.aln = DnaCharacterMatrix.get(path=self.aln_fn, schema=self.aln_schema)
         self.tre_fn = tre
         self.tre_schema = tre_schema
-        if not self.tre_fn is None:
+        if self.tre_fn is not None:
             if self.tre_schema is None:
                 self.tre_schema = 'newick'
             self.tre = Tree.get(path=os.path.abspath(self.tre_fn), schema=self.tre_schema,
@@ -65,7 +82,7 @@ class PhylogeneticUpdater:
         sys.stdout.write('Translate input names to ncbi taxonomy...\n')
         self.table = phylogenetic_helpers.build_table_from_file(id_to_spn, self.config, self.config.downtorank)
         self.table.at[:, 'status_note'] = 'original'
-        #print(self.config.different_level)
+
         if self.config.different_level is not True:
             sys.stdout.write('Load sequences...\n')
             phylogenetic_helpers.add_seq_to_table(self.aln, self.table)
@@ -80,7 +97,7 @@ class PhylogeneticUpdater:
 
         Needed for different_level == True
 
-        :return:
+        :return: Nothing is returned. Files are being moved and self.table.status is updated if condition is met.
         """
         if self.config.different_level is True and self.status < 1:
             # try:
@@ -89,7 +106,7 @@ class PhylogeneticUpdater:
             #     self.table['date'] = pd.Timestamp.strptime('01/01/00', '%d/%m/%y')
             self.table.at[self.table['status'] > 0, 'status'] = 0.5
 
-            if self.config.preferred_taxa != True:
+            if self.config.preferred_taxa is not True:
 
                 # self.config.update_tree = False
                 if os.path.exists(os.path.join(self.workdir, 'new_seqs.updated')):
@@ -110,9 +127,7 @@ class PhylogeneticUpdater:
     def set_mrca(self, mrca):
         """
         Set the mrca in the class for various input: None, one ncbi id, list of ncbi_ids.
-
-        Note: list finds mrca of all ids, including ids that were not mentioned.
-        Thus, not helpful for non-monophyletic groups!
+        If None, mcra will be defined automatically from the input sequences.
 
         :param mrca: input mrca
         :return: sets self.mrca
@@ -189,7 +204,7 @@ class PhylogeneticUpdater:
         """
         Gets new sequences from those existing once which have not yet been blasted before.
 
-        :return:
+        :return:pandas dataframe with the newly retrieved sequences from blast before filtering
         """
         # create list of indice of subset list
         sys.stdout.write("Find new sequences using the BLAST database.\n")
@@ -221,7 +236,7 @@ class PhylogeneticUpdater:
             sys.stdout.write('Blast {} out of {}, subsample size is {}.\n'.format(count, len(blast_subset.index),
                                                                                   self.config.subsample))
             query_seq = self.table.loc[index, 'sseq']
-            self.table.at[index, 'date'] = pd.Timestamp.today()  # this is the new version of pd.set_value(), sometimes it's iat
+            self.table.at[index, 'date'] = pd.Timestamp.today()  # this is the new version of pd.set_value()
             new_seq_tax = blast.get_new_seqs(query_seq, tip_name, "Genbank", self.config)
             # new_seqs_local = new_seqs_local.append(new_seq_tax, ignore_index=True)
             new_seqs_local = pd.concat([new_seqs_local, new_seq_tax], ignore_index=True, sort=True)
@@ -237,7 +252,7 @@ class PhylogeneticUpdater:
         Removes accession numbers specified in the analysis file that shall not be added.
 
         :param new_seqs:  pandas dataframe with the new sequences retrieved earlier
-        :return:
+        :return: new_seqs without sequences that are defined in ignore_acc_list
         """
         drop_boolean = np.where((new_seqs.accession.isin(self.ignore_acc_list)), True, False)
         new_seqs = new_seqs[drop_boolean != True]
@@ -279,7 +294,7 @@ class PhylogeneticUpdater:
 
         :param new_seqs: pandas dataframe with the new sequences retrieved earlier
         :param aln: alignment as dendropy object
-        :return:
+        :return: new_seqs after all filtering steps
         """
         msg = "Round of filters: {}\n".format(self.status)
         write_msg_logfile(msg, self.config.workdir)
@@ -307,7 +322,7 @@ class PhylogeneticUpdater:
         Function calls filters, that alter entries in the table.
 
         :param new_seqs: pandas dataframe with the new sequences retrieved/not filtered from earlier
-        :return:
+        :return: new_seqs after FilterSeqIdent, FilterPreferredTaxa, FilterNumberOtu
         """
         debug('compare filter')
         if len(new_seqs) > 0:
@@ -411,7 +426,7 @@ class PhylogeneticUpdater:
 
         self.call_input_cleaner()
         # assert len(self.table) > 1, (len(self.table), self.table)  # not the case if single seq is used as input
-        if self.config.different_level == False and os.path.exists(os.path.join(self.workdir, 'new_seqs.updated')):
+        if self.config.different_level is False and os.path.exists(os.path.join(self.workdir, 'new_seqs.updated')):
             next
         else:
             while retrieved_seqs > 0 and (status_end is None or self.status <= status_end):
@@ -431,7 +446,8 @@ class PhylogeneticUpdater:
                                          'and provide to config.\n')
 
                         sys.stdout.write('Stopping for preferred taxon overlap check.\n')
-                        return None  # finished method run
+                        sys.exit(0)
+                        # return None  # finished method run
 
                 new_seqs = self.call_filter(new_seqs, self.aln)
                 if len(new_seqs.index) > 0:
@@ -444,7 +460,7 @@ class PhylogeneticUpdater:
                 write_msg_logfile(msg, self.config.workdir)
                 self.table.to_csv(os.path.join(self.workdir, 'table.updated'), index=False)
 
-                if self.config.perpetual is False:
+                if self.config.perpetual is False and status_end != 0:
                     self.config.unpublished = False
 
             if self.config.preferred_taxa:
@@ -527,10 +543,10 @@ class PhylogeneticUpdater:
         Note, that therefore the new seqs have to be placed into the alignment first.
 
         :param new_seqs:
-        :return:
+        :return: None, updates self objects
         """
         debug('replace_complete_withusedseq')
-        #print(new_seqs.accession)
+        # print(new_seqs.accession)
         # get shorter seqs from aln - also replace in table
         for idx in new_seqs.index:
             tip_name = str(new_seqs.loc[idx, 'accession'].split('.')[0])
@@ -541,11 +557,11 @@ class PhylogeneticUpdater:
             with open(filepath, 'r') as read_obj:
                 # Read all lines in the file one by one
                 for line in read_obj:
-                    #print(line)
+                    # print(line)
                     # For each line, check if line contains the string
                     if tip_name in line:
                         # found = True
-            #assert found == True, (tip_name, 'Taxon name not found in alignment {} - make sure you use the right input aln'
+            # assert found == True, (tip_name, 'Taxon name not found in alignment {} - make sure you use the right input aln'
             #                                 ' - likely hierarchical updating issue.'.format(self.config.workdir))
 
                         with open(filepath) as fp:
@@ -575,17 +591,18 @@ class PhylogeneticUpdater:
         #                         preserve_underscores=True,
         #                         taxon_namespace=self.aln.taxon_namespace)
         # self.update_tre()
-        #msg = "Time finished: {}.\n".format(datetime.datetime.now())
-        #write_msg_logfile(msg, self.config.workdir)
+        # msg = "Time finished: {}.\n".format(datetime.datetime.now())
+        # write_msg_logfile(msg, self.config.workdir)
 
     def call_input_cleaner(self):
         """
         Calls InputCleaner class and updates input data.
+
         :return:
         """
         # debug(self.mrca)
         cleaner = phylogen_updater.InputCleaner(self.tre_fn, self.tre_schema, self.aln_fn, self.aln_schema, self.table,
-                                                self.config) #  self.mrca
+                                                self.config)  # self.mrca
         self.aln = cleaner.aln
         if self.tre_fn is not None:
             self.tre = cleaner.tre
@@ -609,12 +626,12 @@ class PhylogeneticUpdater:
                            taxon_namespace=aln.taxon_namespace, preserve_underscores=True)
 
         updated = False
-        if self.config.unpublished == True:
+        if self.config.unpublished is True:
             print("unpublished aln update")
             aln_upd = phylogen_updater.AlnUpdater(self.config, aln, self.table, self.status, tre)
             self.config.added_seqs_aln = True
             updated = True
-        elif self.config.added_seqs_aln == True:
+        elif self.config.added_seqs_aln is True:
             if self.status >= 1:
                 aln_upd = phylogen_updater.AlnUpdater(self.config, aln, self.table, self.status, tre)
                 updated = True
@@ -622,7 +639,7 @@ class PhylogeneticUpdater:
             aln_upd = phylogen_updater.AlnUpdater(self.config, aln, self.table, None, tre)
             updated = True
 
-        if updated == True:
+        if updated is True:
             self.aln = aln_upd.aln
             self.tre = aln_upd.tre
             msg = 'Updating of aln done.\n'
@@ -646,6 +663,9 @@ class Filter(object):
     Super class for the different Filter classes.
     """
     def __init__(self, config):
+        """
+        :param config: configuration module from where the settings for the filtering are being taken
+        """
         self.config = config
         columns = ['ncbi_txn', 'ncbi_txid', 'status', 'status_note', "date",
                    'accession', 'pident', 'evalue', 'bitscore', 'sseq', 'title']
@@ -667,7 +687,7 @@ class Filter(object):
 
         assert all(x in newseqs_list for x in deltable_list)
 
-        assert any(x in updnewseqs_list for x in deltable_list) == False, \
+        assert any(x in updnewseqs_list for x in deltable_list) is False, \
             ([i for i in updnewseqs_list if i in deltable_list])
 
         check_df_index_unique(self.upd_new_seqs)
@@ -709,7 +729,7 @@ def assert_new_seqs_table(new_seqs, table, status):
     assert len(new_seqs) == len(table[table['status'] == status]), \
         (len(new_seqs), len(table[table['status'] == status]), new_seqs['accession'])
     check_df_index_unique(new_seqs)
-    assert new_seqs['ncbi_txid'].hasnans == False, new_seqs[['ncbi_txid', 'accession']].hasnans
+    assert new_seqs['ncbi_txid'].hasnans is False, new_seqs[['ncbi_txid', 'accession']].hasnans
     for idx in new_seqs.index:
         assert idx in table.index, (idx, table.index)
 
@@ -731,9 +751,14 @@ def calculate_mean_sd(bitscores):
 
 class FilterPreferredTaxa(Filter):
     """
-    Filter new sequences to the number defined as threshold. Either via local blast or select longest
+    Filter new sequences to the number defined as threshold. Either via local blast or select longest.
     """
     def __init__(self, config, table, status):
+        """
+        :param config: configuration module from where the settings for the filtering are being taken
+        :param table: self.table object from PhylogeneticUpdater class
+        :param status: self.status from PhylogeneticUpdater class
+    """
         super().__init__(config)
         self.table = table
         check_df_index_unique(self.table)
@@ -763,7 +788,8 @@ class FilterPreferredTaxa(Filter):
             tax_ids_newseqs = filtered_new_seqs['ncbi_txid']
         else:
             debug("downtorank")
-            filtered_new_seqs = self.set_downtorank(filtered_new_seqs, downtorank)  # todo: this is likely doubled now, since i chnages now ncbi id to rank and original_ncbi_id for the real one...# no, its not, its for the new seqs
+            # looks like next line is not necessary as function was called earlier, but needed here for the new seqs
+            filtered_new_seqs = self.set_downtorank(filtered_new_seqs, downtorank)
             tax_ids_newseqs = filtered_new_seqs.ncbi_txid
 
         txid_list = list()
@@ -789,6 +815,10 @@ class FilterPreferredTaxa(Filter):
         self.table.at[self.table['accession'].isin(
             excluded_preferred.accession), 'status_note'] = 'excluded - not preferred across loci'
 
+        # if self.config.downtorank is not None:
+        #     if all_preferred.index.any() == True:
+        #         assert all_preferred.ncbi_txid.is_unique == True, all_preferred.ncbi_txid
+
         self.upd_new_seqs = all_preferred
         self.del_table = del_table
 
@@ -807,7 +837,7 @@ class FilterPreferredTaxa(Filter):
 
         """
         # print('get_preferred_ids')
-        assert self.config.preferred_taxa_fn != None, self.config.preferred_taxa_fn
+        assert self.config.preferred_taxa_fn is not None, self.config.preferred_taxa_fn
         with open(self.config.preferred_taxa_fn, 'r') as content:
             preferred_taxa_ids = content.read().splitlines()
             if preferred_taxa_ids[1].isnumeric():
@@ -828,7 +858,7 @@ class FilterPreferredTaxa(Filter):
         debug('preferred taxa?')
         debug(self.config.preferred_taxa)
         assert len(list(set(ns_txid_df.ncbi_txid))) == 1, set(ns_txid_df.ncbi_txid)
-        if self.config.preferred_taxa == True:
+        if self.config.preferred_taxa is True:
             # print('prefer_taxa_from_locus')
             preferred_taxa_ids = self.get_preferred_ids()
             assert len(list(set(ns_txid_df.ncbi_txid))) == 1, list(set(ns_txid_df.ncbi_txid))
@@ -836,7 +866,7 @@ class FilterPreferredTaxa(Filter):
             if tax_id_from_df in preferred_taxa_ids:
                 new_filtered_taxid_df = ns_txid_df
             else:
-                if self.config.allow_parent == True:
+                if self.config.allow_parent is True:
                     sys.stdout.write('check if parent - slow - consider if needed!')
                     for tax_id in preferred_taxa_ids:
                         # if tax_id_from_df is lower taxon from preferred ids:
@@ -861,11 +891,12 @@ class FilterPreferredTaxa(Filter):
 
         :param ns_txid_df: id of found taxa
         :param downtorank: different according to which rank
+        :param status: round of blast updating
 
         :return:
         """
         debug("prefer_different_OTU")
-        if downtorank is not None:  #and downtorank not in ['species', 'subspecies', 'variety']:
+        if downtorank is not None:  # and downtorank not in ['species', 'subspecies', 'variety']:
             if self.config.different_level is True:
                 present_subset = self.table[self.table['status'] > -1]
                 present_subset = present_subset[present_subset['status'] < status]
@@ -873,35 +904,40 @@ class FilterPreferredTaxa(Filter):
             else:
                 new_filtered_taxid_df = ns_txid_df
             if len(new_filtered_taxid_df.index) > 1:
-                new_filtered_taxid_df = self.drop_seq_by_length(new_filtered_taxid_df)
+                new_filtered_taxid_df = drop_seq_by_length(new_filtered_taxid_df)
         else:
             new_filtered_taxid_df = ns_txid_df
 
         return new_filtered_taxid_df
 
-    def drop_seq_by_length(self, filter_dict):
-        """
-        Select the longest of the sequences from a dataframe.
+def drop_seq_by_length(filter_dict):
+    """
+    Select the longest of the sequences from a dataframe.
 
-        :param filter_dict:
-        :return: filtered sequences
-        """
-        assert len(list(set(filter_dict.ncbi_txid))) == 1, set(filter_dict.ncbi_txid)
-        debug("drop_seq_by_length")
-        if len(filter_dict.index) > 1:
-            debug("drop by length")
-            len_seqs_new = filter_dict['sseq'].apply(len)
-            select = filter_dict.loc[len_seqs_new.idxmax()]
-        else:
-            select = filter_dict
-        return select
+    :param filter_dict:
+    :return: filtered sequences
+    """
+    assert len(list(set(filter_dict.ncbi_txid))) == 1, set(filter_dict.ncbi_txid)
+    debug("drop_seq_by_length")
+    if len(filter_dict.index) > 1:
+        debug("drop by length")
+        len_seqs_new = filter_dict['sseq'].apply(len)
+        select = filter_dict.loc[len_seqs_new.idxmax()]
+    else:
+        select = filter_dict
+    return select
 
 
 class FilterNumberOtu(Filter):
     """
-    Filter new sequences to the number defined as threshold. Either via local blast or select longest
+    Filter new sequences to the number defined as threshold. Either via local blast or select longest.
     """
     def __init__(self, config, table, status):
+        """
+        :param config: configuration module from where the settings for the filtering are being taken
+        :param table: self.table object from PhylogeneticUpdater class
+        :param status: self.status from PhylogeneticUpdater class
+        """
         super().__init__(config)
         self.table = table
         check_df_index_unique(self.table)
@@ -924,7 +960,7 @@ class FilterNumberOtu(Filter):
         # get all seqs and ids from aln and before for next filter
         present = self.table[self.table['status'] > -1]
         if self.status == 0:
-            added_before = present[present['status'].astype(int) <= self.status]  # added to be able to filter unpublished
+            added_before = present[present['status'].astype(int) <= self.status]  # added in order to filter unpublished
         else:
             added_before = present[present['status'].astype(int) < self.status]
 
@@ -932,7 +968,8 @@ class FilterNumberOtu(Filter):
             tax_ids_newseqs = filtered_new_seqs['ncbi_txid']
             txids_added = added_before['ncbi_txid']
         else:
-            filtered_new_seqs = self.set_downtorank(filtered_new_seqs, downtorank)  # todo: this is likely doubled now, since i chnages now ncbi id to rank and original_ncbi_id for the real one...# no, its not, its for the new seqs
+            # looks like next line is not necessary as function was called earlier, but needed here for the new seqs
+            filtered_new_seqs = self.set_downtorank(filtered_new_seqs, downtorank)
             new_seqs_downto = self.set_downtorank(added_before, downtorank)
             tax_ids_newseqs = filtered_new_seqs['downtorank']
             txids_added = new_seqs_downto['downtorank']
@@ -1077,8 +1114,6 @@ class FilterNumberOtu(Filter):
         filter_blast_seqs = blast.get_new_seqs(query_seq, txid, 'filterrun', self.config)
         if len(filter_blast_seqs) > 0:
             subfilter_blast_seqs = remove_mean_sd_nonfit(filter_blast_seqs)
-
-            #print(subfilter_blast_seqs)
             filtered_seqs = self.select_number_missing(subfilter_blast_seqs, exist_dict)
             filtered_acc = set(list(filtered_seqs['accession']))
         # print('filter wrapper done')
@@ -1110,10 +1145,11 @@ class FilterNumberOtu(Filter):
             while len(filtered_seqs['ncbi_txid']) > len(set(filtered_seqs['ncbi_txid'])):
                 count += 1
                 diff = len(filtered_seqs['ncbi_txid']) - len(set(filtered_seqs['ncbi_txid']))
-                subfilter_blast_seqs = subfilter_blast_seqs[~subfilter_blast_seqs.ncbi_txid.isin(set(filtered_seqs['ncbi_txid']))]
+                subfilter_blast_seqs = \
+                    subfilter_blast_seqs[~subfilter_blast_seqs.ncbi_txid.isin(set(filtered_seqs['ncbi_txid']))]
                 if len(subfilter_blast_seqs) > 0:
                     select_different = subfilter_blast_seqs.sample(diff)
-                    #if not filtered_seqs['accession'].str.contains(select_different['accession']).any():
+                    # if not filtered_seqs['accession'].str.contains(select_different['accession']).any():
                     bool_isin = select_different["accession"].isin(filtered_seqs["accession"])
 
                     if len(select_different[bool_isin]) == 0:
@@ -1163,6 +1199,11 @@ class FilterSeqIdent(Filter):
     Filters new sequences that are identical (seq and taxon id) to something already in the data.
     """
     def __init__(self, config, table, status):
+        """
+        :param config: configuration module from where the settings for the filtering are being taken
+        :param table: self.table object from PhylogeneticUpdater class
+        :param status: self.status from PhylogeneticUpdater class
+        """
         super().__init__(config)
         self.status = status
         self.table = table
@@ -1295,6 +1336,10 @@ class FilterMRCA(Filter):
     Filters sequences that are not part of the defined mrca.
     """
     def __init__(self, config, mrca):
+        """
+        :param config: configuration module from where the settings for the filtering are being taken
+        :param mrca: self.mrca from PhylogeneticUpdater class
+        """
         super().__init__(config)
         self.mrca = mrca
 
@@ -1315,8 +1360,7 @@ class FilterMRCA(Filter):
             if isinstance(self.mrca, int):
                 # TODO: make self.mrca to be a set - single id is type int
                 print("DO I EVER GET HERE - MRCA IS INT")
-                #if mrca_tx == self.mrca:
-                if mrca_tx == True:
+                if mrca_tx is True:
                     to_add = new_seqs[select_tf]
                     assert len(to_add) != 0, len(to_add)
                     self.upd_new_seqs = pd.concat([self.upd_new_seqs, to_add], axis=0, ignore_index=True, sort=True)
@@ -1326,9 +1370,9 @@ class FilterMRCA(Filter):
                     to_del.at[:, 'status'] = 'deleted - mrca'
                     self.del_table = pd.concat([self.del_table, to_del], axis=0, ignore_index=True, sort=True)
             elif isinstance(self.mrca, set):
-                #print(mrca_tx in self.mrca, mrca_tx, self.mrca)
+                # print(mrca_tx in self.mrca, mrca_tx, self.mrca)
                 # if mrca_tx in self.mrca:
-                if mrca_tx == True:
+                if mrca_tx is True:
                     to_add = new_seqs[select_tf]
                     assert len(to_add) != 0, len(to_add)
                     self.upd_new_seqs = pd.concat([self.upd_new_seqs, to_add], axis=0, ignore_index=True, sort=True)
@@ -1350,12 +1394,15 @@ class FilterMRCA(Filter):
             self.del_table.to_csv(os.path.join(self.config.workdir, 'wrong_mrca.csv'), mode='a')
 
 
-#todo-done: unused. is being filtered in blast # actually used when later blast e-value is changed
+# todo-done: unused. is being filtered in blast # actually used when later blast e-value is changed
 class FilterBLASTThreshold(Filter):
     """
     Removes sequences that do not pass the similarity filter (blast threshold).
     """
     def __init__(self, config):
+        """
+        :param config: configuration module from where the settings for the filtering are being taken
+        """
         super().__init__(config)
 
     def filter(self, new_seqs):
@@ -1389,6 +1436,10 @@ class FilterUniqueAcc(Filter):
     Removes sequences that were already there (have same accession number.)
     """
     def __init__(self, config, table):
+        """
+        :param config: configuration module from where the settings for the filtering are being taken
+        :param table: self.table object from PhylogeneticUpdater class
+        """
         super().__init__(config)
         self.table = table
 
@@ -1434,7 +1485,7 @@ def drop_shortest_among_duplicates(new_seqs):
 
 def check_df_index_unique(df):
     """used for assertion of unique index"""
-    assert df.index.is_unique == True, df.index
+    assert df.index.is_unique is True, df.index
 
 
 def check_filter_numbers(remove, add, before):
@@ -1447,6 +1498,10 @@ class FilterLength(Filter):
     Removes sequences that are too short or too long.
     """
     def __init__(self, config, aln):
+        """
+        :param config: configuration module from where the settings for the filtering are being taken
+        :param aln: self.aln object from PhylogeneticUpdater class
+        """
         super().__init__(config)
         self.aln = aln
 

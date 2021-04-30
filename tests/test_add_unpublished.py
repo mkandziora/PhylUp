@@ -30,6 +30,6 @@ def test_add_unpublished():
 
     test = phyl_up.PhylogeneticUpdater(id_to_spn, seqaln, mattype, trfn, schema_trf, conf)
 
-    new_seqs = test.extend_with_unpublished()
+    new_seqs = test.wrapper_for_extend(1)
     print(new_seqs)
     assert len(new_seqs) > 0

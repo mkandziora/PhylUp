@@ -3,8 +3,12 @@ PhylUp: phylogenetic alignment building with custom taxon sampling
 Copyright (C) 2020  Martha Kandziora
 martha.kandziora@mailbox.org
 
-Package to automatically update alignments and phylogenies using local sequences or a local Genbank database
-while controlling for the number of sequences per OTU.
+Package to automatically generate alignments (or update alignments and phylogenies)
+using local sequences or a local Genbank database
+while controlling for the number of sequences per OTU and taxonomic rank.
+
+These modules handle the cleaning of the input data, the updating of the alignment using external programs as well as
+the updating of the phylogeny using external programs.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -18,7 +22,6 @@ GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
-
 
 """
 
@@ -76,8 +79,10 @@ class AlnUpdater(object):
         """
         print('update aln data')
         print(len(self.new_seq_table.index))
+        self.delete_short_seqs()
+
         if len(self.new_seq_table) > 0:
-            self.delete_short_seqs()
+
             self.write_papara_queryseqs()
             if len(self.aln) > 1:
                 if self.tre is None:  # generate random tree, e.g. from modeltest
@@ -96,10 +101,11 @@ class AlnUpdater(object):
                                                    self.config.modeltest_criteria)
                 self.tre = Tree.get(path=os.path.join(self.config.workdir, 'updt_aln.fasta.tree'),
                                     schema="newick", preserve_underscores=True)
-            phylogenetic_helpers.write_aln(self.aln, self.config.workdir)
             phylogenetic_helpers.write_tre(self.tre, self.config.workdir)
-            # self.aln = self.trim(os.path.abspath(os.path.join(self.config.workdir, 'papara_alignment.phylip')),
-            #                      format_aln='phylip')
+        phylogenetic_helpers.write_aln(self.aln, self.config.workdir)
+
+        # self.aln = self.trim(os.path.abspath(os.path.join(self.config.workdir, 'papara_alignment.phylip')),
+        #                      format_aln='phylip')
         self.write_labelled('updt_aln.fasta')
 
     def add_queryseqs_to_singleseq(self):
@@ -108,6 +114,7 @@ class AlnUpdater(object):
 
         :return:
         """
+        print('add query seq to single')
         phylogenetic_helpers.make_mafft_aln(self.aln, self.config.workdir)
         cmd_mafft = 'mafft --genafpair --leavegappyregion --maxiterate 16 --thread {} --reorder ' \
                     '{}/mafft.fasta > {}/mafft_align.fasta'.format(self.config.num_threads, self.config.workdir,
@@ -132,7 +139,7 @@ class AlnUpdater(object):
 
         try:
             os.chdir(self.config.workdir)
-            #with cd(self.config.workdir):
+            # with cd(self.config.workdir):
             print('run papara')
             phylogenetic_helpers.run_papara()
             path = os.path.join(os.getcwd(), "papara_alignment.phylip".format())
@@ -150,8 +157,8 @@ class AlnUpdater(object):
             print('Papara failed - using MAFFT now')
             aln_old = self.aln
             self.add_queryseqs_to_singleseq()
-        #aln_old = self.aln
-        #aln_path = os.path.join(self.config.workdir, "papara_alignment.phylip")
+        # aln_old = self.aln
+        # aln_path = os.path.join(self.config.workdir, "papara_alignment.phylip")
         with cd(self.config.workdir):
             phylogenetic_helpers.truncate_papara_aln(aln_old)
         phylogenetic_helpers.write_aln(self.aln, self.config.workdir)
@@ -210,7 +217,7 @@ class AlnUpdater(object):
         :param taxon_label: taxon_label from dendropy object - aln or phy
         :return:
         """
-        if self.tre != None:
+        if self.tre is not None:
             # not sure why this function exist. None of them actually remove a tip.
             # tax2 = self.tre.taxon_namespace.get_taxon(taxon_label)
             # self.tre.prune_taxa([tax2])
@@ -324,7 +331,7 @@ class TreeUpdater(object):
         """
         print("update phylogeny")
 
-        # this exists as from single seq there are no seqs to place and no old_seqs.fasta file as no alignment was available
+        # this exists as from single seq there are no old seqs to place (no old_seqs.fasta) as no alignment is available
         if os.path.exists(os.path.join(self.config.workdir, "old_seqs.fasta")):
             self.place_query_seqs_epa()
             self.check_tre_in_aln()
@@ -433,7 +440,7 @@ class TreeUpdater(object):
         sys.stdout.write("calculate bootstrap \n")
         with cd(self.config.workdir):
             # check if job was started with mpi: this checks if actual several cores and nodes were allocated
-            ntasks = os.environ.get('SLURM_JOB_CPUS_PER_NODE') # or ntasks = os.environ.get('SLURM_NTASKS_PER_NODE')
+            ntasks = os.environ.get('SLURM_JOB_CPUS_PER_NODE')  # or ntasks = os.environ.get('SLURM_NTASKS_PER_NODE')
             nnodes = os.environ.get("SLURM_JOB_NUM_NODES")
             seed = str(random.randint(1, 21))
             mpi = False
@@ -450,15 +457,16 @@ class TreeUpdater(object):
                     # except:
                     subprocess.call(["raxml-ng-mpi", '--all', "--msa", "{}".format(aln_fn), '--model', best_subst_model,
                                      '--bs-trees', 'autoMRE', '--seed', seed, "--threads", "{}".format(num_threads),
-                                     "--prefix", "fulltree"], shell=False) # 'tbe', #
+                                     "--prefix", "fulltree"], shell=False)  # 'tbe', #
                 else:
                     debug('else')
 
                     subprocess.call(["raxml-ng-mpi", '--all', "--msa", "{}".format(aln_fn), '--model', best_subst_model,
                                      'autoMRE', '--seed', seed, "--threads", "{}".format(num_threads),
-                                     "--prefix", "fulltree"], shell=False) # 'tbe', #
+                                     "--prefix", "fulltree"], shell=False)  # 'tbe', #
                 # subprocess.call(["raxml-ng-mpi", '--support', '--tree', 'fulltree.raxml.bestTree', '--bs-trees',
                 #                 'fulltree.raxml.bootstraps', "--prefix", 'support'])
+                print('make consensus')
                 subprocess.call(["raxml-ng-mpi", '--consense', 'MRE', '--tree', 'fulltree.raxml.bootstraps',
                                  "--prefix", 'consMRE'], shell=False)
                 subprocess.call(["raxml-ng-mpi", '--consense', 'STRICT', '--tree', 'fulltree.raxml.bootstraps',
@@ -523,6 +531,15 @@ class InputCleaner(object):
     This is the input class, that cleans the data before updating the phylogeny.
     """
     def __init__(self, tre_fn, tre_schema, aln_fn, aln_schema, table, config_obj):  # removed mrca
+        """
+
+        :param tre_fn: path to phylogeny
+        :param tre_schema: format of phylogeny
+        :param aln_fn: path to alignment
+        :param aln_schema: format of alignment
+        :param table: self.table from PhylogenticUpdater
+        :param config_obj: configuration object
+        """
         sys.stdout.write('Clean the input data: {}, {}.'.format(tre_fn, aln_fn))
         self.config = config_obj
         if not os.path.exists(self.config.workdir):
@@ -591,7 +608,7 @@ class InputCleaner(object):
         else:
             sys.stderr.write("Method 'format_mrca_set' does not behave as expected")
             sys.exit(-3)
-        #assert type(mrca) in {list, set, int}, ("your ingroup_mrca '%s' is not an integer/list/set." % mrca)
+        # assert type(mrca) in {list, set, int}, ("your ingroup_mrca '%s' is not an integer/list/set." % mrca)
         return mrca
 
     def delete_missing(self):
@@ -633,7 +650,7 @@ class InputCleaner(object):
             self.table.at[true_false, 'status_note'] = "deleted, was missing in aln or tre"
         assert self.aln.taxon_namespace == self.tre.taxon_namespace
 
-    #todo: does nothing
+    # todo: does nothing? needed?
     def clean_inputname(self):
         """It rewrites tip names if they start with a number at the beginning of the name.
         Python adds an 'n' to the name.
@@ -655,13 +672,13 @@ class InputCleaner(object):
                 if match:
                     newname = tax.label[2:]
                     newname = newname[:-1]
-                # for idx in self.table.index:
-                    # original = self.table.loc[idx, "accession"].split('.')[0]
-                    # if original == tax.label or original == newname:
-                        # tax.label = self.table.loc[idx, "accession"].split('.')[0]
-                        # found_label = 1
-                # if found_label == 0: # and self.table.loc[idx, "ncbi_txid"]:
-                #    sys.stderr.write("could not match tip label {} any ncbi taxon name\n".format(tax.label))
+                for idx in self.table.index:
+                    original = self.table.loc[idx, "accession"].split('.')[0]
+                    if original == tax.label or original == newname:
+                        tax.label = self.table.loc[idx, "accession"].split('.')[0]
+                        found_label = 1
+                if found_label == 0: # and self.table.loc[idx, "ncbi_txid"]:
+                   sys.stderr.write("could not match tip label {} any ncbi taxon name\n".format(tax.label))
 
     def write_clean_aln(self, aln_fn, aln_schema):
         """
@@ -718,7 +735,7 @@ class InputCleaner(object):
         :param tre_schema: schema of tree
         :return:
         """
-        #if tre_fn is not None:
+        # if tre_fn is not None:
         with open(tre_fn, "r") as fin:
             filedata = fin.read()
         # Write the file out again
