@@ -3,7 +3,7 @@
 # PhylUp - generating phylogenetic alignments with custom sampling across taxonomic ranks
 
 
-![](./workflow_Dez2020.png)   
+![](./docs/workflow.png)   
     
 ## Short introduction
 
