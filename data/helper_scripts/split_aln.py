@@ -1,6 +1,6 @@
 """
-Copyright (C) 2019  Martha Kandziora
-martha.kandziora@yahoo.com
+Martha Kandziora
+martha.kandziora@mailbox.org
 
 Split concatenated alignment into loci - to be run where the file is located
 
@@ -12,21 +12,13 @@ import dendropy
 import argparse
 
 # create variables that can be entered in the command line
-parser = argparse.ArgumentParser(usage='''
-split_aln.py [<args>]
-The split_aln.py arguments is:
-  -aln     STR     path to alignment (required)
-  -f       STR     format of alignment (required)
-  -start   STR     start of locus (required)
-  -stop    STR     end of locus (required)
-  -name    STR     name of locus (required)
-''')
+parser = argparse.ArgumentParser(description='Split concatenated alignment into loci - to be run where the file is located')
 
-parser.add_argument('-aln', required = True, help = ' path to alignment')
-parser.add_argument('-f', required = True, help = 'format alignment')
-parser.add_argument('-start', required = True, help = 'start of locus')
-parser.add_argument('-stop', required = True, help = 'end of locus')
-parser.add_argument('-name', required = True, help = 'name of locus')
+parser.add_argument('-aln', required=True, help=' path to alignment')
+parser.add_argument('-f', required=True, help='format alignment')
+parser.add_argument('-start', required=True, help='start of locus')
+parser.add_argument('-stop', required=True, help='end of locus')
+parser.add_argument('-name', required=True, help='name of locus')
 
 args = parser.parse_args()
 

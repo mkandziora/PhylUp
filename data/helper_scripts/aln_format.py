@@ -1,28 +1,19 @@
-# -*- coding: utf-8 -*-
 """
-Copyright (C) 2019  Martha Kandziora
-martha.kandziora@yahoo.com
+Martha Kandziora
+martha.kandziora@mailbox.org
 
 change format of alignment to fasta
 """
-import sys
 import os
 import dendropy
 import argparse
 
-input_aln = sys.argv[1]
-input_frmt = sys.argv[2]
-
 
 # create variables that can be entered in the command line
-parser = argparse.ArgumentParser(usage='''
-aln_format.py [<args>]
-The aln_format.py arguments are:
-  -aln   STR     path to alignment (required)
-  -f     STR     format of alignment (required)
-''')
-parser.add_argument('-aln', type = str, required = True, help = 'path to alignment ')
-parser.add_argument('-f', type = str, required = True, help = 'format of alignment')
+parser = argparse.ArgumentParser(description='change format of an alignment to fasta')
+
+parser.add_argument('-aln', type=str, required=True, help='path to alignment ')
+parser.add_argument('-f', type=str, required=True, help='format of alignment')
 
 
 args = parser.parse_args()

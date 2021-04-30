@@ -1,13 +1,21 @@
-import sys
+"""
+Martha Kandziora
+martha.kandziora@mailbox.org
+
+Get ncbi taxon name from species name
+
+"""
 from ncbiTAXONparser import ncbi_data_parser
+import argparse
 
-spn = sys.argv[1]
-nodes = "./data/nodes.dmp"
-names = "./data/names.dmp"
+# create variables that can be entered in the command line
+parser = argparse.ArgumentParser(description='Get ncbi taxon name from species name')
 
+parser.add_argument('-spn', required=True, help='name of species')
 
-ncbi_parser = ncbi_data_parser.Parser(names_file=names,
-                                      nodes_file=nodes)
+args = parser.parse_args()
+ncbi_parser = ncbi_data_parser.Parser(names_file="./data/nodes.dmp",
+                                      nodes_file="./data/names.dmp")
 
-taxid = ncbi_parser.get_id_from_name(spn)
-return taxid
+taxid = ncbi_parser.get_id_from_name(args.spn)
+print(taxid)

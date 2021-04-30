@@ -1,22 +1,18 @@
-# -*- coding: utf-8 -*-
 """
-Copyright (C) 2019  Martha Kandziora
-martha.kandziora@yahoo.com
+Martha Kandziora
+martha.kandziora@mailbox.org
 
-check if names provided are accepted by ncbi - prints names that are not"""
+check if names provided are accepted by ncbi - prints names that are not
+"""
+
 from ncbiTAXONparser import ncbi_data_parser
 import pandas as pd
 import argparse
 
 # create variables that can be entered in the command line
-parser = argparse.ArgumentParser(usage='''
-check_spn.py [<args>]
-The check_spn.py arguments is:
-  -txn_list   FILE     path to file with sample name and ncbi name (one per row) (required)
-''')
-parser.add_argument('-txn_list', required = True, help = 'path to file with sample name and ncbi name')
+parser = argparse.ArgumentParser(description='check if names in files are accepted by ncbi - prints names that are not')
 
-
+parser.add_argument('-txn_list', required=True, help='path to file with sample name and ncbi name')
 args = parser.parse_args()
 
 tax_col = ["seq_name",
