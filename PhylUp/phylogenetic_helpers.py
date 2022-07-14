@@ -425,7 +425,8 @@ def add_seq_to_table(aln, table):
         seq = seq.replace('-', '')
         contains_string = table['accession'].str.contains(taxon.label)
         if contains_string.any():
-            table.at[table['accession'] == taxon.label, 'sseq'] = seq
+            idx = table.index[table['accession'] == taxon.label]
+            table.at[idx[0], 'sseq'] = seq
             queried_taxa.append(taxon.label)
         assert taxon.label in queried_taxa, (taxon.label, queried_taxa, 'often missing in spn translation table')
     table['sseq'].replace('', np.nan, inplace=True)

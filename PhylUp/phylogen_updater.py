@@ -202,8 +202,11 @@ class AlnUpdater(object):
                 self.remove_taxa_aln_tre(tax.label)
                 msg = '{}, '.format(tax.label)
                 write_msg_logfile(msg, self.config.workdir)
-                self.table.at[self.table['accession'] == tax.label, "status"] = -1
-                self.table.at[self.table['accession'] == tax.label, "status_note"] = "deleted - too short"
+                self.table.loc[self.table['accession'] == tax.label, "status"] = -1
+                self.table.loc[self.table['accession'] == tax.label, "status_note"] = "deleted - too short"
+
+                # self.table.at[self.table['accession'] == tax.label, "status"] = -1
+                # self.table.at[self.table['accession'] == tax.label, "status_note"] = "deleted - too short"
             msg = '\n'
             write_msg_logfile(msg, self.config.workdir)
         self.aln.write(path=os.path.join(self.config.workdir, 'updt_aln.fasta'), schema='fasta')
@@ -600,7 +603,7 @@ class InputCleaner(object):
                 else:
                     sys.stderr("Your mrca id is not known by ncbi: {}".format(item))
             mrca = mrca_set
-            # mrca = self.ncbi_parser.get_mrca(taxid_set=mrca_set)
+            #mrca = self.ncbi_parser.get_mrca(taxid_set=mrca_set)
         elif mrca is None:
             # print('mrca is None - find mrca of all input data.')
             aln_taxids = set(self.table['ncbi_txid'].tolist())
@@ -646,8 +649,10 @@ class InputCleaner(object):
 
         if len(delete_tax) > 0:
             true_false = np.where((self.table.accession.isin(list(delete_tax))), True, False)
-            self.table.at[true_false, 'status'] = -1
-            self.table.at[true_false, 'status_note'] = "deleted, was missing in aln or tre"
+            self.table.loc[self.table['accession'].isin(list(delete_tax)), "status"] = -1
+            self.table.loc[self.table['accession'].isin(list(delete_tax)), "status_note"] = "deleted, was missing in aln or tre"
+            #self.table.at[true_false, 'status'] = -1
+            #self.table.at[true_false, 'status_note'] = "deleted, was missing in aln or tre"
         assert self.aln.taxon_namespace == self.tre.taxon_namespace
 
     # todo: does nothing? needed?
@@ -719,8 +724,11 @@ class InputCleaner(object):
                 aln.taxon_namespace.remove_taxon_label(tax.label)
                 msg = '{}, '.format(tax.label)
                 write_msg_logfile(msg, self.config.workdir)
-                self.table.at[self.table['accession'] == tax.label, "status"] = -1
-                self.table.at[self.table['accession'] == tax.label, "status_note"] = "deleted - missing data only"
+                self.table.loc[self.table['accession'] == tax.label, "status"] = -1
+                self.table.loc[self.table['accession'] == tax.label, "status_note"] = "deleted, was missing in aln or tre"
+
+                #self.table.at[self.table['accession'] == tax.label, "status"] = -1
+                #self.table.at[self.table['accession'] == tax.label, "status_note"] = "deleted - missing data only"
             msg = '\n'
             write_msg_logfile(msg, self.config.workdir)
         aln.write(path=os.path.join(self.config.workdir, 'updt_aln.fasta'), schema='fasta')

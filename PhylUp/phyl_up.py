@@ -276,7 +276,7 @@ class PhylogeneticUpdater:
         new_seqs.ncbi_txn = new_seqs.ncbi_txn.str.replace('.', '')
 
         subcols = new_seqs[['ncbi_txn', 'ncbi_txid', 'status', 'status_note', "date", 'sseq', 'accession']]
-        subcols.at[:, 'status'] = self.status
+        subcols["status"] = self.status
         if self.config.unpublished == True:
             subcols.at[:, 'status_note'] = 'unpublished'
         self.table = pd.concat([self.table, subcols], ignore_index=True, sort=True)
@@ -525,7 +525,7 @@ class PhylogeneticUpdater:
             # if self.config.perpetual is False:
             #     self.config.unpublished = False
             if self.config.blast_all is True:
-                self.table.at[self.table.status == self.status, 'status'] = 0.5
+                self.table.loc[self.table['status'] == self.status, "status"] = 0.5
                 self.status = 0.5
         else:
             msg = "Blast against Genbank sequences.\n"
@@ -576,7 +576,9 @@ class PhylogeneticUpdater:
                             new_seqs.at[idx, 'sseq'] = seq
                             if self.table['accession'].str.contains(tip_name).any():
                                 # seq_before = self.table.loc[self.table['accession'] == tip_name, 'sseq'].values[0]
-                                self.table.at[self.table['accession'] == tip_name, 'sseq'] = seq
+                                self.table.loc[self.table['accession'] == tip_name, "sseq"] = seq
+
+                                #self.table.at[self.table['accession'] == tip_name, 'sseq'] = seq
                     # don't assert seq_before and after differ - must not be the case
                     # assert seq_before != seq, (seq_before, seq)
                     # assert seq_before != self.table.loc[self.table['accession'] == tip_name, 'sseq'].values[0], (
@@ -713,7 +715,7 @@ class Filter(object):
             downtorank_id = self.ncbi_parser.get_downtorank_id(txid, downtorank)
             if downtorank_id == 0:  # added for seqs that have no corresponding rank defined - which results in id 0
                 downtorank_id = txid
-            new_seqs.at[new_seqs.ncbi_txid == txid, 'downtorank'] = downtorank_id
+            new_seqs.loc[new_seqs['ncbi_txid'] == txid, "downtorank"] = downtorank_id
         return new_seqs
 
 
@@ -811,9 +813,12 @@ class FilterPreferredTaxa(Filter):
         else:
             excluded_preferred = filtered_new_seqs
             del_table = del_table.append(excluded_preferred)
-        self.table.at[self.table['accession'].isin(excluded_preferred.accession), 'status'] = -1
-        self.table.at[self.table['accession'].isin(
-            excluded_preferred.accession), 'status_note'] = 'excluded - not preferred across loci'
+        self.table.loc[self.table['accession'].isin(excluded_preferred.accession), 'status'] = -1
+        self.table.loc[self.table['accession'].isin(excluded_preferred.accession),
+                       'status_note'] = 'excluded - not preferred across loci'
+
+        #self.table.at[self.table['accession'].isin(
+        #    excluded_preferred.accession), 'status_note'] = 'excluded - not preferred across loci'
 
         # if self.config.downtorank is not None:
         #     if all_preferred.index.any() == True:
@@ -979,9 +984,11 @@ class FilterNumberOtu(Filter):
         not_selected = list(set(new_seqs['accession'].values) - set(self.upd_new_seqs['accession'].values))
         self.del_table = new_seqs[new_seqs['accession'].isin(not_selected)]
         if len(not_selected) > 0:
-            self.table.at[self.table['accession'].isin(not_selected), 'status_note'] = 'too many seqs of same tax_id'
-            self.table.at[self.table['accession'].isin(not_selected), 'status'] = -1
-
+            self.table.loc[self.table['accession'].isin(not_selected), "status_note"] = 'too many seqs of same tax_id'
+            self.table.loc[self.table['accession'].isin(not_selected), "status"] = -1
+            #self.table.at[self.table['accession'].isin(not_selected), 'status_note'] = 'too many seqs of same tax_id'
+            #self.table.at[self.table['accession'].isin(not_selected), 'status'] = -1
+            print(self.table['accession'].isin(not_selected))
         check_filter_numbers(not_selected, self.upd_new_seqs, new_seqs)
 
         msg = "Filter FilterNumberOtu reduced the new seqs from {} to {}.\n".format(len(new_seqs),
@@ -1367,7 +1374,7 @@ class FilterMRCA(Filter):
                 else:
                     # print('out of mrca')
                     to_del = new_seqs[select_tf]
-                    to_del.at[:, 'status'] = 'deleted - mrca'
+                    to_del['status'] = 'deleted - mrca'
                     self.del_table = pd.concat([self.del_table, to_del], axis=0, ignore_index=True, sort=True)
             elif isinstance(self.mrca, set):
                 # print(mrca_tx in self.mrca, mrca_tx, self.mrca)
@@ -1379,7 +1386,7 @@ class FilterMRCA(Filter):
                 else:
                     # print('out of mrca')
                     to_del = new_seqs[select_tf]
-                    to_del.at[:, 'status'] = 'deleted - mrca'
+                    to_del['status'] = 'deleted - mrca'
                     self.del_table = pd.concat([self.del_table, to_del], axis=0, ignore_index=True, sort=True)
             else:
                 sys.stderr.write('MRCA FILTER DOES NOT BEHAVE AS EXPECTED!')
