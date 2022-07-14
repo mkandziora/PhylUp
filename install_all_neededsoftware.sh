@@ -75,6 +75,7 @@ cd ..
 mkdir modeltest-ng
 cd modeltest-ng
 git clone --recursive https://github.com/ddarriba/modeltest
+cd modeltest
 mkdir build
 cd build
 cmake ..
@@ -84,7 +85,7 @@ echo export PATH="$PATH:$(pwd)" >> ~/.bashrc
 cd ..
 cd ..
 cd ..
-
+cd ..
 
 ###################################################
 wget ftp://ftp.ncbi.nlm.nih.gov/blast/executables/blast+/2.9.0/ncbi-blast-2.9.0+-x64-linux.tar.gz
