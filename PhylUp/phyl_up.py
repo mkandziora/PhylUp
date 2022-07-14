@@ -988,7 +988,6 @@ class FilterNumberOtu(Filter):
             self.table.loc[self.table['accession'].isin(not_selected), "status"] = -1
             #self.table.at[self.table['accession'].isin(not_selected), 'status_note'] = 'too many seqs of same tax_id'
             #self.table.at[self.table['accession'].isin(not_selected), 'status'] = -1
-            print(self.table['accession'].isin(not_selected))
         check_filter_numbers(not_selected, self.upd_new_seqs, new_seqs)
 
         msg = "Filter FilterNumberOtu reduced the new seqs from {} to {}.\n".format(len(new_seqs),
