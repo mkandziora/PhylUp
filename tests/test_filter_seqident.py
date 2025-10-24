@@ -1,5 +1,6 @@
 import os
-from distutils.dir_util import copy_tree
+#from distutils.dir_util import copy_tree
+import shutil
 import shutil
 from PhylUp import phyl_up, config
 import pandas as pd
@@ -20,7 +21,7 @@ def test_oldseq_longer():
     if not os.path.exists(tmp_folder):
         os.mkdir(tmp_folder)
     # call(['cp', '-a', 'data/tmp_for_test/', tmp_folder])
-    copy_tree('data/tmp_for_test/', tmp_folder)
+    shutil.copytree('data/tmp_for_test/', tmp_folder, dirs_exist_ok=True)
     shutil.copyfile('data/tiny_test_example/updt_aln.fasta', os.path.join(workdir, 'updt_aln.fasta'))
     shutil.copyfile('data/tiny_test_example/updt_tre.tre', os.path.join(workdir, 'updt_tre.tre'))
 
@@ -224,7 +225,8 @@ def test_filter_compare():
     if not os.path.exists(tmp_folder):
         os.mkdir(tmp_folder)
     # call(['cp', '-a', 'data/tmp_for_test/', tmp_folder])
-    copy_tree('data/tmp_for_test/', tmp_folder)
+
+    shutil.copytree('data/tmp_for_test/', tmp_folder, dirs_exist_ok=True)
     shutil.copyfile('data/tiny_test_example/updt_aln.fasta', os.path.join(workdir, 'updt_aln.fasta'))
     shutil.copyfile('data/tiny_test_example/updt_tre.tre', os.path.join(workdir, 'updt_tre.tre'))
 
@@ -319,7 +321,8 @@ def test_filter_compare_shorter():
     if not os.path.exists(tmp_folder):
         os.mkdir(tmp_folder)
     # call(['cp', '-a', 'data/tmp_for_test/', tmp_folder])
-    copy_tree('data/tmp_for_test/', tmp_folder)
+
+    shutil.copytree('data/tmp_for_test/', tmp_folder, dirs_exist_ok=True)
     shutil.copyfile('data/tiny_test_example/updt_aln.fasta', os.path.join(workdir, 'updt_aln.fasta'))
     shutil.copyfile('data/tiny_test_example/updt_tre.tre', os.path.join(workdir, 'updt_tre.tre'))
 

@@ -93,6 +93,7 @@ tar -xvf ncbi-blast-2.9.0+-x64-linux.tar.gz
 
 wget 'https://ftp.ncbi.nlm.nih.gov/pub/taxonomy/taxdump.tar.gz'
 gunzip  -cd taxdump.tar.gz | (tar xvf - names.dmp nodes.dmp)
+mkdir data
 mv *.dmp ./data/
 
 
@@ -102,7 +103,7 @@ source ~/.bashrc
 
 ##################################################
 
-# install the Genbank databse
+# install the Genbank database
 mkdir Genbank_database
 cd Genbank_database
 wget ftp://ftp.ncbi.nlm.nih.gov/blast/db/nt.* # this downloads all nt-compressed files

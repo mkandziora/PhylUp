@@ -1,13 +1,7 @@
 # package import
-import os, shutil
-from distutils.dir_util import copy_tree
-import pandas as pd
+
+import shutil
 from PhylUp import phyl_up, config, blast, phylogenetic_helpers, phylogen_updater
-import sys
-import numpy
-import datetime
-import pandas as pd
-import numpy as np
 import os
 from dendropy import Tree, DnaCharacterMatrix
 
@@ -39,7 +33,7 @@ def test_truncate_papara_aln():
     tmp_folder = os.path.join(workdir, 'tmp')
     if not os.path.exists(tmp_folder):
         os.mkdir(tmp_folder)
-    copy_tree('data/tmp_for_test/', tmp_folder)
+    shutil.copytree('data/tmp_for_test/', tmp_folder, dirs_exist_ok=True)
 
 
     ###################

@@ -1,6 +1,7 @@
 # package import
 import os, shutil
-from distutils.dir_util import copy_tree
+#from distutils.dir_util import copy_tree
+import shutil
 import pandas as pd
 from PhylUp import phyl_up, config, blast
 import sys
@@ -37,7 +38,7 @@ def xtest_standard_run():
     if not os.path.exists(tmp_folder):
         os.mkdir(tmp_folder)
     # call(['cp', '-a', 'data/tmp_for_test/', tmp_folder])
-    copy_tree('data/tmp_for_test/', tmp_folder)
+    shutil.copytree('data/tmp_for_test/', tmp_folder, dirs_exist_ok=True)
    # shutil.copyfile('data/tiny_test_example/updt_aln.fasta', os.path.join(workdir, 'updt_aln.fasta'))
    # shutil.copyfile('data/tiny_test_example/updt_tre.tre', os.path.join(workdir, 'updt_tre.tre'))
 
@@ -70,7 +71,7 @@ def test_standard_run():
     if not os.path.exists(tmp_folder):
         os.mkdir(tmp_folder)
     # call(['cp', '-a', 'data/tmp_for_test/', tmp_folder])
-    copy_tree('data/tmp_for_test/', tmp_folder)
+    shutil.copytree('data/tmp_for_test/', tmp_folder, dirs_exist_ok=True)
    # shutil.copyfile('data/tiny_test_example/updt_aln.fasta', os.path.join(workdir, 'updt_aln.fasta'))
    # shutil.copyfile('data/tiny_test_example/updt_tre.tre', os.path.join(workdir, 'updt_tre.tre'))
 
@@ -94,7 +95,7 @@ def test_standard_run():
     # assert len(table) > 1, (len(table), table)  # not the case if single seq is used as input
 
     new_seqs = test.wrapper_for_extend(1)  # todo rename to find new seqs
-
+    print(new_seqs)
     new_seqs = test.call_filter(new_seqs, test.aln)
 
     print(len(new_seqs.index))

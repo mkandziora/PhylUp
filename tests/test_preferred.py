@@ -1,10 +1,10 @@
 from PhylUp import wrapper, phylogenetic_helpers
-from distutils.dir_util import copy_tree
+#from distutils.dir_util import copy_tree
+import shutil
 from dendropy import Tree, DnaCharacterMatrix
 import ncbiTAXONparser.ncbi_data_parser as ncbi_data_parser
 
 import os
-from distutils.dir_util import copy_tree
 
 from PhylUp import phyl_up, config, blast
 
@@ -25,7 +25,7 @@ def test_prefer():
     if not os.path.exists(tmp_folder):
         os.mkdir(tmp_folder)
     # call(['cp', '-a', 'data/tmp_for_test/', tmp_folder])
-    copy_tree('data/tmp_for_test/', tmp_folder)
+    shutil.copytree('data/tmp_for_test/', tmp_folder, dirs_exist_ok=True)
 
     conf = config.ConfigObj(configfi, workdir, interactive=False)
     conf.threshold = 2
@@ -77,12 +77,11 @@ def test_prefer():
         assert i in preferred_taxa, (i, preferred_taxa)
 
 def fixtest_preferred():
-    copy_tree('tests/output/test_runs/', 'tests/output/test_run_preferred/test_its')
-    copy_tree('./data/blast_for_tests', 'tests/output/test_run_preferred/test_its/blast')
-    copy_tree('./data/blast_for_test_ets', 'tests/output/test_run_preferred/test_ets/blast')
-    copy_tree('./data/tmp_for_test_ETS', 'tests/output/test_run_preferred/test_ets/tmp')
-    copy_tree('./data/tiny_test_ETS/', 'tests/output/test_run_preferred/test_ets')
-
+    shutil.copytree('tests/output/test_runs/', 'tests/output/test_run_preferred/test_its', dirs_exist_ok=True)
+    shutil.copytree('./data/blast_for_tests', 'tests/output/test_run_preferred/test_its/blast', dirs_exist_ok=True)
+    shutil.copytree('./data/blast_for_test_ets', 'tests/output/test_run_preferred/test_ets/blast', dirs_exist_ok=True)
+    shutil.copytree('./data/tmp_for_test_ETS', 'tests/output/test_run_preferred/test_ets/tmp', dirs_exist_ok=True)
+    shutil.copytree('./data/tiny_test_ETS/', 'tests/output/test_run_preferred/test_ets', dirs_exist_ok=True)
 
     workdir = "tests/output/test_run_preferred/test_its"
     trfn = "data/tiny_test_example/test.tre"

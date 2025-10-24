@@ -1,7 +1,8 @@
 import datetime
 # import pandas as pd
 import os
-from distutils.dir_util import copy_tree
+#from distutils.dir_util import copy_tree
+import shutil
 from PhylUp import phyl_up, config, blast
 # from PhylUp import cd
 
@@ -20,7 +21,7 @@ def test_run_blast_query():
     if not os.path.exists(tmp_folder):
         os.mkdir(tmp_folder)
     #call(['cp', '-a', 'data/tmp_for_test/', tmp_folder])
-    copy_tree('data/tmp_for_test/', tmp_folder)
+    shutil.copytree('data/tmp_for_test/', tmp_folder, dirs_exist_ok=True)
 
     conf = config.ConfigObj(configfi, workdir, interactive=False)
     conf.blast_folder = os.path.abspath("./data/blast_for_tests")

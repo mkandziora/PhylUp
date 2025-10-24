@@ -1,6 +1,7 @@
 # package import
 import os, shutil
-from distutils.dir_util import copy_tree
+#from distutils.dir_util import copy_tree
+import shutil
 import pandas as pd
 from PhylUp import phyl_up, config, blast
 import sys
@@ -34,7 +35,7 @@ def test_get_full_seq():
     if not os.path.exists(tmp_folder):
         os.mkdir(tmp_folder)
     # call(['cp', '-a', 'data/tmp_for_test/', tmp_folder])
-    copy_tree('data/tmp_for_test/', tmp_folder)
+    shutil.copytree('data/tmp_for_test/', tmp_folder, dirs_exist_ok=True)
     # shutil.copyfile('data/tiny_test_example/updt_aln.fasta', os.path.join(workdir, 'updt_aln.fasta'))
     # shutil.copyfile('data/tiny_test_example/updt_tre.tre', os.path.join(workdir, 'updt_tre.tre'))
 
