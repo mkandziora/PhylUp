@@ -554,7 +554,8 @@ def read_blast_query_pandas(blast_fn, config, db_name):
                     map_id = tax_id_map[tax_id_map['accession;gi'] == acc, 'ncbi_txid']
                     data.loc[idx, 'ncbi_txid'] = map_id
         else:
-            data['ncbi_txid'].isnull().values = 0
+            # data['ncbi_txid'].isnull().values = 0
+            data.loc[data['ncbi_txid'].isnull(), 'ncbi_txid'] = 0
 
         assert len(data) == before, (before, len(data))
 

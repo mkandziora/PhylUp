@@ -434,8 +434,8 @@ class PhylogeneticUpdater:
 
                 if self.config.preferred_taxa is True:
                     if not os.path.exists(os.path.join(self.workdir, 'found_taxa.csv')):
-                        set_taxid = list(new_seqs['ncbi_txid'].values)
-                        set_taxname = list(new_seqs['ncbi_txn'].values)
+                        set_taxid = new_seqs['ncbi_txid'].to_list()
+                        set_taxname = new_seqs['ncbi_txn'].to_list()
 
                         with open(os.path.join(self.workdir, 'found_taxa.csv'), mode='wt') as f:
                             for i in range(0, len(set_taxid)):
@@ -805,14 +805,17 @@ class FilterPreferredTaxa(Filter):
             # filter for preferred taxa
             subset_newseqs_txid_df = self.prefer_taxa_from_locus(newseqs_txid_df)
             subset_newseqs_txid_df = self.prefer_different_OTU(subset_newseqs_txid_df, downtorank, self.status)
-            all_preferred = all_preferred.append(subset_newseqs_txid_df)
-
+            # all_preferred = all_preferred.append(subset_newseqs_txid_df)
+            all_preferred = pd.concat([all_preferred, subset_newseqs_txid_df], ignore_index=True)
         if not all_preferred.empty:
             excluded_preferred = new_seqs[~new_seqs['accession'].isin(all_preferred.accession)]
-            del_table = del_table.append(excluded_preferred)
+            # del_table = del_table.append(excluded_preferred)
+            del_table = pd.concat([del_table, excluded_preferred], ignore_index=True)
         else:
             excluded_preferred = filtered_new_seqs
-            del_table = del_table.append(excluded_preferred)
+            # del_table = del_table.append(excluded_preferred)
+            del_table = pd.concat([del_table, excluded_preferred], ignore_index=True)
+
         self.table.loc[self.table['accession'].isin(excluded_preferred.accession), 'status'] = -1
         self.table.loc[self.table['accession'].isin(excluded_preferred.accession),
                        'status_note'] = 'excluded - not preferred across loci'
@@ -1075,7 +1078,8 @@ class FilterNumberOtu(Filter):
                                            'pident', 'evalue', 'bitscore', 'sseq', 'title'])
             for i in range(1, amnt_missing_seq+1):
                 idxmax_val = len_seqs_new.idxmax()
-                select = select.append(filter_dict.loc[idxmax_val])
+                # select = select.append(filter_dict.loc[idxmax_val])
+                select = pd.concat([select, filter_dict.loc[idxmax_val].to_frame().T])
                 filter_dict = filter_dict.drop([idxmax_val])
                 len_seqs_new = len_seqs_new.drop([idxmax_val])
             assert len(select) == amnt_missing_seq, (len(select), amnt_missing_seq)
@@ -1232,7 +1236,8 @@ class FilterSeqIdent(Filter):
         dupl_df = self.upd_new_seqs[self.upd_new_seqs.duplicated(['ncbi_txid', 'sseq'], keep='first')]
         for ind in dupl_df.index:
             to_del = new_seqs.loc[ind]
-            self.del_table = self.del_table.append(to_del)
+            # self.del_table = self.del_table.append(to_del)
+            self.del_table = pd.concat([self.del_table, to_del.to_frame().T])
             self.upd_new_seqs = self.upd_new_seqs.drop([ind])
 
         for idx in set(self.upd_new_seqs.index):
@@ -1247,10 +1252,11 @@ class FilterSeqIdent(Filter):
                 # debug("identical seq new")
                 to_del = new_seqs.loc[idx]
                 # debug(new_seqs.loc[idx, "accession"])
-                self.del_table = self.del_table.append(to_del)
+                #self.del_table = self.del_table.append(to_del)
+                self.del_table = pd.concat([self.del_table, to_del.to_frame().T])
                 self.upd_new_seqs = self.upd_new_seqs.drop([idx])
             else:
-                same_table = self.table[self.table['status'].between(-1, self.status, inclusive=False)]
+                same_table = self.table[self.table['status'].between(-1, self.status, inclusive='neither')]
                 same_old = same_table[(same_table.sseq.str.contains(seq_compare)) &
                                       (same_table['ncbi_txid'] == int(txid_compare))]
 
@@ -1260,7 +1266,9 @@ class FilterSeqIdent(Filter):
                     # debug(new_seqs.loc[idx, "accession"])
                     to_del = self.upd_new_seqs.loc[idx]
                     # to_del = new_seqs.loc[idx]  # wrong object - fixed 1.11.2020
-                    self.del_table = self.del_table.append(to_del)
+                    # self.del_table = self.del_table.append(to_del)
+                    self.del_table = pd.concat([self.del_table, to_del.to_frame().T])
+                    # assert self.del_table['accession'].isin(to_del.to_frame().T['accession']).any()
                     self.upd_new_seqs = self.upd_new_seqs.drop([idx])
                     assert idx not in self.upd_new_seqs.index
         for index in self.del_table.index:
@@ -1280,7 +1288,7 @@ class FilterSeqIdent(Filter):
     def remove_existing_for_longer(self):
         debug("remove_existing_for_longer")
         # check if one of the new seqs is identical but longer than old
-        existing_old = self.table[self.table['status'].between(-1, self.status, inclusive=False)]
+        existing_old = self.table[self.table['status'].between(-1, self.status, inclusive='neither')]
         aln = DnaCharacterMatrix.get(path=os.path.abspath(os.path.join(self.config.workdir, "updt_aln.fasta")), schema='fasta')
         counter = 0
         for idx in existing_old.index:
@@ -1541,10 +1549,12 @@ class FilterLength(Filter):
             assert '-' not in seq
             # print(self.config.maxlen * avg_len, len(seq), self.config.minlen * avg_len)
             if self.config.maxlen * avg_len > len(seq) > self.config.minlen * avg_len:
-                filter_new_seqs = filter_new_seqs.append(new_seqs.loc[idx], ignore_index=True)
+                #filter_new_seqs = filter_new_seqs.append(new_seqs.loc[idx], ignore_index=True)
+                filter_new_seqs = pd.concat([filter_new_seqs, new_seqs.loc[idx].to_frame().T], ignore_index=True)
             else:
                 # print('too long/too short')
-                del_seq = del_seq.append(new_seqs.loc[idx], ignore_index=True)
+                #del_seq = del_seq.append(new_seqs.loc[idx], ignore_index=True)
+                del_seq = pd.concat([del_seq, new_seqs.loc[idx].to_frame().T], ignore_index=True)
                 # del_seq = pd.concat([del_seq, new_seqs.loc[idx]], ignore_index=True, sort=True)  # note:concat does not work, as it is df and series
         # important to not assign new value in the else above - it duplicates entries, thats why we have the next one
         if not del_seq.empty:
