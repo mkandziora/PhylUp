@@ -78,8 +78,8 @@ def test_filters_to_longest():
         acc_df = new_seqs[new_seqs.accession == acc]
         lenseq_acc_df = acc_df['sseq'].apply(len)
         idxmax_val = lenseq_acc_df.idxmax()
-        select = select.append(acc_df.loc[idxmax_val])
-
+        #select = select.append(acc_df.loc[idxmax_val])
+        select = pd.concat([select, acc_df.loc[idxmax_val].to_frame().T])
     assert len(select) == len_supposed, (len(select), len_supposed)
 
     # run filter from phylup

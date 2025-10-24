@@ -104,7 +104,7 @@ def test_oldseq_longer():
     assert del_tab >= 0
     assert after + del_tab == before, (after, del_tab, before)
 
-    all_avail_data = test.table[test.table['status'].between(0, test.status, inclusive=True)]
+    all_avail_data = test.table[test.table['status'].between(0, test.status, inclusive='both')]
 
     seq_table = all_avail_data['sseq']
     found = seq_table[seq_table.str.contains(old_seq_butlonger)]
@@ -170,9 +170,7 @@ def test_not_add_identical():
     print(new_ident_key)
     print(new_seqs['accession'].str.contains(new_ident_key).any())
     assert new_seqs['accession'].str.contains(new_ident_key).any() == False
-
-    all_avail_data = test.table[test.table['status'].between(0, test.status, inclusive=True)]
-
+    all_avail_data = test.table[test.table['status'].between(0, test.status, inclusive='both')]
     seq_table = all_avail_data['sseq']
     found = seq_table[seq_table.str.contains(new_ident)]
     print(found)
@@ -271,7 +269,8 @@ def test_filter_compare():
     assert new_seqs['sseq'].str.contains(new_existing_seq).any() == True
     assert new_seqs['accession'].str.contains(new_seq_acc).any() == True
     assert test.table['sseq'].str.contains(new_existing_seq).any() == True
-    print(new_seqs.index[new_seqs['sseq'].str.contains(new_existing_seq).any()])
+    #print(new_seqs.index[new_seqs['sseq'].str.contains(new_existing_seq).any()])
+    #print(new_seqs.index[new_seqs['sseq'].str.contains(new_existing_seq)])
 
 #     new_seqs = test.compare_filter(new_seqs)
     f = phyl_up.FilterSeqIdent(test.config, test.table, test.status)
@@ -290,7 +289,7 @@ def test_filter_compare():
 
     assert new_seqs['sseq'].str.contains(new_existing_seq).any() == False
 
-    all_avail_data = test.table[test.table['status'].between(0, test.status, inclusive=True)]
+    all_avail_data = test.table[test.table['status'].between(0, test.status, inclusive='both')]
 
     seq_table = all_avail_data['sseq']
     found = seq_table[seq_table.str.contains(new_existing_seq)]
@@ -383,7 +382,7 @@ def test_filter_compare_shorter():
     assert new_seqs['accession'].str.contains(new_seq_acc).any() == False
     assert new_seqs['sseq'].str.contains(new_existing_seq).any() == False
 
-    all_avail_data = test.table[test.table['status'].between(0, test.status, inclusive=True)]
+    all_avail_data = test.table[test.table['status'].between(0, test.status, inclusive='both')]
 
     seq_table = all_avail_data['sseq']
     found = seq_table[seq_table.str.contains(new_existing_seq)]
@@ -456,7 +455,7 @@ def test_filter_seqident_newexist():
     assert del_tab >= 0
     assert after + del_tab == before, (after, del_tab, before)
 
-    all_avail_data = test.table[test.table['status'].between(0, test.status, inclusive=True)]
+    all_avail_data = test.table[test.table['status'].between(0, test.status, inclusive='both')]
 
     seq_table = all_avail_data['sseq']
     found = seq_table[seq_table.str.contains(new_existing_seq)]
@@ -530,7 +529,7 @@ def test_oldseq():
     assert del_tab >= 0
     assert after + del_tab == before, (after, del_tab, before)
 
-    all_avail_data = test.table[test.table['status'].between(0, test.status, inclusive=True)]
+    all_avail_data = test.table[test.table['status'].between(0, test.status, inclusive='both')]
 
     seq_table = all_avail_data['sseq']
     found = seq_table[seq_table.str.contains(old_seq)]
@@ -603,7 +602,7 @@ def test_no_similar():
     assert del_tab >= 0
     assert after + del_tab == before, (after, del_tab, before)
 
-    all_avail_data = test.table[test.table['status'].between(0, test.status, inclusive=True)]
+    all_avail_data = test.table[test.table['status'].between(0, test.status, inclusive="both")]
 
     seq_table = all_avail_data['sseq']
     found = seq_table[seq_table.str.contains(no_similar)]
