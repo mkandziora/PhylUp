@@ -4,7 +4,7 @@ on:
   push:
     branches:
       - main
-      - dev
+      - dev_update2025
 
 jobs:
   run_python:
