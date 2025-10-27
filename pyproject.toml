@@ -11,12 +11,12 @@ license = { text = "MIT" }
 authors = [
   { name="Martha Kandziora", email="martha.kandziora@yahoo.com" }
 ]
-requires-python = ">=3.8"
+requires-python = ">=3.12"
 dependencies = [
-  "numpy>=1.15.4",
-  "DendroPy==4.4",
+  "numpy>=2.3.3",
+  "DendroPy==5.0.8",
   "pytest",
-  "pandas",
+  "pandas>=2.3.3",
   "biopython",
   "Concat @ git+https://github.com/mkandziora/phylogenetic_concatenation.git",
   "ncbiTAXONparser @ git+https://github.com/mkandziora/ncbiTAXONparser.git"
