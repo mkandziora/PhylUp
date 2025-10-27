@@ -68,6 +68,7 @@ jobs:
 
       - name: Test with pytest
         run: |
+            export PATH="$GITHUB_WORKSPACE/ncbi-blast-2.9.0+/bin:$PATH"
             pytest --cov=PhylUp tests/test_*
 
 #      - name: upload coverage
