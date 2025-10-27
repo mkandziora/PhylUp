@@ -65,11 +65,24 @@ jobs:
             blastn -version
             which makeblastdb
             makeblastdb -version
-
-      - name: Test with pytest
+      - name: Test with pytest and PATH
+        env:
+          PATH: ${{ github.workspace }}/ncbi-blast-2.9.0+/bin:${{ github.workspace }}/PaPaRa:$PATH
         run: |
-            export PATH="$GITHUB_WORKSPACE/ncbi-blast-2.9.0+/bin:$PATH"
-            pytest --cov=PhylUp tests/test_*
+          # Optional sanity check
+          which blastn
+          blastn -version
+          which makeblastdb
+          makeblastdb -version
+          which papara_static_x86_64
+      
+          # Run tests
+          pytest --cov=PhylUp tests/test_*
+
+  #     - name: Test with pytest
+   #      run: |
+  # #           export PATH="$GITHUB_WORKSPACE/ncbi-blast-2.9.0+/bin:$PATH"
+   #          pytest --cov=PhylUp tests/test_*
 
 #      - name: upload coverage
 #        run: |
