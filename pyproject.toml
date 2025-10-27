@@ -24,3 +24,12 @@ dependencies = [
 
 [project.scripts]
 phylup = "phylup.cli:main"
+
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+markers = [
+    "slow: marks slow tests",
+    "api: tests that hit the API",
+]
