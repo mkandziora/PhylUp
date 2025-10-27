@@ -29,7 +29,7 @@ jobs:
               python -m pip install --upgrade pip
               pip install pytest pytest-cov pytest-xdist codecov
               pip install -r requirements.txt
-              python setup.py install
+              pip install -e .
 
               wget ftp://ftp.ncbi.nlm.nih.gov/blast/executables/blast+/2.9.0/ncbi-blast-2.9.0+-x64-linux.tar.gz
               tar -xvf ncbi-blast-2.9.0+-x64-linux.tar.gz
