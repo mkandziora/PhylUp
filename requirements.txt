@@ -1,6 +1,6 @@
-numpy>=1.15.4
-pandas
-DendroPy==4.4
+numpy>=2.3.3
+pandas>=2.3.3
+DendroPy>=5.0.8
 biopython
 pytest
 git+https://github.com/mkandziora/phylogenetic_concatenation.git#egg=Concat
