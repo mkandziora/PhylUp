@@ -40,6 +40,8 @@ jobs:
               # Add the bin directory using full path
               BLAST_PATH="$GITHUB_WORKSPACE/ncbi-blast-2.9.0+/bin"
               echo "$BLAST_PATH" >> $GITHUB_PATH
+              chmod +x $GITHUB_WORKSPACE/ncbi-blast-2.9.0+/bin/*
+
 
               mkdir PaPaRa
               cd PaPaRa
@@ -57,6 +59,13 @@ jobs:
             mv *.dmp ./data/
             mkdir tests/output
             mkdir tests/output/test_runs
+      - name: Verify BLAST
+        run: |
+            which blastn
+            blastn -version
+            which makeblastdb
+            makeblastdb -version
+
       - name: Test with pytest
         run: |
             pytest --cov=PhylUp tests/test_*
