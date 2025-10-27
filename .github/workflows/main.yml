@@ -66,9 +66,12 @@ jobs:
             which makeblastdb
             makeblastdb -version
       - name: Test with pytest and PATH
-        env:
-          PATH: ${{ github.workspace }}/ncbi-blast-2.9.0+/bin:${{ github.workspace }}/PaPaRa:${{ runner.env.PATH }}
+   #     env:
+   #       PATH: ${{ github.workspace }}/ncbi-blast-2.9.0+/bin:${{ github.workspace }}/PaPaRa:${{ runner.env.PATH }}
         run: |
+           # Prepend BLAST and PaPaRa binaries to PATH
+          export PATH="${GITHUB_WORKSPACE}/ncbi-blast-2.9.0+/bin:${GITHUB_WORKSPACE}/PaPaRa:$PATH"
+
           # Optional sanity check
           which blastn
           blastn -version
