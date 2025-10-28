@@ -66,6 +66,11 @@ jobs:
             blastn -version
             which makeblastdb
             makeblastdb -version
+      - name: Add BLAST and PaPaRa to PATH for all steps
+        run: |
+          echo "${GITHUB_WORKSPACE}/ncbi-blast-2.9.0+/bin" >> $GITHUB_PATH
+          echo "${GITHUB_WORKSPACE}/PaPaRa" >> $GITHUB_PATH
+
             
       - name: Test with pytest
         run: |
